@@ -1,4 +1,3 @@
-import { LocalBlockchain } from 'snarkyjs/dist/node/lib/mina';
 import {
   Events,
   usersTree,
@@ -17,10 +16,9 @@ import {
   AccountUpdate,
   Poseidon,
   Signature,
-  Scalar,
 } from 'snarkyjs';
 
-let proofsEnabled = false;
+let proofsEnabled = true;
 
 describe('Events', () => {
   let deployerAccount: PublicKey,
@@ -32,6 +30,7 @@ describe('Events', () => {
     zkApp: Events;
 
   beforeAll(async () => {
+    await Rollup.compile();
     if (proofsEnabled) await Events.compile();
   });
 
@@ -53,7 +52,6 @@ describe('Events', () => {
       zkApp.deploy();
     });
     await txn.prove();
-    // this tx needs .sign(), because `deploy()` adds an account update that requires signature authorization
     await txn.sign([deployerKey, zkAppPrivateKey]).send();
   }
 
@@ -109,8 +107,6 @@ describe('Events', () => {
       post1State
     );
 
-    await Rollup.compile();
-
     const proof1 = await Rollup.postsTransition(
       transition1,
       signature,
@@ -137,5 +133,49 @@ describe('Events', () => {
     currentPostsNumber = zkApp.postsNumber.get();
     expect(currentUsersRoot).toEqual(latestUsersRoot);
     expect(currentPostsNumber).toEqual(Field(1));
+  });
+
+  it(`'createPostsTransition' fails if the signature for the message is
+  invalid`, async () => {
+    await localDeploy();
+    const initialPostsNumber = zkApp.postsNumber.get();
+
+    const hashedPost = Field(777);
+    const wrongHashedPost = Field(666);
+    const signature = Signature.create(senderKey, [hashedPost]);
+
+    const postWitness = postsTree.getWitness(hashedPost);
+
+    const post1State = new PostState({
+      postNumber: Field(1),
+      blockHeight: Field(1),
+    });
+
+    postsTree.set(hashedPost, post1State.hash());
+
+    const latestPostsRoot = postsTree.getRoot();
+    const senderAccountAsField = Poseidon.hash(senderAccount.toFields());
+
+    const userWitness = usersTree.getWitness(senderAccountAsField);
+
+    usersTree.set(senderAccountAsField, latestPostsRoot);
+
+    const latestUsersRoot = usersTree.getRoot();
+
+    expect(() => {
+      RollupTransition.createPostsTransition(
+        signature,
+        usersRoot,
+        latestUsersRoot,
+        senderAccount,
+        userWitness,
+        postsRoot,
+        latestPostsRoot,
+        wrongHashedPost,
+        postWitness,
+        initialPostsNumber,
+        post1State
+      );
+    }).toThrowError(`Bool.assertTrue(): false != true`);
   });
 });
