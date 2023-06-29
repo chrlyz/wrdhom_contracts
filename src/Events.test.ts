@@ -55,6 +55,48 @@ describe('Events', () => {
     await txn.sign([deployerKey, zkAppPrivateKey]).send();
   }
 
+  function createPostsTransitionValidInputs() {
+    const initialPostsNumber = zkApp.postsNumber.get();
+
+    const hashedPost = Field(777);
+    const signature = Signature.create(senderKey, [hashedPost]);
+
+    const postWitness = postsTree.getWitness(hashedPost);
+
+    const postState = new PostState({
+      postNumber: Field(1),
+      blockHeight: Field(1),
+    });
+
+    postsTree.set(hashedPost, postState.hash());
+
+    const latestPostsRoot = postsTree.getRoot();
+    const senderAccountAsField = Poseidon.hash(senderAccount.toFields());
+
+    const userWitness = usersTree.getWitness(senderAccountAsField);
+
+    usersTree.set(senderAccountAsField, latestPostsRoot);
+
+    const latestUsersRoot = usersTree.getRoot();
+
+    return {
+      signature: signature,
+
+      initialUsersRoot: usersRoot,
+      latestUsersRoot: latestUsersRoot,
+      userAddress: senderAccount,
+      userWitness: userWitness,
+
+      initialPostsRoot: postsRoot,
+      latestPostsRoot: latestPostsRoot,
+      hashedPost: hashedPost,
+      postWitness: postWitness,
+
+      initialPostsNumber: initialPostsNumber,
+      postState: postState,
+    };
+  }
+
   it('generates and deploys the `Events` smart contract', async () => {
     await localDeploy();
     const currentUsersRoot = zkApp.users.get();
@@ -70,60 +112,39 @@ describe('Events', () => {
     expect(currentUsersRoot).toEqual(usersRoot);
     expect(currentPostsNumber).toEqual(Field(0));
 
-    const initialPostsNumber = zkApp.postsNumber.get();
+    const valid = createPostsTransitionValidInputs();
 
-    const hashedPost = Field(777);
-    const signature = Signature.create(senderKey, [hashedPost]);
-
-    const postWitness = postsTree.getWitness(hashedPost);
-
-    const post1State = new PostState({
-      postNumber: Field(1),
-      blockHeight: Field(1),
-    });
-
-    postsTree.set(hashedPost, post1State.hash());
-
-    const latestPostsRoot = postsTree.getRoot();
-    const senderAccountAsField = Poseidon.hash(senderAccount.toFields());
-
-    const userWitness = usersTree.getWitness(senderAccountAsField);
-
-    usersTree.set(senderAccountAsField, latestPostsRoot);
-
-    const latestUsersRoot = usersTree.getRoot();
-
-    const transition1 = RollupTransition.createPostsTransition(
-      signature,
+    const transition = RollupTransition.createPostsTransition(
+      valid.signature,
       usersRoot,
-      latestUsersRoot,
+      valid.latestUsersRoot,
       senderAccount,
-      userWitness,
+      valid.userWitness,
       postsRoot,
-      latestPostsRoot,
-      hashedPost,
-      postWitness,
-      initialPostsNumber,
-      post1State
+      valid.latestPostsRoot,
+      valid.hashedPost,
+      valid.postWitness,
+      valid.initialPostsNumber,
+      valid.postState
     );
 
-    const proof1 = await Rollup.postsTransition(
-      transition1,
-      signature,
+    const proof = await Rollup.postsTransition(
+      transition,
+      valid.signature,
       usersRoot,
-      latestUsersRoot,
+      valid.latestUsersRoot,
       senderAccount,
-      userWitness,
+      valid.userWitness,
       postsRoot,
-      latestPostsRoot,
-      hashedPost,
-      postWitness,
-      initialPostsNumber,
-      post1State
+      valid.latestPostsRoot,
+      valid.hashedPost,
+      valid.postWitness,
+      valid.initialPostsNumber,
+      valid.postState
     );
 
     const txn = await Mina.transaction(senderAccount, () => {
-      zkApp.update(proof1);
+      zkApp.update(proof);
     });
 
     await txn.prove();
@@ -131,50 +152,30 @@ describe('Events', () => {
 
     currentUsersRoot = zkApp.users.get();
     currentPostsNumber = zkApp.postsNumber.get();
-    expect(currentUsersRoot).toEqual(latestUsersRoot);
+    expect(currentUsersRoot).toEqual(valid.latestUsersRoot);
     expect(currentPostsNumber).toEqual(Field(1));
   });
 
   it(`'createPostsTransition' fails if the signature for the message is
   invalid`, async () => {
     await localDeploy();
-    const initialPostsNumber = zkApp.postsNumber.get();
 
-    const hashedPost = Field(777);
-    const wrongHashedPost = Field(666);
-    const signature = Signature.create(senderKey, [hashedPost]);
-
-    const postWitness = postsTree.getWitness(hashedPost);
-
-    const post1State = new PostState({
-      postNumber: Field(1),
-      blockHeight: Field(1),
-    });
-
-    postsTree.set(hashedPost, post1State.hash());
-
-    const latestPostsRoot = postsTree.getRoot();
-    const senderAccountAsField = Poseidon.hash(senderAccount.toFields());
-
-    const userWitness = usersTree.getWitness(senderAccountAsField);
-
-    usersTree.set(senderAccountAsField, latestPostsRoot);
-
-    const latestUsersRoot = usersTree.getRoot();
+    const valid = createPostsTransitionValidInputs();
+    const signatureMismatchedHashedPost = Field(666);
 
     expect(() => {
       RollupTransition.createPostsTransition(
-        signature,
+        valid.signature,
         usersRoot,
-        latestUsersRoot,
+        valid.latestUsersRoot,
         senderAccount,
-        userWitness,
+        valid.userWitness,
         postsRoot,
-        latestPostsRoot,
-        wrongHashedPost,
-        postWitness,
-        initialPostsNumber,
-        post1State
+        valid.latestPostsRoot,
+        signatureMismatchedHashedPost,
+        valid.postWitness,
+        valid.initialPostsNumber,
+        valid.postState
       );
     }).toThrowError(`Bool.assertTrue(): false != true`);
   });
