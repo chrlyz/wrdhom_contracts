@@ -1,13 +1,11 @@
+import { EventsContract, usersTree, usersRoot } from './EventsContract';
 import {
-  Events,
-  usersTree,
-  usersRoot,
   postsTree,
   postsRoot,
   RollupTransition,
   PostState,
-  Rollup,
-} from './Events';
+  PostsRollup,
+} from './Posts';
 import {
   Field,
   Mina,
@@ -27,11 +25,11 @@ describe('Events', () => {
     senderKey: PrivateKey,
     zkAppAddress: PublicKey,
     zkAppPrivateKey: PrivateKey,
-    zkApp: Events;
+    zkApp: EventsContract;
 
   beforeAll(async () => {
-    await Rollup.compile();
-    if (proofsEnabled) await Events.compile();
+    await PostsRollup.compile();
+    if (proofsEnabled) await EventsContract.compile();
   });
 
   beforeEach(() => {
@@ -43,7 +41,7 @@ describe('Events', () => {
       Local.testAccounts[1]);
     zkAppPrivateKey = PrivateKey.random();
     zkAppAddress = zkAppPrivateKey.toPublicKey();
-    zkApp = new Events(zkAppAddress);
+    zkApp = new EventsContract(zkAppAddress);
   });
 
   async function localDeploy() {
@@ -128,7 +126,7 @@ describe('Events', () => {
       valid.postState
     );
 
-    const proof = await Rollup.postsTransition(
+    const proof = await PostsRollup.postsTransition(
       transition,
       valid.signature,
       usersRoot,

@@ -1,9 +1,5 @@
 import {
   Field,
-  SmartContract,
-  state,
-  State,
-  method,
   MerkleMap,
   Struct,
   MerkleMapWitness,
@@ -11,9 +7,7 @@ import {
   Signature,
   Poseidon,
   Experimental,
-  UInt32,
   Provable,
-  Circuit,
 } from 'snarkyjs';
 
 // ============================================================================
@@ -104,7 +98,7 @@ export class RollupTransition extends Struct({
 
 // ============================================================================
 
-export const Rollup = Experimental.ZkProgram({
+export const PostsRollup = Experimental.ZkProgram({
   publicInput: RollupTransition,
 
   methods: {
@@ -156,41 +150,7 @@ export const Rollup = Experimental.ZkProgram({
   },
 });
 
-export let RollupProof_ = Experimental.ZkProgram.Proof(Rollup);
-export class RollupProof extends RollupProof_ {}
-
-// ============================================================================
-
-export const usersTree = new MerkleMap();
-export const usersRoot = usersTree.getRoot();
-
-export class Events extends SmartContract {
-  @state(Field) users = State<Field>();
-  @state(Field) postsNumber = State<Field>();
-
-  init() {
-    super.init();
-    this.users.set(usersRoot);
-    this.postsNumber.set(Field(0));
-  }
-
-  @method update(rollupProof: RollupProof) {
-    rollupProof.verify();
-
-    this.currentSlot.assertBetween(
-      UInt32.from(rollupProof.publicInput.blockHeight.sub(Field(1))),
-      UInt32.from(rollupProof.publicInput.blockHeight.add(Field(1)))
-    );
-
-    const currentState = this.users.getAndAssertEquals();
-    rollupProof.publicInput.initialUsersRoot.assertEquals(currentState);
-
-    const currentPostsNumber = this.postsNumber.getAndAssertEquals();
-    rollupProof.publicInput.initialPostsNumber.assertEquals(currentPostsNumber);
-
-    this.users.set(rollupProof.publicInput.latestUsersRoot);
-    this.postsNumber.set(rollupProof.publicInput.latestPostsNumber);
-  }
-}
+export let PostsRollupProof_ = Experimental.ZkProgram.Proof(PostsRollup);
+export class PostsRollupProof extends PostsRollupProof_ {}
 
 // ============================================================================
