@@ -16,7 +16,7 @@ import {
   Signature,
 } from 'snarkyjs';
 
-let proofsEnabled = false;
+let proofsEnabled = true;
 
 describe('Events', () => {
   let deployerAccount: PublicKey,
@@ -154,8 +154,46 @@ describe('Events', () => {
     expect(currentPostsNumber).toEqual(Field(1));
   });
 
+  test(`if 'transition' and 'computedTransition' mismatch \
+  'PostsRollup.postsTransition()' throws `, async () => {
+    await localDeploy();
+
+    const valid = createPostsTransitionValidInputs();
+
+    const transition = RollupTransition.createPostsTransition(
+      valid.signature,
+      postsRoot,
+      valid.latestUsersRoot,
+      senderAccount,
+      valid.userWitness,
+      userPostsRoot,
+      valid.latestPostsRoot,
+      valid.hashedPost,
+      valid.postWitness,
+      valid.initialPostsNumber,
+      valid.postState
+    );
+
+    await expect(async () => {
+      const proof = await PostsRollup.postsTransition(
+        transition,
+        valid.signature,
+        Field(222),
+        valid.latestUsersRoot,
+        senderAccount,
+        valid.userWitness,
+        userPostsRoot,
+        valid.latestPostsRoot,
+        valid.hashedPost,
+        valid.postWitness,
+        valid.initialPostsNumber,
+        valid.postState
+      );
+    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
   test(`if there's a message and signature mismatch \
-  'createPostsTransition' throws a 'Bool.assertTrue()' error`, async () => {
+  'createPostsTransition()' throws a 'Bool.assertTrue()' error`, async () => {
     await localDeploy();
 
     const valid = createPostsTransitionValidInputs();
@@ -179,7 +217,7 @@ describe('Events', () => {
   });
 
   test(`if 'initialUsersRoot' and the root derived from 'userWitness' mismatch \
-  'createPostsTransition' throws a 'Field.assertEquals()' error `, async () => {
+  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
     await localDeploy();
 
     const valid = createPostsTransitionValidInputs();
