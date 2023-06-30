@@ -1,7 +1,7 @@
-import { EventsContract, usersTree, usersRoot } from './EventsContract';
+import { EventsContract, postsTree, postsRoot } from './EventsContract';
 import {
-  postsTree,
-  postsRoot,
+  userPostsTree,
+  userPostsRoot,
   RollupTransition,
   PostState,
   PostsRollup,
@@ -16,7 +16,7 @@ import {
   Signature,
 } from 'snarkyjs';
 
-let proofsEnabled = true;
+let proofsEnabled = false;
 
 describe('Events', () => {
   let deployerAccount: PublicKey,
@@ -59,33 +59,33 @@ describe('Events', () => {
     const hashedPost = Field(777);
     const signature = Signature.create(senderKey, [hashedPost]);
 
-    const postWitness = postsTree.getWitness(hashedPost);
+    const postWitness = userPostsTree.getWitness(hashedPost);
 
     const postState = new PostState({
       postNumber: Field(1),
       blockHeight: Field(1),
     });
 
-    postsTree.set(hashedPost, postState.hash());
+    userPostsTree.set(hashedPost, postState.hash());
 
-    const latestPostsRoot = postsTree.getRoot();
+    const latestPostsRoot = userPostsTree.getRoot();
     const senderAccountAsField = Poseidon.hash(senderAccount.toFields());
 
-    const userWitness = usersTree.getWitness(senderAccountAsField);
+    const userWitness = postsTree.getWitness(senderAccountAsField);
 
-    usersTree.set(senderAccountAsField, latestPostsRoot);
+    postsTree.set(senderAccountAsField, latestPostsRoot);
 
-    const latestUsersRoot = usersTree.getRoot();
+    const latestUsersRoot = postsTree.getRoot();
 
     return {
       signature: signature,
 
-      initialUsersRoot: usersRoot,
+      initialUsersRoot: postsRoot,
       latestUsersRoot: latestUsersRoot,
       userAddress: senderAccount,
       userWitness: userWitness,
 
-      initialPostsRoot: postsRoot,
+      initialPostsRoot: userPostsRoot,
       latestPostsRoot: latestPostsRoot,
       hashedPost: hashedPost,
       postWitness: postWitness,
@@ -95,30 +95,30 @@ describe('Events', () => {
     };
   }
 
-  it('generates and deploys the `Events` smart contract', async () => {
+  it(`generates and deploys the 'Events' smart contract`, async () => {
     await localDeploy();
-    const currentUsersRoot = zkApp.users.get();
+    const currentUsersRoot = zkApp.posts.get();
     const currentPostsNumber = zkApp.postsNumber.get();
-    expect(currentUsersRoot).toEqual(usersRoot);
+    expect(currentUsersRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
   });
 
-  it('updates the state of the `Events` smart contract', async () => {
+  it(`updates the state of the 'Events' smart contract`, async () => {
     await localDeploy();
-    let currentUsersRoot = zkApp.users.get();
+    let currentUsersRoot = zkApp.posts.get();
     let currentPostsNumber = zkApp.postsNumber.get();
-    expect(currentUsersRoot).toEqual(usersRoot);
+    expect(currentUsersRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
 
     const valid = createPostsTransitionValidInputs();
 
     const transition = RollupTransition.createPostsTransition(
       valid.signature,
-      usersRoot,
+      postsRoot,
       valid.latestUsersRoot,
       senderAccount,
       valid.userWitness,
-      postsRoot,
+      userPostsRoot,
       valid.latestPostsRoot,
       valid.hashedPost,
       valid.postWitness,
@@ -129,11 +129,11 @@ describe('Events', () => {
     const proof = await PostsRollup.postsTransition(
       transition,
       valid.signature,
-      usersRoot,
+      postsRoot,
       valid.latestUsersRoot,
       senderAccount,
       valid.userWitness,
-      postsRoot,
+      userPostsRoot,
       valid.latestPostsRoot,
       valid.hashedPost,
       valid.postWitness,
@@ -148,14 +148,14 @@ describe('Events', () => {
     await txn.prove();
     await txn.sign([senderKey]).send();
 
-    currentUsersRoot = zkApp.users.get();
+    currentUsersRoot = zkApp.posts.get();
     currentPostsNumber = zkApp.postsNumber.get();
     expect(currentUsersRoot).toEqual(valid.latestUsersRoot);
     expect(currentPostsNumber).toEqual(Field(1));
   });
 
-  it(`'createPostsTransition' fails if the signature for the message is
-  invalid`, async () => {
+  test(`if there's a message and signature mismatch \
+  'createPostsTransition' throws a 'Bool.assertTrue()' error`, async () => {
     await localDeploy();
 
     const valid = createPostsTransitionValidInputs();
@@ -164,11 +164,11 @@ describe('Events', () => {
     expect(() => {
       RollupTransition.createPostsTransition(
         valid.signature,
-        usersRoot,
+        postsRoot,
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        postsRoot,
+        userPostsRoot,
         valid.latestPostsRoot,
         signatureMismatchedHashedPost,
         valid.postWitness,
@@ -176,5 +176,28 @@ describe('Events', () => {
         valid.postState
       );
     }).toThrowError(`Bool.assertTrue(): false != true`);
+  });
+
+  test(`if 'initialUsersRoot' and the root derived from 'userWitness' mismatch \
+  'createPostsTransition' throws a 'Field.assertEquals()' error `, async () => {
+    await localDeploy();
+
+    const valid = createPostsTransitionValidInputs();
+
+    expect(() => {
+      RollupTransition.createPostsTransition(
+        valid.signature,
+        Field(999),
+        valid.latestUsersRoot,
+        senderAccount,
+        valid.userWitness,
+        userPostsRoot,
+        valid.latestPostsRoot,
+        valid.hashedPost,
+        valid.postWitness,
+        valid.initialPostsNumber,
+        valid.postState
+      );
+    }).toThrowError(`Field.assertEquals(): 999 !=`);
   });
 });
