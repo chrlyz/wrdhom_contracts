@@ -23,8 +23,8 @@ export class PostState extends Struct({
 
 // ============================================================================
 
-export const postsTree = new MerkleMap();
-export const postsRoot = postsTree.getRoot();
+export const userPostsTree = new MerkleMap();
+export const userPostsRoot = userPostsTree.getRoot();
 
 export class RollupTransition extends Struct({
   initialUsersRoot: Field,
@@ -53,7 +53,7 @@ export class RollupTransition extends Struct({
     isSigned.assertTrue();
 
     const zeroIfNewUser = Provable.if(
-      initialPostsRoot.equals(postsRoot),
+      initialPostsRoot.equals(userPostsRoot),
       Field(0),
       initialPostsRoot
     );
