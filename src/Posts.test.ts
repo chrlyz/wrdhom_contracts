@@ -1,11 +1,5 @@
-import { EventsContract, postsTree, postsRoot } from './EventsContract';
-import {
-  userPostsTree,
-  userPostsRoot,
-  RollupTransition,
-  PostState,
-  PostsRollup,
-} from './Posts';
+import { EventsContract } from './EventsContract';
+import { RollupTransition, PostState, PostsRollup } from './Posts';
 import {
   Field,
   Mina,
@@ -14,6 +8,7 @@ import {
   AccountUpdate,
   Poseidon,
   Signature,
+  MerkleMap,
 } from 'snarkyjs';
 
 let proofsEnabled = true;
@@ -59,6 +54,9 @@ describe('Events', () => {
     const hashedPost = Field(777);
     const signature = Signature.create(senderKey, [hashedPost]);
 
+    const userPostsTree = new MerkleMap();
+    const userPostsRoot = userPostsTree.getRoot();
+
     const postWitness = userPostsTree.getWitness(hashedPost);
 
     const postState = new PostState({
@@ -71,6 +69,9 @@ describe('Events', () => {
     const latestPostsRoot = userPostsTree.getRoot();
     const senderAccountAsField = Poseidon.hash(senderAccount.toFields());
 
+    const postsTree = new MerkleMap();
+    const postsRoot = postsTree.getRoot();
+
     const userWitness = postsTree.getWitness(senderAccountAsField);
 
     postsTree.set(senderAccountAsField, latestPostsRoot);
@@ -80,11 +81,13 @@ describe('Events', () => {
     return {
       signature: signature,
 
+      postsRoot: postsRoot,
       initialUsersRoot: postsRoot,
       latestUsersRoot: latestUsersRoot,
       userAddress: senderAccount,
       userWitness: userWitness,
 
+      userPostsRoot: userPostsRoot,
       initialPostsRoot: userPostsRoot,
       latestPostsRoot: latestPostsRoot,
       hashedPost: hashedPost,
@@ -99,6 +102,10 @@ describe('Events', () => {
     await localDeploy();
     const currentUsersRoot = zkApp.posts.get();
     const currentPostsNumber = zkApp.postsNumber.get();
+
+    const postsTree = new MerkleMap();
+    const postsRoot = postsTree.getRoot();
+
     expect(currentUsersRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
   });
@@ -107,6 +114,10 @@ describe('Events', () => {
     await localDeploy();
     let currentUsersRoot = zkApp.posts.get();
     let currentPostsNumber = zkApp.postsNumber.get();
+
+    const postsTree = new MerkleMap();
+    const postsRoot = postsTree.getRoot();
+
     expect(currentUsersRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
 
@@ -114,11 +125,11 @@ describe('Events', () => {
 
     const transition = RollupTransition.createPostsTransition(
       valid.signature,
-      postsRoot,
+      valid.postsRoot,
       valid.latestUsersRoot,
       senderAccount,
       valid.userWitness,
-      userPostsRoot,
+      valid.userPostsRoot,
       valid.latestPostsRoot,
       valid.hashedPost,
       valid.postWitness,
@@ -129,11 +140,11 @@ describe('Events', () => {
     const proof = await PostsRollup.postsTransition(
       transition,
       valid.signature,
-      postsRoot,
+      valid.postsRoot,
       valid.latestUsersRoot,
       senderAccount,
       valid.userWitness,
-      userPostsRoot,
+      valid.userPostsRoot,
       valid.latestPostsRoot,
       valid.hashedPost,
       valid.postWitness,
@@ -155,18 +166,18 @@ describe('Events', () => {
   });
 
   test(`if 'transition' and 'computedTransition' mismatch \
-  'PostsRollup.postsTransition()' throws `, async () => {
+  'PostsRollup.postsTransition()' throws 'Constraint unsatisfied' error `, async () => {
     await localDeploy();
 
     const valid = createPostsTransitionValidInputs();
 
     const transition = RollupTransition.createPostsTransition(
       valid.signature,
-      postsRoot,
+      valid.postsRoot,
       valid.latestUsersRoot,
       senderAccount,
       valid.userWitness,
-      userPostsRoot,
+      valid.userPostsRoot,
       valid.latestPostsRoot,
       valid.hashedPost,
       valid.postWitness,
@@ -182,7 +193,7 @@ describe('Events', () => {
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        userPostsRoot,
+        valid.userPostsRoot,
         valid.latestPostsRoot,
         valid.hashedPost,
         valid.postWitness,
@@ -202,11 +213,11 @@ describe('Events', () => {
     expect(() => {
       RollupTransition.createPostsTransition(
         valid.signature,
-        postsRoot,
+        valid.postsRoot,
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        userPostsRoot,
+        valid.userPostsRoot,
         valid.latestPostsRoot,
         signatureMismatchedHashedPost,
         valid.postWitness,
@@ -229,7 +240,7 @@ describe('Events', () => {
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        userPostsRoot,
+        valid.userPostsRoot,
         valid.latestPostsRoot,
         valid.hashedPost,
         valid.postWitness,
