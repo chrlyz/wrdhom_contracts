@@ -9,8 +9,8 @@ import {
 } from 'snarkyjs';
 import { PostsRollupProof } from './Posts';
 
-export const postsTree = new MerkleMap();
-export const postsRoot = postsTree.getRoot();
+const postsTree = new MerkleMap();
+const postsRoot = postsTree.getRoot();
 
 export class EventsContract extends SmartContract {
   @state(Field) posts = State<Field>();

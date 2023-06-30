@@ -23,8 +23,8 @@ export class PostState extends Struct({
 
 // ============================================================================
 
-export const userPostsTree = new MerkleMap();
-export const userPostsRoot = userPostsTree.getRoot();
+const userPostsTree = new MerkleMap();
+const userPostsRoot = userPostsTree.getRoot();
 
 export class RollupTransition extends Struct({
   initialUsersRoot: Field,
@@ -63,8 +63,11 @@ export class RollupTransition extends Struct({
     initialUsersRoot.assertEquals(usersRootBefore);
     Poseidon.hash(userAddress.toFields()).assertEquals(userKey);
 
-    const userPostsRootBefore = postWitness.computeRootAndKey(Field(0))[0];
+    const [userPostsRootBefore, postkey] = postWitness.computeRootAndKey(
+      Field(0)
+    );
     initialPostsRoot.assertEquals(userPostsRootBefore);
+    hashedPost.assertEquals(postkey);
 
     initialPostsNumber.add(Field(1)).assertEquals(postState.postNumber);
     const userPostsRootAfter = postWitness.computeRootAndKey(
