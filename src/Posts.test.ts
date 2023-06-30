@@ -56,7 +56,6 @@ describe('Events', () => {
 
     const userPostsTree = new MerkleMap();
     const userPostsRoot = userPostsTree.getRoot();
-
     const postWitness = userPostsTree.getWitness(hashedPost);
 
     const postState = new PostState({
@@ -112,12 +111,11 @@ describe('Events', () => {
 
   it(`updates the state of the 'Events' smart contract`, async () => {
     await localDeploy();
+
     let currentUsersRoot = zkApp.posts.get();
     let currentPostsNumber = zkApp.postsNumber.get();
-
     const postsTree = new MerkleMap();
     const postsRoot = postsTree.getRoot();
-
     expect(currentUsersRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
 
@@ -165,10 +163,9 @@ describe('Events', () => {
     expect(currentPostsNumber).toEqual(Field(1));
   });
 
-  test(`if 'transition' and 'computedTransition' mismatch \
+  test(`if 'transition' and 'computedTransition' mismatch,\
   'PostsRollup.postsTransition()' throws 'Constraint unsatisfied' error `, async () => {
     await localDeploy();
-
     const valid = createPostsTransitionValidInputs();
 
     const transition = RollupTransition.createPostsTransition(
@@ -189,7 +186,7 @@ describe('Events', () => {
       const proof = await PostsRollup.postsTransition(
         transition,
         valid.signature,
-        Field(222),
+        Field(111),
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
@@ -203,12 +200,32 @@ describe('Events', () => {
     }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
   });
 
-  test(`if there's a message and signature mismatch \
+  test(`if 'userAddress' and the key derived from 'userWitness' mismatch,\
+  the signature for 'hashedPost' is invalid in 'createPostsTransition()'`, async () => {
+    await localDeploy();
+    const valid = createPostsTransitionValidInputs();
+
+    expect(() => {
+      RollupTransition.createPostsTransition(
+        valid.signature,
+        valid.postsRoot,
+        valid.latestUsersRoot,
+        PrivateKey.random().toPublicKey(),
+        valid.userWitness,
+        valid.userPostsRoot,
+        valid.latestPostsRoot,
+        valid.hashedPost,
+        valid.postWitness,
+        valid.initialPostsNumber,
+        valid.postState
+      );
+    }).toThrowError(`Bool.assertTrue()`);
+  });
+
+  test(`if 'signature' is invalid for 'hashedPost',\
   'createPostsTransition()' throws a 'Bool.assertTrue()' error`, async () => {
     await localDeploy();
-
     const valid = createPostsTransitionValidInputs();
-    const signatureMismatchedHashedPost = Field(666);
 
     expect(() => {
       RollupTransition.createPostsTransition(
@@ -219,24 +236,23 @@ describe('Events', () => {
         valid.userWitness,
         valid.userPostsRoot,
         valid.latestPostsRoot,
-        signatureMismatchedHashedPost,
+        Field(111),
         valid.postWitness,
         valid.initialPostsNumber,
         valid.postState
       );
-    }).toThrowError(`Bool.assertTrue(): false != true`);
+    }).toThrowError(`Bool.assertTrue()`);
   });
 
-  test(`if 'initialUsersRoot' and the root derived from 'userWitness' mismatch \
+  test(`if 'initialUsersRoot' and the root derived from 'userWitness' mismatch,\
   'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
     await localDeploy();
-
     const valid = createPostsTransitionValidInputs();
 
     expect(() => {
       RollupTransition.createPostsTransition(
         valid.signature,
-        Field(999),
+        Field(111),
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
@@ -247,6 +263,142 @@ describe('Events', () => {
         valid.initialPostsNumber,
         valid.postState
       );
-    }).toThrowError(`Field.assertEquals(): 999 !=`);
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if 'latestUsersRoot' and the updated root mismatch,\
+  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
+    await localDeploy();
+    const valid = createPostsTransitionValidInputs();
+
+    expect(() => {
+      RollupTransition.createPostsTransition(
+        valid.signature,
+        valid.postsRoot,
+        Field(111),
+        senderAccount,
+        valid.userWitness,
+        valid.userPostsRoot,
+        valid.latestPostsRoot,
+        valid.hashedPost,
+        valid.postWitness,
+        valid.initialPostsNumber,
+        valid.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if 'initialPostsRoot' and the root derived from 'postWitness' mismatch,\
+  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
+    await localDeploy();
+    const valid = createPostsTransitionValidInputs();
+
+    expect(() => {
+      RollupTransition.createPostsTransition(
+        valid.signature,
+        valid.postsRoot,
+        valid.latestUsersRoot,
+        senderAccount,
+        valid.userWitness,
+        Field(111),
+        valid.latestPostsRoot,
+        valid.hashedPost,
+        valid.postWitness,
+        valid.initialPostsNumber,
+        valid.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if 'latestPostsRoot' and the updated root mismatch,\
+  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
+    await localDeploy();
+    const valid = createPostsTransitionValidInputs();
+
+    expect(() => {
+      RollupTransition.createPostsTransition(
+        valid.signature,
+        valid.postsRoot,
+        valid.latestUsersRoot,
+        senderAccount,
+        valid.userWitness,
+        valid.userPostsRoot,
+        Field(111),
+        valid.hashedPost,
+        valid.postWitness,
+        valid.initialPostsNumber,
+        valid.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if 'hashedPost' and the key derived from 'postWitness' mismatch,\
+  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
+    await localDeploy();
+    const valid = createPostsTransitionValidInputs();
+    const userPostsTree = new MerkleMap();
+
+    expect(() => {
+      RollupTransition.createPostsTransition(
+        valid.signature,
+        valid.postsRoot,
+        valid.latestUsersRoot,
+        senderAccount,
+        valid.userWitness,
+        valid.userPostsRoot,
+        valid.latestPostsRoot,
+        valid.hashedPost,
+        userPostsTree.getWitness(Field(111)),
+        valid.initialPostsNumber,
+        valid.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if 'initialPostsNumber' is not equal to 'postState.postNumber' minus one,\
+  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
+    await localDeploy();
+    const valid = createPostsTransitionValidInputs();
+
+    expect(() => {
+      RollupTransition.createPostsTransition(
+        valid.signature,
+        valid.postsRoot,
+        valid.latestUsersRoot,
+        senderAccount,
+        valid.userWitness,
+        valid.userPostsRoot,
+        valid.latestPostsRoot,
+        valid.hashedPost,
+        valid.postWitness,
+        valid.postState.postNumber.add(1),
+        valid.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if 'postState' doesn't generate a root equal to 'latestPostsRoot',\
+  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
+    await localDeploy();
+    const valid = createPostsTransitionValidInputs();
+
+    expect(() => {
+      RollupTransition.createPostsTransition(
+        valid.signature,
+        valid.postsRoot,
+        valid.latestUsersRoot,
+        senderAccount,
+        valid.userWitness,
+        valid.userPostsRoot,
+        valid.latestPostsRoot,
+        valid.hashedPost,
+        valid.postWitness,
+        valid.initialPostsNumber,
+        new PostState({
+          postNumber: Field(2),
+          blockHeight: Field(2),
+        })
+      );
+    }).toThrowError(`Field.assertEquals()`);
   });
 });
