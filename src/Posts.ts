@@ -8,6 +8,7 @@ import {
   Poseidon,
   Experimental,
   Provable,
+  SelfProof,
 } from 'snarkyjs';
 
 // ============================================================================
@@ -26,7 +27,7 @@ export class PostState extends Struct({
 const userPostsTree = new MerkleMap();
 const userPostsRoot = userPostsTree.getRoot();
 
-export class RollupTransition extends Struct({
+export class PostsTransition extends Struct({
   initialUsersRoot: Field,
   latestUsersRoot: Field,
   initialPostsNumber: Field,
@@ -78,7 +79,7 @@ export class RollupTransition extends Struct({
     const usersRootAfter = userWitness.computeRootAndKey(latestPostsRoot)[0];
     usersRootAfter.assertEquals(latestUsersRoot);
 
-    return new RollupTransition({
+    return new PostsTransition({
       initialUsersRoot: initialUsersRoot,
       latestUsersRoot: latestUsersRoot,
       initialPostsNumber: initialPostsNumber,
@@ -88,8 +89,8 @@ export class RollupTransition extends Struct({
   }
 
   static assertEquals(
-    transition1: RollupTransition,
-    transition2: RollupTransition
+    transition1: PostsTransition,
+    transition2: PostsTransition
   ) {
     transition1.initialUsersRoot.assertEquals(transition2.initialUsersRoot);
     transition1.latestUsersRoot.assertEquals(transition2.latestUsersRoot);
@@ -97,15 +98,28 @@ export class RollupTransition extends Struct({
     transition1.latestPostsNumber.assertEquals(transition2.latestPostsNumber);
     transition1.blockHeight.assertEquals(transition2.blockHeight);
   }
+
+  static mergePostsTransitions(
+    transition1: PostsTransition,
+    transition2: PostsTransition
+  ) {
+    return new PostsTransition({
+      initialUsersRoot: transition1.initialUsersRoot,
+      latestUsersRoot: transition2.latestUsersRoot,
+      initialPostsNumber: transition1.initialPostsNumber,
+      latestPostsNumber: transition2.latestPostsNumber,
+      blockHeight: transition2.blockHeight,
+    });
+  }
 }
 
 // ============================================================================
 
 export const PostsRollup = Experimental.ZkProgram({
-  publicInput: RollupTransition,
+  publicInput: PostsTransition,
 
   methods: {
-    postsTransition: {
+    provePostsTransition: {
       privateInputs: [
         Signature,
         Field,
@@ -121,7 +135,7 @@ export const PostsRollup = Experimental.ZkProgram({
       ],
 
       method(
-        transition: RollupTransition,
+        transition: PostsTransition,
         signature: Signature,
         initialUsersRoot: Field,
         latestUsersRoot: Field,
@@ -134,7 +148,7 @@ export const PostsRollup = Experimental.ZkProgram({
         initialPostsNumber: Field,
         postState: PostState
       ) {
-        const computedTransition = RollupTransition.createPostsTransition(
+        const computedTransition = PostsTransition.createPostsTransition(
           signature,
           initialUsersRoot,
           latestUsersRoot,
@@ -147,7 +161,46 @@ export const PostsRollup = Experimental.ZkProgram({
           initialPostsNumber,
           postState
         );
-        RollupTransition.assertEquals(computedTransition, transition);
+        PostsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+    proveMergedPostsTransitions: {
+      privateInputs: [SelfProof, SelfProof],
+
+      method(
+        mergedPostsTransitions: PostsTransition,
+        postsTransition1Proof: SelfProof<PostsTransition, undefined>,
+        postsTransition2Proof: SelfProof<PostsTransition, undefined>
+      ) {
+        postsTransition1Proof.verify();
+        postsTransition2Proof.verify();
+
+        postsTransition1Proof.publicInput.latestUsersRoot.assertEquals(
+          postsTransition2Proof.publicInput.initialUsersRoot
+        );
+        postsTransition1Proof.publicInput.initialUsersRoot.assertEquals(
+          mergedPostsTransitions.initialUsersRoot
+        );
+        postsTransition2Proof.publicInput.latestUsersRoot.assertEquals(
+          mergedPostsTransitions.latestUsersRoot
+        );
+
+        postsTransition1Proof.publicInput.latestPostsNumber.assertEquals(
+          postsTransition2Proof.publicInput.initialPostsNumber
+        );
+        postsTransition1Proof.publicInput.initialPostsNumber.assertEquals(
+          mergedPostsTransitions.initialPostsNumber
+        );
+        postsTransition2Proof.publicInput.latestPostsNumber.assertEquals(
+          mergedPostsTransitions.latestPostsNumber
+        );
+
+        postsTransition1Proof.publicInput.blockHeight.assertEquals(
+          mergedPostsTransitions.blockHeight
+        );
+        postsTransition2Proof.publicInput.blockHeight.assertEquals(
+          mergedPostsTransitions.blockHeight
+        );
       },
     },
   },
