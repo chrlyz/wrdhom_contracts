@@ -60,82 +60,43 @@ describe('Events', () => {
   ) {
     const signature = Signature.create(userKey, [hashedPost]);
 
-    if (userPostsTree == undefined) {
-      const userPostsTree = new MerkleMap();
-      const userPostsRoot = userPostsTree.getRoot();
-      const postWitness = userPostsTree.getWitness(hashedPost);
+    if (userPostsTree == undefined) userPostsTree = new MerkleMap();
+    const userPostsRoot = userPostsTree.getRoot();
+    const postWitness = userPostsTree.getWitness(hashedPost);
 
-      const postState = new PostState({
-        postNumber: postNumber,
-        blockHeight: blockHeight,
-      });
+    const postState = new PostState({
+      postNumber: postNumber,
+      blockHeight: blockHeight,
+    });
 
-      userPostsTree.set(hashedPost, postState.hash());
+    userPostsTree.set(hashedPost, postState.hash());
 
-      const latestPostsRoot = userPostsTree.getRoot();
-      const userAccountAsField = Poseidon.hash(userAccount.toFields());
+    const latestPostsRoot = userPostsTree.getRoot();
+    const userAccountAsField = Poseidon.hash(userAccount.toFields());
 
-      const postsRoot = postsTree.getRoot();
-      const userWitness = postsTree.getWitness(userAccountAsField);
+    const postsRoot = postsTree.getRoot();
+    const userWitness = postsTree.getWitness(userAccountAsField);
 
-      postsTree.set(userAccountAsField, latestPostsRoot);
+    postsTree.set(userAccountAsField, latestPostsRoot);
 
-      const latestUsersRoot = postsTree.getRoot();
+    const latestUsersRoot = postsTree.getRoot();
 
-      return {
-        signature: signature,
+    return {
+      signature: signature,
 
-        initialUsersRoot: postsRoot,
-        latestUsersRoot: latestUsersRoot,
-        userAddress: userAccount,
-        userWitness: userWitness,
+      initialUsersRoot: postsRoot,
+      latestUsersRoot: latestUsersRoot,
+      userAddress: userAccount,
+      userWitness: userWitness,
 
-        initialPostsRoot: userPostsRoot,
-        latestPostsRoot: latestPostsRoot,
-        hashedPost: hashedPost,
-        postWitness: postWitness,
+      initialPostsRoot: userPostsRoot,
+      latestPostsRoot: latestPostsRoot,
+      hashedPost: hashedPost,
+      postWitness: postWitness,
 
-        postState: postState,
-        userPostsTree: userPostsTree,
-      };
-    } else {
-      const userPostsRoot = userPostsTree.getRoot();
-      const postWitness = userPostsTree.getWitness(hashedPost);
-
-      const postState = new PostState({
-        postNumber: postNumber,
-        blockHeight: blockHeight,
-      });
-
-      userPostsTree.set(hashedPost, postState.hash());
-
-      const latestPostsRoot = userPostsTree.getRoot();
-      const userAccountAsField = Poseidon.hash(userAccount.toFields());
-
-      const postsRoot = postsTree.getRoot();
-      const userWitness = postsTree.getWitness(userAccountAsField);
-
-      postsTree.set(userAccountAsField, latestPostsRoot);
-
-      const latestUsersRoot = postsTree.getRoot();
-
-      return {
-        signature: signature,
-
-        initialUsersRoot: postsRoot,
-        latestUsersRoot: latestUsersRoot,
-        userAddress: userAccount,
-        userWitness: userWitness,
-
-        initialPostsRoot: userPostsRoot,
-        latestPostsRoot: latestPostsRoot,
-        hashedPost: hashedPost,
-        postWitness: postWitness,
-
-        postState: postState,
-        userPostsTree: userPostsTree,
-      };
-    }
+      postState: postState,
+      userPostsTree: userPostsTree,
+    };
   }
 
   it(`generates and deploys the 'Events' smart contract`, async () => {
