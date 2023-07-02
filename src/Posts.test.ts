@@ -82,13 +82,11 @@ describe('Events', () => {
     return {
       signature: signature,
 
-      postsRoot: postsRoot,
       initialUsersRoot: postsRoot,
       latestUsersRoot: latestUsersRoot,
       userAddress: senderAccount,
       userWitness: userWitness,
 
-      userPostsRoot: userPostsRoot,
       initialPostsRoot: userPostsRoot,
       latestPostsRoot: latestPostsRoot,
       hashedPost: hashedPost,
@@ -128,11 +126,11 @@ describe('Events', () => {
 
     const transition = PostsTransition.createPostsTransition(
       valid.signature,
-      valid.postsRoot,
+      valid.initialUsersRoot,
       valid.latestUsersRoot,
       senderAccount,
       valid.userWitness,
-      valid.userPostsRoot,
+      valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.hashedPost,
       valid.postWitness,
@@ -143,11 +141,11 @@ describe('Events', () => {
     const proof = await PostsRollup.provePostsTransition(
       transition,
       valid.signature,
-      valid.postsRoot,
+      valid.initialUsersRoot,
       valid.latestUsersRoot,
       senderAccount,
       valid.userWitness,
-      valid.userPostsRoot,
+      valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.hashedPost,
       valid.postWitness,
@@ -179,11 +177,11 @@ describe('Events', () => {
 
     const transition = PostsTransition.createPostsTransition(
       valid.signature,
-      valid.postsRoot,
+      valid.initialUsersRoot,
       valid.latestUsersRoot,
       senderAccount,
       valid.userWitness,
-      valid.userPostsRoot,
+      valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.hashedPost,
       valid.postWitness,
@@ -199,7 +197,7 @@ describe('Events', () => {
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        valid.userPostsRoot,
+        valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.hashedPost,
         valid.postWitness,
@@ -221,11 +219,11 @@ describe('Events', () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.postsRoot,
+        valid.initialUsersRoot,
         valid.latestUsersRoot,
         PrivateKey.random().toPublicKey(),
         valid.userWitness,
-        valid.userPostsRoot,
+        valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.hashedPost,
         valid.postWitness,
@@ -247,11 +245,11 @@ describe('Events', () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.postsRoot,
+        valid.initialUsersRoot,
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        valid.userPostsRoot,
+        valid.initialPostsRoot,
         valid.latestPostsRoot,
         Field(111),
         valid.postWitness,
@@ -277,7 +275,7 @@ describe('Events', () => {
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        valid.userPostsRoot,
+        valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.hashedPost,
         valid.postWitness,
@@ -299,11 +297,11 @@ describe('Events', () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.postsRoot,
+        valid.initialUsersRoot,
         Field(111),
         senderAccount,
         valid.userWitness,
-        valid.userPostsRoot,
+        valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.hashedPost,
         valid.postWitness,
@@ -325,7 +323,7 @@ describe('Events', () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.postsRoot,
+        valid.initialUsersRoot,
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
@@ -351,11 +349,11 @@ describe('Events', () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.postsRoot,
+        valid.initialUsersRoot,
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        valid.userPostsRoot,
+        valid.initialPostsRoot,
         Field(111),
         valid.hashedPost,
         valid.postWitness,
@@ -378,11 +376,11 @@ describe('Events', () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.postsRoot,
+        valid.initialUsersRoot,
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        valid.userPostsRoot,
+        valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.hashedPost,
         userPostsTree.getWitness(Field(111)),
@@ -404,11 +402,11 @@ describe('Events', () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.postsRoot,
+        valid.initialUsersRoot,
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        valid.userPostsRoot,
+        valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.hashedPost,
         valid.postWitness,
@@ -430,11 +428,11 @@ describe('Events', () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.postsRoot,
+        valid.initialUsersRoot,
         valid.latestUsersRoot,
         senderAccount,
         valid.userWitness,
-        valid.userPostsRoot,
+        valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.hashedPost,
         valid.postWitness,
@@ -464,11 +462,11 @@ describe('Events', () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.postsRoot,
+      valid1.initialUsersRoot,
       valid1.latestUsersRoot,
       senderAccount,
       valid1.userWitness,
-      valid1.userPostsRoot,
+      valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.hashedPost,
       valid1.postWitness,
@@ -478,11 +476,11 @@ describe('Events', () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.postsRoot,
+      valid1.initialUsersRoot,
       valid1.latestUsersRoot,
       senderAccount,
       valid1.userWitness,
-      valid1.userPostsRoot,
+      valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.hashedPost,
       valid1.postWitness,
@@ -497,11 +495,11 @@ describe('Events', () => {
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      valid2.postsRoot,
+      valid2.initialUsersRoot,
       valid2.latestUsersRoot,
       senderAccount,
       valid2.userWitness,
-      valid2.userPostsRoot,
+      valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.hashedPost,
       valid2.postWitness,
@@ -511,11 +509,11 @@ describe('Events', () => {
     const proof2 = await PostsRollup.provePostsTransition(
       transition2,
       valid2.signature,
-      valid2.postsRoot,
+      valid2.initialUsersRoot,
       valid2.latestUsersRoot,
       senderAccount,
       valid2.userWitness,
-      valid2.userPostsRoot,
+      valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.hashedPost,
       valid2.postWitness,
