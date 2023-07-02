@@ -60,7 +60,7 @@ describe('Events', () => {
   ) {
     const signature = Signature.create(userKey, [hashedPost]);
 
-    if (userPostsTree == null) {
+    if (userPostsTree == undefined) {
       const userPostsTree = new MerkleMap();
       const userPostsRoot = userPostsTree.getRoot();
       const postWitness = userPostsTree.getWitness(hashedPost);
@@ -444,6 +444,48 @@ describe('Events', () => {
         valid.latestPostsRoot,
         valid.hashedPost,
         userPostsTree.getWitness(Field(111)),
+        valid.postState.postNumber.sub(1),
+        valid.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if the post already exists, 'createPostsTransition()' throws\
+  a 'Field.assertEquals()' error`, async () => {
+    await localDeploy();
+
+    const userPostsTree = new MerkleMap();
+    const postState = new PostState({
+      postNumber: Field(1),
+      blockHeight: Field(1),
+    });
+    userPostsTree.set(Field(777), postState.hash());
+    postsTree.set(
+      Poseidon.hash(senderAccount.toFields()),
+      userPostsTree.getRoot()
+    );
+    const initialUsersRoot = postsTree.getRoot();
+
+    const valid = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1),
+      userPostsTree
+    );
+
+    expect(() => {
+      PostsTransition.createPostsTransition(
+        valid.signature,
+        initialUsersRoot,
+        valid.latestUsersRoot,
+        senderAccount,
+        valid.userWitness,
+        valid.initialPostsRoot,
+        valid.latestPostsRoot,
+        valid.hashedPost,
+        valid.postWitness,
         valid.postState.postNumber.sub(1),
         valid.postState
       );
