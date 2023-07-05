@@ -722,4 +722,749 @@ describe('Events', () => {
     expect(currentUsersRoot).toEqual(valid2.latestUsersRoot);
     expect(currentPostsNumber).toEqual(Field(2));
   });
+
+  test(`if 'latestUsersRoot' of 'postsTransition1Proof' and 'initialUsersRoot'\
+  of 'postsTransition2Proof' mismatch, 'proveMergedPostsTransitions()' throws\
+  'Constraint unsatisfied' error`, async () => {
+    await localDeploy();
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+    const proof1 = await PostsRollup.provePostsTransition(
+      transition1,
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const divergentUsersTree = new MerkleMap();
+    const divergentInitialUsersRoot = divergentUsersTree.getRoot();
+    const userAccountAsField = Poseidon.hash(deployerAccount.toFields());
+    const divergentUserWitness =
+      divergentUsersTree.getWitness(userAccountAsField);
+    const hashedPost = Field(212);
+    const signature = Signature.create(deployerKey, [hashedPost]);
+    const userPostsTree = new MerkleMap();
+    const initialPostsRoot = userPostsTree.getRoot();
+    const postWitness = userPostsTree.getWitness(hashedPost);
+    const postState = new PostState({
+      postNumber: Field(2),
+      blockHeight: Field(1),
+    });
+    userPostsTree.set(hashedPost, postState.hash());
+    const latestPostsRoot = userPostsTree.getRoot();
+    divergentUsersTree.set(userAccountAsField, latestPostsRoot);
+    const divergentLatestUsersRoot = divergentUsersTree.getRoot();
+
+    const divergentTransition2 = PostsTransition.createPostsTransition(
+      signature,
+      divergentInitialUsersRoot,
+      divergentLatestUsersRoot,
+      deployerAccount,
+      divergentUserWitness,
+      initialPostsRoot,
+      latestPostsRoot,
+      hashedPost,
+      postWitness,
+      postState.postNumber.sub(1),
+      postState
+    );
+    const proof2 = await PostsRollup.provePostsTransition(
+      divergentTransition2,
+      signature,
+      divergentInitialUsersRoot,
+      divergentLatestUsersRoot,
+      deployerAccount,
+      divergentUserWitness,
+      initialPostsRoot,
+      latestPostsRoot,
+      hashedPost,
+      postWitness,
+      postState.postNumber.sub(1),
+      postState
+    );
+
+    const mergedTransitions = new PostsTransition({
+      initialUsersRoot: valid1.initialUsersRoot,
+      latestUsersRoot: divergentLatestUsersRoot,
+      initialPostsNumber: valid1.postState.postNumber.sub(1),
+      latestPostsNumber: postState.postNumber,
+      blockHeight: postState.blockHeight,
+    });
+
+    await expect(async () => {
+      await PostsRollup.proveMergedPostsTransitions(
+        mergedTransitions,
+        proof1,
+        proof2
+      );
+    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
+  test(`if 'initialUsersRoot' of 'postsTransition1Proof' and 'initialUsersRoot'\
+  of 'mergedPostsTransitions' mismatch, 'proveMergedPostsTransitions()' throws\
+  'Constraint unsatisfied' error`, async () => {
+    await localDeploy();
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+    const proof1 = await PostsRollup.provePostsTransition(
+      transition1,
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const valid2 = createPostsTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      Field(212),
+      Field(2),
+      Field(1)
+    );
+    const transition2 = PostsTransition.createPostsTransition(
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+    const proof2 = await PostsRollup.provePostsTransition(
+      transition2,
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+
+    const mergedTransitions = new PostsTransition({
+      initialUsersRoot: Field(111),
+      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsNumber: valid1.postState.postNumber.sub(1),
+      latestPostsNumber: valid2.postState.postNumber,
+      blockHeight: valid2.postState.blockHeight,
+    });
+
+    await expect(async () => {
+      await PostsRollup.proveMergedPostsTransitions(
+        mergedTransitions,
+        proof1,
+        proof2
+      );
+    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
+  test(`if 'latestUsersRoot' of 'postsTransition2Proof'  and 'latestUsersRoot'\
+  of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
+  'Constraint unsatisfied' error`, async () => {
+    await localDeploy();
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+    const proof1 = await PostsRollup.provePostsTransition(
+      transition1,
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const valid2 = createPostsTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      Field(212),
+      Field(2),
+      Field(1)
+    );
+    const transition2 = PostsTransition.createPostsTransition(
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+    const proof2 = await PostsRollup.provePostsTransition(
+      transition2,
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+
+    const mergedTransitions = new PostsTransition({
+      initialUsersRoot: valid1.initialUsersRoot,
+      latestUsersRoot: Field(111),
+      initialPostsNumber: valid1.postState.postNumber.sub(1),
+      latestPostsNumber: valid2.postState.postNumber,
+      blockHeight: valid2.postState.blockHeight,
+    });
+
+    await expect(async () => {
+      await PostsRollup.proveMergedPostsTransitions(
+        mergedTransitions,
+        proof1,
+        proof2
+      );
+    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
+  test(`if 'latestPostsNumber' of 'postsTransition1Proof' and 'initialPostsNumber'\
+  of 'postsTransition2Proof' mismatch, 'provePostsTransition()' throws\
+  'Constraint unsatisfied' error`, async () => {
+    await localDeploy();
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+    const proof1 = await PostsRollup.provePostsTransition(
+      transition1,
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const valid2 = createPostsTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      Field(212),
+      Field(1),
+      Field(1)
+    );
+    const transition2 = PostsTransition.createPostsTransition(
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+    const proof2 = await PostsRollup.provePostsTransition(
+      transition2,
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+
+    const mergedTransitions = PostsTransition.mergePostsTransitions(
+      transition1,
+      transition2
+    );
+
+    await expect(async () => {
+      await PostsRollup.proveMergedPostsTransitions(
+        mergedTransitions,
+        proof1,
+        proof2
+      );
+    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
+  test(`if 'initialPostsNumber' of 'postsTransition1Proof' and 'initialPostsNumber'\
+  of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
+  'Constraint unsatisfied' error`, async () => {
+    await localDeploy();
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+    const proof1 = await PostsRollup.provePostsTransition(
+      transition1,
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const valid2 = createPostsTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      Field(212),
+      Field(2),
+      Field(1)
+    );
+    const transition2 = PostsTransition.createPostsTransition(
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+    const proof2 = await PostsRollup.provePostsTransition(
+      transition2,
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+
+    const mergedTransitions = new PostsTransition({
+      initialUsersRoot: valid1.initialUsersRoot,
+      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsNumber: Field(6),
+      latestPostsNumber: valid2.postState.postNumber,
+      blockHeight: valid2.postState.blockHeight,
+    });
+
+    await expect(async () => {
+      await PostsRollup.proveMergedPostsTransitions(
+        mergedTransitions,
+        proof1,
+        proof2
+      );
+    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
+  test(`if 'latestPostsNumber' of 'postsTransition2Proof' and 'latestPostsNumber'\
+  of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
+  'Constraint unsatisfied' error`, async () => {
+    await localDeploy();
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+    const proof1 = await PostsRollup.provePostsTransition(
+      transition1,
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const valid2 = createPostsTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      Field(212),
+      Field(2),
+      Field(1)
+    );
+    const transition2 = PostsTransition.createPostsTransition(
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+    const proof2 = await PostsRollup.provePostsTransition(
+      transition2,
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+
+    const mergedTransitions = new PostsTransition({
+      initialUsersRoot: valid1.initialUsersRoot,
+      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsNumber: valid1.postState.postNumber.sub(1),
+      latestPostsNumber: Field(6),
+      blockHeight: valid2.postState.blockHeight,
+    });
+
+    await expect(async () => {
+      await PostsRollup.proveMergedPostsTransitions(
+        mergedTransitions,
+        proof1,
+        proof2
+      );
+    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
+  test(`if 'blockHeight' of 'postsTransition1Proof' and 'blockHeight'\
+  of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
+  'Constraint unsatisfied' error`, async () => {
+    await localDeploy();
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(6)
+    );
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+    const proof1 = await PostsRollup.provePostsTransition(
+      transition1,
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const valid2 = createPostsTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      Field(212),
+      Field(2),
+      Field(5)
+    );
+    const transition2 = PostsTransition.createPostsTransition(
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+    const proof2 = await PostsRollup.provePostsTransition(
+      transition2,
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+
+    const mergedTransitions = new PostsTransition({
+      initialUsersRoot: valid1.initialUsersRoot,
+      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsNumber: valid1.postState.postNumber.sub(1),
+      latestPostsNumber: valid2.postState.postNumber,
+      blockHeight: Field(5),
+    });
+
+    await expect(async () => {
+      await PostsRollup.proveMergedPostsTransitions(
+        mergedTransitions,
+        proof1,
+        proof2
+      );
+    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
+  test(`if 'blockHeight' of 'postsTransition2Proof' and 'blockHeight'\
+  of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
+  'Constraint unsatisfied' error`, async () => {
+    await localDeploy();
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(7)
+    );
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+    const proof1 = await PostsRollup.provePostsTransition(
+      transition1,
+      valid1.signature,
+      valid1.initialUsersRoot,
+      valid1.latestUsersRoot,
+      senderAccount,
+      valid1.userWitness,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.hashedPost,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const valid2 = createPostsTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      Field(212),
+      Field(2),
+      Field(6)
+    );
+    const transition2 = PostsTransition.createPostsTransition(
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+    const proof2 = await PostsRollup.provePostsTransition(
+      transition2,
+      valid2.signature,
+      valid2.initialUsersRoot,
+      valid2.latestUsersRoot,
+      deployerAccount,
+      valid2.userWitness,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.hashedPost,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+
+    const mergedTransitions = new PostsTransition({
+      initialUsersRoot: valid1.initialUsersRoot,
+      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsNumber: valid1.postState.postNumber.sub(1),
+      latestPostsNumber: valid2.postState.postNumber,
+      blockHeight: Field(7),
+    });
+
+    await expect(async () => {
+      await PostsRollup.proveMergedPostsTransitions(
+        mergedTransitions,
+        proof1,
+        proof2
+      );
+    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
 });
