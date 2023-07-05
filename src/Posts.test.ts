@@ -1086,10 +1086,13 @@ describe('Events', () => {
       valid2.postState
     );
 
-    const mergedTransitions = PostsTransition.mergePostsTransitions(
-      transition1,
-      transition2
-    );
+    const mergedTransitions = new PostsTransition({
+      initialUsersRoot: valid1.initialUsersRoot,
+      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsNumber: valid1.postState.postNumber.sub(1),
+      latestPostsNumber: valid2.postState.postNumber,
+      blockHeight: valid2.postState.blockHeight,
+    });
 
     await expect(async () => {
       await PostsRollup.proveMergedPostsTransitions(

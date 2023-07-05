@@ -103,6 +103,10 @@ export class PostsTransition extends Struct({
     transition1: PostsTransition,
     transition2: PostsTransition
   ) {
+    transition1.latestUsersRoot.assertEquals(transition2.initialUsersRoot);
+    transition1.latestPostsNumber.assertEquals(transition2.initialPostsNumber);
+    transition1.blockHeight.assertEquals(transition2.blockHeight);
+
     return new PostsTransition({
       initialUsersRoot: transition1.initialUsersRoot,
       latestUsersRoot: transition2.latestUsersRoot,
