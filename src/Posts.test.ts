@@ -13,7 +13,7 @@ import {
 
 let proofsEnabled = true;
 
-describe('Events', () => {
+describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
   let deployerAccount: PublicKey,
     deployerKey: PrivateKey,
     senderAccount: PublicKey,
@@ -99,7 +99,7 @@ describe('Events', () => {
     };
   }
 
-  it(`generates and deploys the 'Events' smart contract`, async () => {
+  it(`generates and deploys the 'EventsContract'`, async () => {
     await localDeploy();
     const currentUsersRoot = zkApp.posts.get();
     const currentPostsNumber = zkApp.postsNumber.get();
@@ -111,7 +111,7 @@ describe('Events', () => {
     expect(currentPostsNumber).toEqual(Field(0));
   });
 
-  it(`updates the state of the 'Events' smart contract`, async () => {
+  it(`updates the state of the 'EventsContract'`, async () => {
     await localDeploy();
 
     let currentUsersRoot = zkApp.posts.get();
@@ -212,6 +212,59 @@ describe('Events', () => {
         valid.postState
       );
     }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
+  test(`if 'postState.blockHeight' and 'currentSlot' at the moment of\
+  transaction inclusion mismatch, 'EventsContract.update()' throws\
+  'Valid_while_precondition_unsatisfied' error`, async () => {
+    await localDeploy();
+
+    const valid = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(2)
+    );
+
+    const transition = PostsTransition.createPostsTransition(
+      valid.signature,
+      valid.initialUsersRoot,
+      valid.latestUsersRoot,
+      senderAccount,
+      valid.userWitness,
+      valid.initialPostsRoot,
+      valid.latestPostsRoot,
+      valid.hashedPost,
+      valid.postWitness,
+      valid.postState.postNumber.sub(1),
+      valid.postState
+    );
+
+    const proof = await PostsRollup.provePostsTransition(
+      transition,
+      valid.signature,
+      valid.initialUsersRoot,
+      valid.latestUsersRoot,
+      senderAccount,
+      valid.userWitness,
+      valid.initialPostsRoot,
+      valid.latestPostsRoot,
+      valid.hashedPost,
+      valid.postWitness,
+      valid.postState.postNumber.sub(1),
+      valid.postState
+    );
+
+    const txn = await Mina.transaction(senderAccount, () => {
+      zkApp.update(proof);
+    });
+
+    await txn.prove();
+
+    await expect(async () => {
+      await txn.sign([senderKey]).send();
+    }).rejects.toThrowError(`Valid_while_precondition_unsatisfied`);
   });
 
   test(`if 'userAddress' and the key derived from 'userWitness' mismatch,\
