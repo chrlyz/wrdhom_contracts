@@ -23,4 +23,4 @@ npm run coverage
 
 ## License
 
-[GPL-3.0](LICENSE)
+[AGPL](LICENSE)
