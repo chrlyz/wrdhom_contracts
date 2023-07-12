@@ -1,21 +1,33 @@
-# Mina zkApp: Proof_of_events
+# Proof Of Events
 
-This template uses TypeScript.
+Mina smart contract and zkPrograms to power an auditable, resilient, and credibly neutral social media platform.
 
-## How to build
+## Clone
+
+```sh
+git clone git@github.com:chrlyz/proof_of_events.git
+```
+
+## Install
+
+```sh
+npm install
+```
+
+## Build
 
 ```sh
 npm run build
 ```
 
-## How to run tests
+## Run tests
 
 ```sh
 npm run test
 npm run testw # watch mode
 ```
 
-## How to run coverage
+## Run coverage
 
 ```sh
 npm run coverage
