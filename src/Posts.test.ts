@@ -55,47 +55,31 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     userKey: PrivateKey,
     hashedPost: Field,
     postNumber: Field,
-    blockHeight: Field,
-    userPostsTree?: MerkleMap
+    blockHeight: Field
   ) {
     const signature = Signature.create(userKey, [hashedPost]);
-
-    if (userPostsTree == undefined) userPostsTree = new MerkleMap();
-    const userPostsRoot = userPostsTree.getRoot();
-    const postWitness = userPostsTree.getWitness(hashedPost);
+    const postsRoot = postsTree.getRoot();
+    const postKey = Poseidon.hash(userAccount.toFields().concat(hashedPost));
+    const postWitness = postsTree.getWitness(postKey);
 
     const postState = new PostState({
       postNumber: postNumber,
       blockHeight: blockHeight,
     });
 
-    userPostsTree.set(hashedPost, postState.hash());
-
-    const latestPostsRoot = userPostsTree.getRoot();
-    const userAccountAsField = Poseidon.hash(userAccount.toFields());
-
-    const postsRoot = postsTree.getRoot();
-    const userWitness = postsTree.getWitness(userAccountAsField);
-
-    postsTree.set(userAccountAsField, latestPostsRoot);
-
+    postsTree.set(postKey, postState.hash());
     const latestUsersRoot = postsTree.getRoot();
 
     return {
       signature: signature,
-
-      initialUsersRoot: postsRoot,
-      latestUsersRoot: latestUsersRoot,
       userAddress: userAccount,
-      userWitness: userWitness,
-
-      initialPostsRoot: userPostsRoot,
-      latestPostsRoot: latestPostsRoot,
       hashedPost: hashedPost,
+
+      initialPostsRoot: postsRoot,
+      latestPostsRoot: latestUsersRoot,
       postWitness: postWitness,
 
       postState: postState,
-      userPostsTree: userPostsTree,
     };
   }
 
@@ -103,10 +87,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     await localDeploy();
     const currentUsersRoot = zkApp.posts.get();
     const currentPostsNumber = zkApp.postsNumber.get();
-
-    const postsTree = new MerkleMap();
     const postsRoot = postsTree.getRoot();
-
     expect(currentUsersRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
   });
@@ -116,7 +97,6 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
 
     let currentUsersRoot = zkApp.posts.get();
     let currentPostsNumber = zkApp.postsNumber.get();
-    const postsTree = new MerkleMap();
     const postsRoot = postsTree.getRoot();
     expect(currentUsersRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
@@ -131,13 +111,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
 
     const transition = PostsTransition.createPostsTransition(
       valid.signature,
-      valid.initialUsersRoot,
-      valid.latestUsersRoot,
       senderAccount,
-      valid.userWitness,
+      valid.hashedPost,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
-      valid.hashedPost,
       valid.postWitness,
       valid.postState.postNumber.sub(1),
       valid.postState
@@ -146,13 +123,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof = await PostsRollup.provePostsTransition(
       transition,
       valid.signature,
-      valid.initialUsersRoot,
-      valid.latestUsersRoot,
       senderAccount,
-      valid.userWitness,
+      valid.hashedPost,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
-      valid.hashedPost,
       valid.postWitness,
       valid.postState.postNumber.sub(1),
       valid.postState
@@ -167,7 +141,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
 
     currentUsersRoot = zkApp.posts.get();
     currentPostsNumber = zkApp.postsNumber.get();
-    expect(currentUsersRoot).toEqual(valid.latestUsersRoot);
+    expect(currentUsersRoot).toEqual(valid.latestPostsRoot);
     expect(currentPostsNumber).toEqual(Field(1));
   });
 
@@ -184,13 +158,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
 
     const transition = PostsTransition.createPostsTransition(
       valid.signature,
-      valid.initialUsersRoot,
-      valid.latestUsersRoot,
       senderAccount,
-      valid.userWitness,
+      valid.hashedPost,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
-      valid.hashedPost,
       valid.postWitness,
       valid.postState.postNumber.sub(1),
       valid.postState
@@ -200,13 +171,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       const proof = await PostsRollup.provePostsTransition(
         transition,
         valid.signature,
-        Field(111),
-        valid.latestUsersRoot,
         senderAccount,
-        valid.userWitness,
-        valid.initialPostsRoot,
-        valid.latestPostsRoot,
         valid.hashedPost,
+        Field(111),
+        valid.latestPostsRoot,
         valid.postWitness,
         valid.postState.postNumber.sub(1),
         valid.postState
@@ -229,13 +197,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
 
     const transition = PostsTransition.createPostsTransition(
       valid.signature,
-      valid.initialUsersRoot,
-      valid.latestUsersRoot,
       senderAccount,
-      valid.userWitness,
+      valid.hashedPost,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
-      valid.hashedPost,
       valid.postWitness,
       valid.postState.postNumber.sub(1),
       valid.postState
@@ -244,13 +209,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof = await PostsRollup.provePostsTransition(
       transition,
       valid.signature,
-      valid.initialUsersRoot,
-      valid.latestUsersRoot,
       senderAccount,
-      valid.userWitness,
+      valid.hashedPost,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
-      valid.hashedPost,
       valid.postWitness,
       valid.postState.postNumber.sub(1),
       valid.postState
@@ -267,7 +229,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     }).rejects.toThrowError(`Valid_while_precondition_unsatisfied`);
   });
 
-  test(`if 'userAddress' and the key derived from 'userWitness' mismatch,\
+  test(`if 'hashedPost' is signed by a different account,\
   the signature for 'hashedPost' is invalid in 'createPostsTransition()'`, async () => {
     await localDeploy();
     const valid = createPostsTransitionValidInputs(
@@ -281,13 +243,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.initialUsersRoot,
-        valid.latestUsersRoot,
         PrivateKey.random().toPublicKey(),
-        valid.userWitness,
+        valid.hashedPost,
         valid.initialPostsRoot,
         valid.latestPostsRoot,
-        valid.hashedPost,
         valid.postWitness,
         valid.postState.postNumber.sub(1),
         valid.postState
@@ -309,74 +268,15 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.initialUsersRoot,
-        valid.latestUsersRoot,
         senderAccount,
-        valid.userWitness,
+        Field(111),
         valid.initialPostsRoot,
         valid.latestPostsRoot,
-        Field(111),
         valid.postWitness,
         valid.postState.postNumber.sub(1),
         valid.postState
       );
     }).toThrowError(`Bool.assertTrue()`);
-  });
-
-  test(`if 'initialUsersRoot' and the root derived from 'userWitness' mismatch,\
-  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
-    await localDeploy();
-    const valid = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-
-    expect(() => {
-      PostsTransition.createPostsTransition(
-        valid.signature,
-        Field(111),
-        valid.latestUsersRoot,
-        senderAccount,
-        valid.userWitness,
-        valid.initialPostsRoot,
-        valid.latestPostsRoot,
-        valid.hashedPost,
-        valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        valid.postState
-      );
-    }).toThrowError(`Field.assertEquals()`);
-  });
-
-  test(`if 'latestUsersRoot' and the updated root mismatch,\
-  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
-    await localDeploy();
-    const valid = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-
-    expect(() => {
-      PostsTransition.createPostsTransition(
-        valid.signature,
-        valid.initialUsersRoot,
-        Field(111),
-        senderAccount,
-        valid.userWitness,
-        valid.initialPostsRoot,
-        valid.latestPostsRoot,
-        valid.hashedPost,
-        valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        valid.postState
-      );
-    }).toThrowError(`Field.assertEquals()`);
   });
 
   test(`if 'initialPostsRoot' and the root derived from 'postWitness' mismatch,\
@@ -393,13 +293,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.initialUsersRoot,
-        valid.latestUsersRoot,
         senderAccount,
-        valid.userWitness,
+        valid.hashedPost,
         Field(111),
         valid.latestPostsRoot,
-        valid.hashedPost,
         valid.postWitness,
         valid.postState.postNumber.sub(1),
         valid.postState
@@ -421,43 +318,11 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.initialUsersRoot,
-        valid.latestUsersRoot,
         senderAccount,
-        valid.userWitness,
+        valid.hashedPost,
         valid.initialPostsRoot,
         Field(111),
-        valid.hashedPost,
         valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        valid.postState
-      );
-    }).toThrowError(`Field.assertEquals()`);
-  });
-
-  test(`if 'hashedPost' and the key derived from 'postWitness' mismatch,\
-  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
-    await localDeploy();
-    const valid = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-    const userPostsTree = new MerkleMap();
-
-    expect(() => {
-      PostsTransition.createPostsTransition(
-        valid.signature,
-        valid.initialUsersRoot,
-        valid.latestUsersRoot,
-        senderAccount,
-        valid.userWitness,
-        valid.initialPostsRoot,
-        valid.latestPostsRoot,
-        valid.hashedPost,
-        userPostsTree.getWitness(Field(111)),
         valid.postState.postNumber.sub(1),
         valid.postState
       );
@@ -468,37 +333,32 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
   a 'Field.assertEquals()' error`, async () => {
     await localDeploy();
 
-    const userPostsTree = new MerkleMap();
+    const hashedPost = Field(777);
     const postState = new PostState({
       postNumber: Field(1),
       blockHeight: Field(1),
     });
-    userPostsTree.set(Field(777), postState.hash());
     postsTree.set(
-      Poseidon.hash(senderAccount.toFields()),
-      userPostsTree.getRoot()
+      Poseidon.hash(senderAccount.toFields().concat(hashedPost)),
+      postState.hash()
     );
-    const initialUsersRoot = postsTree.getRoot();
+    const initialPostsRoot = postsTree.getRoot();
 
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      hashedPost,
       Field(1),
-      Field(1),
-      userPostsTree
+      Field(1)
     );
 
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        initialUsersRoot,
-        valid.latestUsersRoot,
         senderAccount,
-        valid.userWitness,
-        valid.initialPostsRoot,
-        valid.latestPostsRoot,
         valid.hashedPost,
+        initialPostsRoot,
+        valid.latestPostsRoot,
         valid.postWitness,
         valid.postState.postNumber.sub(1),
         valid.postState
@@ -520,15 +380,12 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.initialUsersRoot,
-        valid.latestUsersRoot,
         senderAccount,
-        valid.userWitness,
+        valid.hashedPost,
         valid.initialPostsRoot,
         valid.latestPostsRoot,
-        valid.hashedPost,
         valid.postWitness,
-        valid.postState.postNumber.add(1),
+        valid.postState.postNumber,
         valid.postState
       );
     }).toThrowError(`Field.assertEquals()`);
@@ -548,13 +405,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        valid.initialUsersRoot,
-        valid.latestUsersRoot,
         senderAccount,
-        valid.userWitness,
+        valid.hashedPost,
         valid.initialPostsRoot,
         valid.latestPostsRoot,
-        valid.hashedPost,
         valid.postWitness,
         valid.postState.postNumber.sub(1),
         new PostState({
@@ -570,7 +424,6 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
 
     let currentUsersRoot = zkApp.posts.get();
     let currentPostsNumber = zkApp.postsNumber.get();
-    const postsTree = new MerkleMap();
     const postsRoot = postsTree.getRoot();
     expect(currentUsersRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
@@ -584,13 +437,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -598,13 +448,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -615,18 +462,14 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       senderKey,
       Field(212),
       Field(2),
-      Field(1),
-      valid1.userPostsTree
+      Field(1)
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       senderAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -634,13 +477,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof2 = await PostsRollup.provePostsTransition(
       transition2,
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       senderAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -667,7 +507,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
 
     currentUsersRoot = zkApp.posts.get();
     currentPostsNumber = zkApp.postsNumber.get();
-    expect(currentUsersRoot).toEqual(valid2.latestUsersRoot);
+    expect(currentUsersRoot).toEqual(valid2.latestPostsRoot);
     expect(currentPostsNumber).toEqual(Field(2));
   });
 
@@ -676,7 +516,6 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
 
     let currentUsersRoot = zkApp.posts.get();
     let currentPostsNumber = zkApp.postsNumber.get();
-    const postsTree = new MerkleMap();
     const postsRoot = postsTree.getRoot();
     expect(currentUsersRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
@@ -690,13 +529,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -704,13 +540,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -725,13 +558,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -739,13 +569,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof2 = await PostsRollup.provePostsTransition(
       transition2,
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -772,11 +599,11 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
 
     currentUsersRoot = zkApp.posts.get();
     currentPostsNumber = zkApp.postsNumber.get();
-    expect(currentUsersRoot).toEqual(valid2.latestUsersRoot);
+    expect(currentUsersRoot).toEqual(valid2.latestPostsRoot);
     expect(currentPostsNumber).toEqual(Field(2));
   });
 
-  test(`if 'latestUsersRoot' of 'postsTransition1Proof' and 'initialUsersRoot'\
+  test(`if 'latestPostsRoot' of 'postsTransition1Proof' and 'initialPostsRoot'\
   of 'postsTransition2Proof' mismatch, 'proveMergedPostsTransitions()' throws\
   'Constraint unsatisfied' error`, async () => {
     await localDeploy();
@@ -790,13 +617,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -804,68 +628,55 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
 
-    const divergentUsersTree = new MerkleMap();
-    const divergentInitialUsersRoot = divergentUsersTree.getRoot();
-    const userAccountAsField = Poseidon.hash(deployerAccount.toFields());
-    const divergentUserWitness =
-      divergentUsersTree.getWitness(userAccountAsField);
+    const divergentPostsTree = new MerkleMap();
+    const divergentInitialPostsRoot = divergentPostsTree.getRoot();
     const hashedPost = Field(212);
+    const postKey = Poseidon.hash(
+      deployerAccount.toFields().concat(hashedPost)
+    );
+    const divergentPostWitness = divergentPostsTree.getWitness(postKey);
     const signature = Signature.create(deployerKey, [hashedPost]);
-    const userPostsTree = new MerkleMap();
-    const initialPostsRoot = userPostsTree.getRoot();
-    const postWitness = userPostsTree.getWitness(hashedPost);
     const postState = new PostState({
       postNumber: Field(2),
       blockHeight: Field(1),
     });
-    userPostsTree.set(hashedPost, postState.hash());
-    const latestPostsRoot = userPostsTree.getRoot();
-    divergentUsersTree.set(userAccountAsField, latestPostsRoot);
-    const divergentLatestUsersRoot = divergentUsersTree.getRoot();
+    divergentPostsTree.set(postKey, postState.hash());
+    const divergentLatestPostsRoot = divergentPostsTree.getRoot();
 
     const divergentTransition2 = PostsTransition.createPostsTransition(
       signature,
-      divergentInitialUsersRoot,
-      divergentLatestUsersRoot,
       deployerAccount,
-      divergentUserWitness,
-      initialPostsRoot,
-      latestPostsRoot,
       hashedPost,
-      postWitness,
+      divergentInitialPostsRoot,
+      divergentLatestPostsRoot,
+      divergentPostWitness,
       postState.postNumber.sub(1),
       postState
     );
     const proof2 = await PostsRollup.provePostsTransition(
       divergentTransition2,
       signature,
-      divergentInitialUsersRoot,
-      divergentLatestUsersRoot,
       deployerAccount,
-      divergentUserWitness,
-      initialPostsRoot,
-      latestPostsRoot,
       hashedPost,
-      postWitness,
+      divergentInitialPostsRoot,
+      divergentLatestPostsRoot,
+      divergentPostWitness,
       postState.postNumber.sub(1),
       postState
     );
 
     const mergedTransitions = new PostsTransition({
-      initialUsersRoot: valid1.initialUsersRoot,
-      latestUsersRoot: divergentLatestUsersRoot,
+      initialPostsRoot: valid1.initialPostsRoot,
+      latestPostsRoot: divergentLatestPostsRoot,
       initialPostsNumber: valid1.postState.postNumber.sub(1),
       latestPostsNumber: postState.postNumber,
       blockHeight: postState.blockHeight,
@@ -880,7 +691,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
   });
 
-  test(`if 'initialUsersRoot' of 'postsTransition1Proof' and 'initialUsersRoot'\
+  test(`if 'initialPostsRoot' of 'postsTransition1Proof' and 'initialPostsRoot'\
   of 'mergedPostsTransitions' mismatch, 'proveMergedPostsTransitions()' throws\
   'Constraint unsatisfied' error`, async () => {
     await localDeploy();
@@ -894,13 +705,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -908,13 +716,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -929,13 +734,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -943,21 +745,18 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof2 = await PostsRollup.provePostsTransition(
       transition2,
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
 
     const mergedTransitions = new PostsTransition({
-      initialUsersRoot: Field(111),
-      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsRoot: Field(111),
+      latestPostsRoot: valid2.latestPostsRoot,
       initialPostsNumber: valid1.postState.postNumber.sub(1),
       latestPostsNumber: valid2.postState.postNumber,
       blockHeight: valid2.postState.blockHeight,
@@ -972,7 +771,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
   });
 
-  test(`if 'latestUsersRoot' of 'postsTransition2Proof'  and 'latestUsersRoot'\
+  test(`if 'latestPostsRoot' of 'postsTransition2Proof'  and 'latestPostsRoot'\
   of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
   'Constraint unsatisfied' error`, async () => {
     await localDeploy();
@@ -986,13 +785,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1000,13 +796,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1021,13 +814,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -1035,21 +825,18 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof2 = await PostsRollup.provePostsTransition(
       transition2,
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
 
     const mergedTransitions = new PostsTransition({
-      initialUsersRoot: valid1.initialUsersRoot,
-      latestUsersRoot: Field(111),
+      initialPostsRoot: valid1.initialPostsRoot,
+      latestPostsRoot: Field(111),
       initialPostsNumber: valid1.postState.postNumber.sub(1),
       latestPostsNumber: valid2.postState.postNumber,
       blockHeight: valid2.postState.blockHeight,
@@ -1078,13 +865,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1092,13 +876,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1113,13 +894,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -1127,21 +905,18 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof2 = await PostsRollup.provePostsTransition(
       transition2,
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
 
     const mergedTransitions = new PostsTransition({
-      initialUsersRoot: valid1.initialUsersRoot,
-      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsRoot: valid1.initialPostsRoot,
+      latestPostsRoot: valid2.latestPostsRoot,
       initialPostsNumber: valid1.postState.postNumber.sub(1),
       latestPostsNumber: valid2.postState.postNumber,
       blockHeight: valid2.postState.blockHeight,
@@ -1170,13 +945,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1184,13 +956,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1205,13 +974,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -1219,21 +985,18 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof2 = await PostsRollup.provePostsTransition(
       transition2,
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
 
     const mergedTransitions = new PostsTransition({
-      initialUsersRoot: valid1.initialUsersRoot,
-      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsRoot: valid1.initialPostsRoot,
+      latestPostsRoot: valid2.latestPostsRoot,
       initialPostsNumber: Field(6),
       latestPostsNumber: valid2.postState.postNumber,
       blockHeight: valid2.postState.blockHeight,
@@ -1262,13 +1025,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1276,13 +1036,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1297,13 +1054,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -1311,21 +1065,18 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof2 = await PostsRollup.provePostsTransition(
       transition2,
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
 
     const mergedTransitions = new PostsTransition({
-      initialUsersRoot: valid1.initialUsersRoot,
-      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsRoot: valid1.initialPostsRoot,
+      latestPostsRoot: valid2.latestPostsRoot,
       initialPostsNumber: valid1.postState.postNumber.sub(1),
       latestPostsNumber: Field(6),
       blockHeight: valid2.postState.blockHeight,
@@ -1354,13 +1105,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1368,13 +1116,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1389,13 +1134,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -1403,21 +1145,18 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof2 = await PostsRollup.provePostsTransition(
       transition2,
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
 
     const mergedTransitions = new PostsTransition({
-      initialUsersRoot: valid1.initialUsersRoot,
-      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsRoot: valid1.initialPostsRoot,
+      latestPostsRoot: valid2.latestPostsRoot,
       initialPostsNumber: valid1.postState.postNumber.sub(1),
       latestPostsNumber: valid2.postState.postNumber,
       blockHeight: Field(5),
@@ -1446,13 +1185,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1460,13 +1196,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof1 = await PostsRollup.provePostsTransition(
       transition1,
       valid1.signature,
-      valid1.initialUsersRoot,
-      valid1.latestUsersRoot,
       senderAccount,
-      valid1.userWitness,
+      valid1.hashedPost,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
-      valid1.hashedPost,
       valid1.postWitness,
       valid1.postState.postNumber.sub(1),
       valid1.postState
@@ -1481,13 +1214,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
@@ -1495,21 +1225,18 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const proof2 = await PostsRollup.provePostsTransition(
       transition2,
       valid2.signature,
-      valid2.initialUsersRoot,
-      valid2.latestUsersRoot,
       deployerAccount,
-      valid2.userWitness,
+      valid2.hashedPost,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
-      valid2.hashedPost,
       valid2.postWitness,
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
 
     const mergedTransitions = new PostsTransition({
-      initialUsersRoot: valid1.initialUsersRoot,
-      latestUsersRoot: valid2.latestUsersRoot,
+      initialPostsRoot: valid1.initialPostsRoot,
+      latestPostsRoot: valid2.latestPostsRoot,
       initialPostsNumber: valid1.postState.postNumber.sub(1),
       latestPostsNumber: valid2.postState.postNumber,
       blockHeight: Field(7),

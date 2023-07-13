@@ -1,13 +1,11 @@
 import {
   Field,
-  MerkleMap,
   Struct,
   MerkleMapWitness,
   PublicKey,
   Signature,
   Poseidon,
   Experimental,
-  Provable,
   SelfProof,
 } from 'snarkyjs';
 
@@ -24,28 +22,21 @@ export class PostState extends Struct({
 
 // ============================================================================
 
-const userPostsTree = new MerkleMap();
-const userPostsRoot = userPostsTree.getRoot();
-
 export class PostsTransition extends Struct({
-  initialUsersRoot: Field,
-  latestUsersRoot: Field,
+  initialPostsRoot: Field,
+  latestPostsRoot: Field,
   initialPostsNumber: Field,
   latestPostsNumber: Field,
   blockHeight: Field,
 }) {
   static createPostsTransition(
     signature: Signature,
-
-    initialUsersRoot: Field,
-    latestUsersRoot: Field,
     userAddress: PublicKey,
-    userWitness: MerkleMapWitness,
+    hashedPost: Field,
 
     initialPostsRoot: Field,
     latestPostsRoot: Field,
-    hashedPost: Field,
-    postWitness: MerkleMapWitness,
+    postsWitness: MerkleMapWitness,
 
     initialPostsNumber: Field,
     postState: PostState
@@ -53,35 +44,20 @@ export class PostsTransition extends Struct({
     const isSigned = signature.verify(userAddress, [hashedPost]);
     isSigned.assertTrue();
 
-    const zeroIfNewUser = Provable.if(
-      initialPostsRoot.equals(userPostsRoot),
-      Field(0),
-      initialPostsRoot
+    const [postsRootBefore, postKey] = postsWitness.computeRootAndKey(Field(0));
+    initialPostsRoot.assertEquals(postsRootBefore);
+    Poseidon.hash(userAddress.toFields().concat(hashedPost)).assertEquals(
+      postKey
     );
-
-    const [usersRootBefore, userKey] =
-      userWitness.computeRootAndKey(zeroIfNewUser);
-    initialUsersRoot.assertEquals(usersRootBefore);
-    Poseidon.hash(userAddress.toFields()).assertEquals(userKey);
-
-    const [userPostsRootBefore, postkey] = postWitness.computeRootAndKey(
-      Field(0)
-    );
-    initialPostsRoot.assertEquals(userPostsRootBefore);
-    hashedPost.assertEquals(postkey);
 
     initialPostsNumber.add(Field(1)).assertEquals(postState.postNumber);
-    const userPostsRootAfter = postWitness.computeRootAndKey(
-      postState.hash()
-    )[0];
-    userPostsRootAfter.assertEquals(latestPostsRoot);
 
-    const usersRootAfter = userWitness.computeRootAndKey(latestPostsRoot)[0];
-    usersRootAfter.assertEquals(latestUsersRoot);
+    const postsRootAfter = postsWitness.computeRootAndKey(postState.hash())[0];
+    postsRootAfter.assertEquals(latestPostsRoot);
 
     return new PostsTransition({
-      initialUsersRoot: initialUsersRoot,
-      latestUsersRoot: latestUsersRoot,
+      initialPostsRoot: initialPostsRoot,
+      latestPostsRoot: latestPostsRoot,
       initialPostsNumber: initialPostsNumber,
       latestPostsNumber: postState.postNumber,
       blockHeight: postState.blockHeight,
@@ -92,8 +68,8 @@ export class PostsTransition extends Struct({
     transition1: PostsTransition,
     transition2: PostsTransition
   ) {
-    transition1.initialUsersRoot.assertEquals(transition2.initialUsersRoot);
-    transition1.latestUsersRoot.assertEquals(transition2.latestUsersRoot);
+    transition1.initialPostsRoot.assertEquals(transition2.initialPostsRoot);
+    transition1.latestPostsRoot.assertEquals(transition2.latestPostsRoot);
     transition1.initialPostsNumber.assertEquals(transition2.initialPostsNumber);
     transition1.latestPostsNumber.assertEquals(transition2.latestPostsNumber);
     transition1.blockHeight.assertEquals(transition2.blockHeight);
@@ -103,13 +79,13 @@ export class PostsTransition extends Struct({
     transition1: PostsTransition,
     transition2: PostsTransition
   ) {
-    transition1.latestUsersRoot.assertEquals(transition2.initialUsersRoot);
+    transition1.latestPostsRoot.assertEquals(transition2.initialPostsRoot);
     transition1.latestPostsNumber.assertEquals(transition2.initialPostsNumber);
     transition1.blockHeight.assertEquals(transition2.blockHeight);
 
     return new PostsTransition({
-      initialUsersRoot: transition1.initialUsersRoot,
-      latestUsersRoot: transition2.latestUsersRoot,
+      initialPostsRoot: transition1.initialPostsRoot,
+      latestPostsRoot: transition2.latestPostsRoot,
       initialPostsNumber: transition1.initialPostsNumber,
       latestPostsNumber: transition2.latestPostsNumber,
       blockHeight: transition2.blockHeight,
@@ -126,10 +102,7 @@ export const PostsRollup = Experimental.ZkProgram({
     provePostsTransition: {
       privateInputs: [
         Signature,
-        Field,
-        Field,
         PublicKey,
-        MerkleMapWitness,
         Field,
         Field,
         Field,
@@ -141,27 +114,21 @@ export const PostsRollup = Experimental.ZkProgram({
       method(
         transition: PostsTransition,
         signature: Signature,
-        initialUsersRoot: Field,
-        latestUsersRoot: Field,
         userAddress: PublicKey,
-        userWitness: MerkleMapWitness,
+        hashedPost: Field,
         initialPostsRoot: Field,
         latestPostsRoot: Field,
-        hashedPost: Field,
-        postWitness: MerkleMapWitness,
+        postsWitness: MerkleMapWitness,
         initialPostsNumber: Field,
         postState: PostState
       ) {
         const computedTransition = PostsTransition.createPostsTransition(
           signature,
-          initialUsersRoot,
-          latestUsersRoot,
           userAddress,
-          userWitness,
+          hashedPost,
           initialPostsRoot,
           latestPostsRoot,
-          hashedPost,
-          postWitness,
+          postsWitness,
           initialPostsNumber,
           postState
         );
@@ -179,14 +146,14 @@ export const PostsRollup = Experimental.ZkProgram({
         postsTransition1Proof.verify();
         postsTransition2Proof.verify();
 
-        postsTransition1Proof.publicInput.latestUsersRoot.assertEquals(
-          postsTransition2Proof.publicInput.initialUsersRoot
+        postsTransition1Proof.publicInput.latestPostsRoot.assertEquals(
+          postsTransition2Proof.publicInput.initialPostsRoot
         );
-        postsTransition1Proof.publicInput.initialUsersRoot.assertEquals(
-          mergedPostsTransitions.initialUsersRoot
+        postsTransition1Proof.publicInput.initialPostsRoot.assertEquals(
+          mergedPostsTransitions.initialPostsRoot
         );
-        postsTransition2Proof.publicInput.latestUsersRoot.assertEquals(
-          mergedPostsTransitions.latestUsersRoot
+        postsTransition2Proof.publicInput.latestPostsRoot.assertEquals(
+          mergedPostsTransitions.latestPostsRoot
         );
 
         postsTransition1Proof.publicInput.latestPostsNumber.assertEquals(
