@@ -31,12 +31,12 @@ export class EventsContract extends SmartContract {
     );
 
     const currentState = this.posts.getAndAssertEquals();
-    rollupProof.publicInput.initialUsersRoot.assertEquals(currentState);
+    rollupProof.publicInput.initialPostsRoot.assertEquals(currentState);
 
     const currentPostsNumber = this.postsNumber.getAndAssertEquals();
     rollupProof.publicInput.initialPostsNumber.assertEquals(currentPostsNumber);
 
-    this.posts.set(rollupProof.publicInput.latestUsersRoot);
+    this.posts.set(rollupProof.publicInput.latestPostsRoot);
     this.postsNumber.set(rollupProof.publicInput.latestPostsNumber);
   }
 }
