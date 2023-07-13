@@ -68,7 +68,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     });
 
     postsTree.set(postKey, postState.hash());
-    const latestUsersRoot = postsTree.getRoot();
+    const latestPostsRoot = postsTree.getRoot();
 
     return {
       signature: signature,
@@ -76,7 +76,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       hashedPost: hashedPost,
 
       initialPostsRoot: postsRoot,
-      latestPostsRoot: latestUsersRoot,
+      latestPostsRoot: latestPostsRoot,
       postWitness: postWitness,
 
       postState: postState,
@@ -85,20 +85,20 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
 
   it(`generates and deploys the 'EventsContract'`, async () => {
     await localDeploy();
-    const currentUsersRoot = zkApp.posts.get();
+    const currentPostsRoot = zkApp.posts.get();
     const currentPostsNumber = zkApp.postsNumber.get();
     const postsRoot = postsTree.getRoot();
-    expect(currentUsersRoot).toEqual(postsRoot);
+    expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
   });
 
   it(`updates the state of the 'EventsContract'`, async () => {
     await localDeploy();
 
-    let currentUsersRoot = zkApp.posts.get();
+    let currentPostsRoot = zkApp.posts.get();
     let currentPostsNumber = zkApp.postsNumber.get();
     const postsRoot = postsTree.getRoot();
-    expect(currentUsersRoot).toEqual(postsRoot);
+    expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
 
     const valid = createPostsTransitionValidInputs(
@@ -139,9 +139,9 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     await txn.prove();
     await txn.sign([senderKey]).send();
 
-    currentUsersRoot = zkApp.posts.get();
+    currentPostsRoot = zkApp.posts.get();
     currentPostsNumber = zkApp.postsNumber.get();
-    expect(currentUsersRoot).toEqual(valid.latestPostsRoot);
+    expect(currentPostsRoot).toEqual(valid.latestPostsRoot);
     expect(currentPostsNumber).toEqual(Field(1));
   });
 
@@ -422,10 +422,10 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
   it(`merges 'PostsTransition' proofs`, async () => {
     await localDeploy();
 
-    let currentUsersRoot = zkApp.posts.get();
+    let currentPostsRoot = zkApp.posts.get();
     let currentPostsNumber = zkApp.postsNumber.get();
     const postsRoot = postsTree.getRoot();
-    expect(currentUsersRoot).toEqual(postsRoot);
+    expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
 
     const valid1 = createPostsTransitionValidInputs(
@@ -505,19 +505,19 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     await txn.prove();
     await txn.sign([senderKey]).send();
 
-    currentUsersRoot = zkApp.posts.get();
+    currentPostsRoot = zkApp.posts.get();
     currentPostsNumber = zkApp.postsNumber.get();
-    expect(currentUsersRoot).toEqual(valid2.latestPostsRoot);
+    expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
     expect(currentPostsNumber).toEqual(Field(2));
   });
 
   test(`if it merges 'PostsTransition' proofs from 2 different users`, async () => {
     await localDeploy();
 
-    let currentUsersRoot = zkApp.posts.get();
+    let currentPostsRoot = zkApp.posts.get();
     let currentPostsNumber = zkApp.postsNumber.get();
     const postsRoot = postsTree.getRoot();
-    expect(currentUsersRoot).toEqual(postsRoot);
+    expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
 
     const valid1 = createPostsTransitionValidInputs(
@@ -597,9 +597,9 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     await txn.prove();
     await txn.sign([senderKey]).send();
 
-    currentUsersRoot = zkApp.posts.get();
+    currentPostsRoot = zkApp.posts.get();
     currentPostsNumber = zkApp.postsNumber.get();
-    expect(currentUsersRoot).toEqual(valid2.latestPostsRoot);
+    expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
     expect(currentPostsNumber).toEqual(Field(2));
   });
 
