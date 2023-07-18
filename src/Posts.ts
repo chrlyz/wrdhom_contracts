@@ -7,16 +7,28 @@ import {
   Poseidon,
   Experimental,
   SelfProof,
+  Bool,
 } from 'snarkyjs';
+
+// ============================================================================
+
+export const fieldToFlagPostsAsDeleted = Field(93137);
 
 // ============================================================================
 
 export class PostState extends Struct({
   postNumber: Field,
   blockHeight: Field,
+  deletedPost: Bool,
+  deletedAtBlockHeight: Field,
 }) {
   hash(): Field {
-    return Poseidon.hash([this.postNumber, this.blockHeight]);
+    return Poseidon.hash([
+      this.postNumber,
+      this.blockHeight,
+      this.deletedPost.toField(),
+      this.deletedAtBlockHeight,
+    ]);
   }
 }
 
@@ -51,6 +63,7 @@ export class PostsTransition extends Struct({
     );
 
     initialPostsNumber.add(Field(1)).assertEquals(postState.postNumber);
+    postState.deletedPost.assertFalse();
 
     const postsRootAfter = postsWitness.computeRootAndKey(postState.hash())[0];
     postsRootAfter.assertEquals(latestPostsRoot);
@@ -91,11 +104,61 @@ export class PostsTransition extends Struct({
       blockHeight: transition2.blockHeight,
     });
   }
+
+  static createPostDeletionTransition(
+    signature: Signature,
+    userAddress: PublicKey,
+    hashedPost: Field,
+
+    initialPostsRoot: Field,
+    latestPostsRoot: Field,
+    postsWitness: MerkleMapWitness,
+
+    postsNumber: Field,
+    blockHeight: Field,
+    initialPostState: PostState
+  ) {
+    const isSigned = signature.verify(userAddress, [
+      hashedPost,
+      fieldToFlagPostsAsDeleted,
+    ]);
+    isSigned.assertTrue();
+
+    const [postsRootBefore, postKey] = postsWitness.computeRootAndKey(
+      initialPostState.hash()
+    );
+    initialPostsRoot.assertEquals(postsRootBefore);
+    Poseidon.hash(userAddress.toFields().concat(hashedPost)).assertEquals(
+      postKey
+    );
+    initialPostState.deletedPost.assertFalse();
+    initialPostState.deletedAtBlockHeight.assertEquals(Field(0));
+
+    const latestPostState = new PostState({
+      postNumber: initialPostState.postNumber,
+      blockHeight: initialPostState.blockHeight,
+      deletedPost: Bool(true),
+      deletedAtBlockHeight: blockHeight,
+    });
+
+    const postsRootAfter = postsWitness.computeRootAndKey(
+      latestPostState.hash()
+    )[0];
+    postsRootAfter.assertEquals(latestPostsRoot);
+
+    return new PostsTransition({
+      initialPostsRoot: initialPostsRoot,
+      latestPostsRoot: latestPostsRoot,
+      initialPostsNumber: postsNumber,
+      latestPostsNumber: postsNumber,
+      blockHeight: blockHeight,
+    });
+  }
 }
 
 // ============================================================================
 
-export const PostsRollup = Experimental.ZkProgram({
+export const Posts = Experimental.ZkProgram({
   publicInput: PostsTransition,
 
   methods: {
@@ -135,6 +198,7 @@ export const PostsRollup = Experimental.ZkProgram({
         PostsTransition.assertEquals(computedTransition, transition);
       },
     },
+
     proveMergedPostsTransitions: {
       privateInputs: [SelfProof, SelfProof],
 
@@ -174,10 +238,50 @@ export const PostsRollup = Experimental.ZkProgram({
         );
       },
     },
+
+    provePostDeletionTransition: {
+      privateInputs: [
+        Signature,
+        PublicKey,
+        Field,
+        Field,
+        Field,
+        MerkleMapWitness,
+        Field,
+        Field,
+        PostState,
+      ],
+
+      method(
+        transition: PostsTransition,
+        signature: Signature,
+        userAddress: PublicKey,
+        hashedPost: Field,
+        initialPostsRoot: Field,
+        latestPostsRoot: Field,
+        postsWitness: MerkleMapWitness,
+        postsNumber: Field,
+        blockHeight: Field,
+        initialPostState: PostState
+      ) {
+        const computedTransition = PostsTransition.createPostDeletionTransition(
+          signature,
+          userAddress,
+          hashedPost,
+          initialPostsRoot,
+          latestPostsRoot,
+          postsWitness,
+          postsNumber,
+          blockHeight,
+          initialPostState
+        );
+        PostsTransition.assertEquals(computedTransition, transition);
+      },
+    },
   },
 });
 
-export let PostsRollupProof_ = Experimental.ZkProgram.Proof(PostsRollup);
-export class PostsRollupProof extends PostsRollupProof_ {}
+export let PostsProof_ = Experimental.ZkProgram.Proof(Posts);
+export class PostsProof extends PostsProof_ {}
 
 // ============================================================================

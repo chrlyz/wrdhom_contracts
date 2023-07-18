@@ -7,7 +7,7 @@ import {
   MerkleMap,
   UInt32,
 } from 'snarkyjs';
-import { PostsRollupProof } from './Posts';
+import { PostsProof } from './Posts';
 
 const postsTree = new MerkleMap();
 const postsRoot = postsTree.getRoot();
@@ -22,7 +22,7 @@ export class EventsContract extends SmartContract {
     this.postsNumber.set(Field(0));
   }
 
-  @method update(rollupProof: PostsRollupProof) {
+  @method update(rollupProof: PostsProof) {
     rollupProof.verify();
 
     this.currentSlot.assertBetween(

@@ -1,5 +1,10 @@
 import { EventsContract } from './EventsContract';
-import { PostsTransition, PostState, PostsRollup } from './Posts';
+import {
+  PostsTransition,
+  PostState,
+  Posts,
+  fieldToFlagPostsAsDeleted,
+} from './Posts';
 import {
   Field,
   Mina,
@@ -9,11 +14,12 @@ import {
   Poseidon,
   Signature,
   MerkleMap,
+  Bool,
 } from 'snarkyjs';
 
 let proofsEnabled = true;
 
-describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
+describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   let deployerAccount: PublicKey,
     deployerKey: PrivateKey,
     senderAccount: PublicKey,
@@ -21,15 +27,16 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     zkAppAddress: PublicKey,
     zkAppPrivateKey: PrivateKey,
     zkApp: EventsContract,
-    postsTree: MerkleMap;
+    postsTree: MerkleMap,
+    Local: ReturnType<typeof Mina.LocalBlockchain>;
 
   beforeAll(async () => {
-    await PostsRollup.compile();
+    await Posts.compile();
     if (proofsEnabled) await EventsContract.compile();
   });
 
   beforeEach(() => {
-    const Local = Mina.LocalBlockchain({ proofsEnabled });
+    Local = Mina.LocalBlockchain({ proofsEnabled });
     Mina.setActiveInstance(Local);
     ({ privateKey: deployerKey, publicKey: deployerAccount } =
       Local.testAccounts[0]);
@@ -58,13 +65,15 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     blockHeight: Field
   ) {
     const signature = Signature.create(userKey, [hashedPost]);
-    const postsRoot = postsTree.getRoot();
+    const initialPostsRoot = postsTree.getRoot();
     const postKey = Poseidon.hash(userAccount.toFields().concat(hashedPost));
     const postWitness = postsTree.getWitness(postKey);
 
     const postState = new PostState({
       postNumber: postNumber,
       blockHeight: blockHeight,
+      deletedPost: Bool(false),
+      deletedAtBlockHeight: Field(0),
     });
 
     postsTree.set(postKey, postState.hash());
@@ -75,11 +84,49 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       userAddress: userAccount,
       hashedPost: hashedPost,
 
-      initialPostsRoot: postsRoot,
+      initialPostsRoot: initialPostsRoot,
       latestPostsRoot: latestPostsRoot,
       postWitness: postWitness,
 
       postState: postState,
+    };
+  }
+
+  function createPostDeletionTransitionValidInputs(
+    userAccount: PublicKey,
+    userKey: PrivateKey,
+    hashedPost: Field,
+    initialPostState: PostState,
+    blockHeight: Field
+  ) {
+    const signature = Signature.create(userKey, [
+      hashedPost,
+      fieldToFlagPostsAsDeleted,
+    ]);
+    const initialPostsRoot = postsTree.getRoot();
+    const postKey = Poseidon.hash(userAccount.toFields().concat(hashedPost));
+    const postWitness = postsTree.getWitness(postKey);
+
+    const latestPostState = new PostState({
+      postNumber: initialPostState.postNumber,
+      blockHeight: initialPostState.blockHeight,
+      deletedPost: Bool(true),
+      deletedAtBlockHeight: blockHeight,
+    });
+
+    postsTree.set(postKey, latestPostState.hash());
+    const latestPostsRoot = postsTree.getRoot();
+
+    return {
+      signature: signature,
+      userAddress: userAccount,
+      hashedPost: hashedPost,
+
+      initialPostsRoot: initialPostsRoot,
+      latestPostsRoot: latestPostsRoot,
+      postWitness: postWitness,
+
+      postState: initialPostState,
     };
   }
 
@@ -88,11 +135,12 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const currentPostsRoot = zkApp.posts.get();
     const currentPostsNumber = zkApp.postsNumber.get();
     const postsRoot = postsTree.getRoot();
+
     expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentPostsNumber).toEqual(Field(0));
   });
 
-  it(`updates the state of the 'EventsContract'`, async () => {
+  it(`updates the state of the 'EventsContract', when publishing a post`, async () => {
     await localDeploy();
 
     let currentPostsRoot = zkApp.posts.get();
@@ -120,7 +168,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid.postState
     );
 
-    const proof = await PostsRollup.provePostsTransition(
+    const proof = await Posts.provePostsTransition(
       transition,
       valid.signature,
       senderAccount,
@@ -146,7 +194,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
   });
 
   test(`if 'transition' and 'computedTransition' mismatch,\
-  'PostsRollup.provePostsTransition()' throws 'Constraint unsatisfied' error `, async () => {
+  'Posts.provePostsTransition()' throws 'Constraint unsatisfied' error `, async () => {
     await localDeploy();
     const valid = createPostsTransitionValidInputs(
       senderAccount,
@@ -168,7 +216,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     );
 
     await expect(async () => {
-      const proof = await PostsRollup.provePostsTransition(
+      const proof = await Posts.provePostsTransition(
         transition,
         valid.signature,
         senderAccount,
@@ -206,7 +254,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid.postState
     );
 
-    const proof = await PostsRollup.provePostsTransition(
+    const proof = await Posts.provePostsTransition(
       transition,
       valid.signature,
       senderAccount,
@@ -337,6 +385,8 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const postState = new PostState({
       postNumber: Field(1),
       blockHeight: Field(1),
+      deletedPost: Bool(false),
+      deletedAtBlockHeight: Field(0),
     });
     postsTree.set(
       Poseidon.hash(senderAccount.toFields().concat(hashedPost)),
@@ -414,6 +464,8 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
         new PostState({
           postNumber: Field(2),
           blockHeight: Field(2),
+          deletedPost: Bool(false),
+          deletedAtBlockHeight: Field(0),
         })
       );
     }).toThrowError(`Field.assertEquals()`);
@@ -445,7 +497,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
-    const proof1 = await PostsRollup.provePostsTransition(
+    const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
       senderAccount,
@@ -474,7 +526,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
-    const proof2 = await PostsRollup.provePostsTransition(
+    const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
       senderAccount,
@@ -491,12 +543,11 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       transition2
     );
 
-    const mergedTransitionsProof =
-      await PostsRollup.proveMergedPostsTransitions(
-        mergedTransitions,
-        proof1,
-        proof2
-      );
+    const mergedTransitionsProof = await Posts.proveMergedPostsTransitions(
+      mergedTransitions,
+      proof1,
+      proof2
+    );
 
     const txn = await Mina.transaction(senderAccount, () => {
       zkApp.update(mergedTransitionsProof);
@@ -537,7 +588,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
-    const proof1 = await PostsRollup.provePostsTransition(
+    const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
       senderAccount,
@@ -566,7 +617,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
-    const proof2 = await PostsRollup.provePostsTransition(
+    const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
       deployerAccount,
@@ -583,12 +634,11 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       transition2
     );
 
-    const mergedTransitionsProof =
-      await PostsRollup.proveMergedPostsTransitions(
-        mergedTransitions,
-        proof1,
-        proof2
-      );
+    const mergedTransitionsProof = await Posts.proveMergedPostsTransitions(
+      mergedTransitions,
+      proof1,
+      proof2
+    );
 
     const txn = await Mina.transaction(senderAccount, () => {
       zkApp.update(mergedTransitionsProof);
@@ -625,7 +675,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
-    const proof1 = await PostsRollup.provePostsTransition(
+    const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
       senderAccount,
@@ -648,6 +698,8 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     const postState = new PostState({
       postNumber: Field(2),
       blockHeight: Field(1),
+      deletedPost: Bool(false),
+      deletedAtBlockHeight: Field(0),
     });
     divergentPostsTree.set(postKey, postState.hash());
     const divergentLatestPostsRoot = divergentPostsTree.getRoot();
@@ -662,7 +714,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       postState.postNumber.sub(1),
       postState
     );
-    const proof2 = await PostsRollup.provePostsTransition(
+    const proof2 = await Posts.provePostsTransition(
       divergentTransition2,
       signature,
       deployerAccount,
@@ -683,7 +735,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     });
 
     await expect(async () => {
-      await PostsRollup.proveMergedPostsTransitions(
+      await Posts.proveMergedPostsTransitions(
         mergedTransitions,
         proof1,
         proof2
@@ -713,7 +765,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
-    const proof1 = await PostsRollup.provePostsTransition(
+    const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
       senderAccount,
@@ -742,7 +794,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
-    const proof2 = await PostsRollup.provePostsTransition(
+    const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
       deployerAccount,
@@ -763,7 +815,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     });
 
     await expect(async () => {
-      await PostsRollup.proveMergedPostsTransitions(
+      await Posts.proveMergedPostsTransitions(
         mergedTransitions,
         proof1,
         proof2
@@ -793,7 +845,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
-    const proof1 = await PostsRollup.provePostsTransition(
+    const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
       senderAccount,
@@ -822,7 +874,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
-    const proof2 = await PostsRollup.provePostsTransition(
+    const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
       deployerAccount,
@@ -843,7 +895,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     });
 
     await expect(async () => {
-      await PostsRollup.proveMergedPostsTransitions(
+      await Posts.proveMergedPostsTransitions(
         mergedTransitions,
         proof1,
         proof2
@@ -873,7 +925,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
-    const proof1 = await PostsRollup.provePostsTransition(
+    const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
       senderAccount,
@@ -902,7 +954,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
-    const proof2 = await PostsRollup.provePostsTransition(
+    const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
       deployerAccount,
@@ -923,7 +975,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     });
 
     await expect(async () => {
-      await PostsRollup.proveMergedPostsTransitions(
+      await Posts.proveMergedPostsTransitions(
         mergedTransitions,
         proof1,
         proof2
@@ -953,7 +1005,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
-    const proof1 = await PostsRollup.provePostsTransition(
+    const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
       senderAccount,
@@ -982,7 +1034,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
-    const proof2 = await PostsRollup.provePostsTransition(
+    const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
       deployerAccount,
@@ -1003,7 +1055,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     });
 
     await expect(async () => {
-      await PostsRollup.proveMergedPostsTransitions(
+      await Posts.proveMergedPostsTransitions(
         mergedTransitions,
         proof1,
         proof2
@@ -1033,7 +1085,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
-    const proof1 = await PostsRollup.provePostsTransition(
+    const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
       senderAccount,
@@ -1062,7 +1114,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
-    const proof2 = await PostsRollup.provePostsTransition(
+    const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
       deployerAccount,
@@ -1083,7 +1135,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     });
 
     await expect(async () => {
-      await PostsRollup.proveMergedPostsTransitions(
+      await Posts.proveMergedPostsTransitions(
         mergedTransitions,
         proof1,
         proof2
@@ -1113,7 +1165,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
-    const proof1 = await PostsRollup.provePostsTransition(
+    const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
       senderAccount,
@@ -1142,7 +1194,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
-    const proof2 = await PostsRollup.provePostsTransition(
+    const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
       deployerAccount,
@@ -1163,7 +1215,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     });
 
     await expect(async () => {
-      await PostsRollup.proveMergedPostsTransitions(
+      await Posts.proveMergedPostsTransitions(
         mergedTransitions,
         proof1,
         proof2
@@ -1193,7 +1245,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid1.postState.postNumber.sub(1),
       valid1.postState
     );
-    const proof1 = await PostsRollup.provePostsTransition(
+    const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
       senderAccount,
@@ -1222,7 +1274,7 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
       valid2.postState.postNumber.sub(1),
       valid2.postState
     );
-    const proof2 = await PostsRollup.provePostsTransition(
+    const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
       deployerAccount,
@@ -1243,11 +1295,111 @@ describe(`the 'EventsContract' and the 'PostsRollup' zkProgram`, () => {
     });
 
     await expect(async () => {
-      await PostsRollup.proveMergedPostsTransitions(
+      await Posts.proveMergedPostsTransitions(
         mergedTransitions,
         proof1,
         proof2
       );
     }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
+  it(`updates the state of the 'EventsContract', when deleting a post`, async () => {
+    await localDeploy();
+
+    let currentPostsRoot = zkApp.posts.get();
+    let currentPostsNumber = zkApp.postsNumber.get();
+    const postsRoot = postsTree.getRoot();
+    expect(currentPostsRoot).toEqual(postsRoot);
+    expect(currentPostsNumber).toEqual(Field(0));
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      senderAccount,
+      valid1.hashedPost,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const proof1 = await Posts.provePostsTransition(
+      transition1,
+      valid1.signature,
+      senderAccount,
+      valid1.hashedPost,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const txn1 = await Mina.transaction(senderAccount, () => {
+      zkApp.update(proof1);
+    });
+
+    await txn1.prove();
+    await txn1.sign([senderKey]).send();
+
+    currentPostsRoot = zkApp.posts.get();
+    currentPostsNumber = zkApp.postsNumber.get();
+    expect(currentPostsRoot).toEqual(valid1.latestPostsRoot);
+    expect(currentPostsNumber).toEqual(Field(1));
+
+    Local.setGlobalSlot(2);
+
+    const valid2 = createPostDeletionTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      valid1.hashedPost,
+      valid1.postState,
+      Field(2)
+    );
+
+    const transition2 = PostsTransition.createPostDeletionTransition(
+      valid2.signature,
+      senderAccount,
+      valid2.hashedPost,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.postWitness,
+      Field(1),
+      Field(2),
+      valid2.postState
+    );
+    const proof2 = await Posts.provePostDeletionTransition(
+      transition2,
+      valid2.signature,
+      senderAccount,
+      valid2.hashedPost,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.postWitness,
+      Field(1),
+      Field(2),
+      valid2.postState
+    );
+
+    const txn2 = await Mina.transaction(senderAccount, () => {
+      zkApp.update(proof2);
+    });
+
+    await txn2.prove();
+    await txn2.sign([senderKey]).send();
+
+    currentPostsRoot = zkApp.posts.get();
+    currentPostsNumber = zkApp.postsNumber.get();
+    expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
+    expect(valid1.latestPostsRoot).not.toEqual(valid2.latestPostsRoot);
+    expect(currentPostsNumber).toEqual(Field(1));
   });
 });
