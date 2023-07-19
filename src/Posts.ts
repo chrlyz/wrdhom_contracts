@@ -48,7 +48,7 @@ export class PostsTransition extends Struct({
 
     initialPostsRoot: Field,
     latestPostsRoot: Field,
-    postsWitness: MerkleMapWitness,
+    postWitness: MerkleMapWitness,
 
     initialPostsNumber: Field,
     postState: PostState
@@ -56,7 +56,7 @@ export class PostsTransition extends Struct({
     const isSigned = signature.verify(userAddress, [hashedPost]);
     isSigned.assertTrue();
 
-    const [postsRootBefore, postKey] = postsWitness.computeRootAndKey(Field(0));
+    const [postsRootBefore, postKey] = postWitness.computeRootAndKey(Field(0));
     initialPostsRoot.assertEquals(postsRootBefore);
     Poseidon.hash(userAddress.toFields().concat(hashedPost)).assertEquals(
       postKey
@@ -64,8 +64,9 @@ export class PostsTransition extends Struct({
 
     initialPostsNumber.add(Field(1)).assertEquals(postState.postNumber);
     postState.deletedPost.assertFalse();
+    postState.deletedAtBlockHeight.assertEquals(Field(0));
 
-    const postsRootAfter = postsWitness.computeRootAndKey(postState.hash())[0];
+    const postsRootAfter = postWitness.computeRootAndKey(postState.hash())[0];
     postsRootAfter.assertEquals(latestPostsRoot);
 
     return new PostsTransition({
@@ -112,7 +113,7 @@ export class PostsTransition extends Struct({
 
     initialPostsRoot: Field,
     latestPostsRoot: Field,
-    postsWitness: MerkleMapWitness,
+    postWitness: MerkleMapWitness,
 
     postsNumber: Field,
     blockHeight: Field,
@@ -124,7 +125,7 @@ export class PostsTransition extends Struct({
     ]);
     isSigned.assertTrue();
 
-    const [postsRootBefore, postKey] = postsWitness.computeRootAndKey(
+    const [postsRootBefore, postKey] = postWitness.computeRootAndKey(
       initialPostState.hash()
     );
     initialPostsRoot.assertEquals(postsRootBefore);
@@ -141,7 +142,7 @@ export class PostsTransition extends Struct({
       deletedAtBlockHeight: blockHeight,
     });
 
-    const postsRootAfter = postsWitness.computeRootAndKey(
+    const postsRootAfter = postWitness.computeRootAndKey(
       latestPostState.hash()
     )[0];
     postsRootAfter.assertEquals(latestPostsRoot);
@@ -181,7 +182,7 @@ export const Posts = Experimental.ZkProgram({
         hashedPost: Field,
         initialPostsRoot: Field,
         latestPostsRoot: Field,
-        postsWitness: MerkleMapWitness,
+        postWitness: MerkleMapWitness,
         initialPostsNumber: Field,
         postState: PostState
       ) {
@@ -191,7 +192,7 @@ export const Posts = Experimental.ZkProgram({
           hashedPost,
           initialPostsRoot,
           latestPostsRoot,
-          postsWitness,
+          postWitness,
           initialPostsNumber,
           postState
         );
@@ -259,7 +260,7 @@ export const Posts = Experimental.ZkProgram({
         hashedPost: Field,
         initialPostsRoot: Field,
         latestPostsRoot: Field,
-        postsWitness: MerkleMapWitness,
+        postWitness: MerkleMapWitness,
         postsNumber: Field,
         blockHeight: Field,
         initialPostState: PostState
@@ -270,7 +271,7 @@ export const Posts = Experimental.ZkProgram({
           hashedPost,
           initialPostsRoot,
           latestPostsRoot,
-          postsWitness,
+          postWitness,
           postsNumber,
           blockHeight,
           initialPostState
