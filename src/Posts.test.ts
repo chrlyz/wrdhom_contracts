@@ -194,8 +194,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   });
 
   test(`if 'transition' and 'computedTransition' mismatch,\
-  'Posts.provePostsTransition()' throws 'Constraint unsatisfied' error `, async () => {
-    await localDeploy();
+  'Posts.provePostsTransition()' throws 'Constraint unsatisfied' error`, async () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -204,16 +203,13 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       Field(1)
     );
 
-    const transition = PostsTransition.createPostsTransition(
-      valid.signature,
-      senderAccount,
-      valid.hashedPost,
-      valid.initialPostsRoot,
-      valid.latestPostsRoot,
-      valid.postWitness,
-      valid.postState.postNumber.sub(1),
-      valid.postState
-    );
+    const transition = new PostsTransition({
+      initialPostsRoot: Field(111),
+      latestPostsRoot: valid.latestPostsRoot,
+      initialPostsNumber: valid.postState.postNumber.sub(1),
+      latestPostsNumber: valid.postState.postNumber,
+      blockHeight: valid.postState.blockHeight,
+    });
 
     await expect(async () => {
       const proof = await Posts.provePostsTransition(
@@ -221,7 +217,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         valid.signature,
         senderAccount,
         valid.hashedPost,
-        Field(111),
+        valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.postWitness,
         valid.postState.postNumber.sub(1),
@@ -279,7 +275,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
   test(`if 'hashedPost' is signed by a different account,\
   the signature for 'hashedPost' is invalid in 'createPostsTransition()'`, async () => {
-    await localDeploy();
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -304,7 +299,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
   test(`if 'signature' is invalid for 'hashedPost',\
   'createPostsTransition()' throws a 'Bool.assertTrue()' error`, async () => {
-    await localDeploy();
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -329,7 +323,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
   test(`if 'initialPostsRoot' and the root derived from 'postWitness' mismatch,\
   'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
-    await localDeploy();
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -354,7 +347,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
   test(`if 'latestPostsRoot' and the updated root mismatch,\
   'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
-    await localDeploy();
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -377,10 +369,89 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     }).toThrowError(`Field.assertEquals()`);
   });
 
+  test(`if the key derived from 'postWitness' and the hash derived from 'userAddress'\
+   and hashedPost mismatch, 'createPostsTransition()' throws a 'Field.assertEquals()' error'`, async () => {
+    const wrongPostWitness = postsTree.getWitness(
+      Poseidon.hash(deployerAccount.toFields().concat(Field(777)))
+    );
+
+    const valid = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+
+    expect(() => {
+      PostsTransition.createPostsTransition(
+        valid.signature,
+        senderAccount,
+        valid.hashedPost,
+        valid.initialPostsRoot,
+        valid.latestPostsRoot,
+        wrongPostWitness,
+        valid.postState.postNumber.sub(1),
+        valid.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if 'initialPostsNumber' is not equal to 'postState.postNumber' minus one,\
+  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
+    const valid = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+
+    expect(() => {
+      PostsTransition.createPostsTransition(
+        valid.signature,
+        senderAccount,
+        valid.hashedPost,
+        valid.initialPostsRoot,
+        valid.latestPostsRoot,
+        valid.postWitness,
+        valid.postState.postNumber,
+        valid.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if 'postState' doesn't generate a root equal to 'latestPostsRoot',\
+  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
+    const valid = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+
+    expect(() => {
+      PostsTransition.createPostsTransition(
+        valid.signature,
+        senderAccount,
+        valid.hashedPost,
+        valid.initialPostsRoot,
+        valid.latestPostsRoot,
+        valid.postWitness,
+        valid.postState.postNumber.sub(1),
+        new PostState({
+          postNumber: Field(2),
+          blockHeight: Field(2),
+          deletedPost: Bool(false),
+          deletedAtBlockHeight: Field(0),
+        })
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
   test(`if the post already exists, 'createPostsTransition()' throws\
   a 'Field.assertEquals()' error`, async () => {
-    await localDeploy();
-
     const hashedPost = Field(777);
     const postState = new PostState({
       postNumber: Field(1),
@@ -412,61 +483,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         valid.postWitness,
         valid.postState.postNumber.sub(1),
         valid.postState
-      );
-    }).toThrowError(`Field.assertEquals()`);
-  });
-
-  test(`if 'initialPostsNumber' is not equal to 'postState.postNumber' minus one,\
-  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
-    await localDeploy();
-    const valid = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-
-    expect(() => {
-      PostsTransition.createPostsTransition(
-        valid.signature,
-        senderAccount,
-        valid.hashedPost,
-        valid.initialPostsRoot,
-        valid.latestPostsRoot,
-        valid.postWitness,
-        valid.postState.postNumber,
-        valid.postState
-      );
-    }).toThrowError(`Field.assertEquals()`);
-  });
-
-  test(`if 'postState' doesn't generate a root equal to 'latestPostsRoot',\
-  'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
-    await localDeploy();
-    const valid = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-
-    expect(() => {
-      PostsTransition.createPostsTransition(
-        valid.signature,
-        senderAccount,
-        valid.hashedPost,
-        valid.initialPostsRoot,
-        valid.latestPostsRoot,
-        valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        new PostState({
-          postNumber: Field(2),
-          blockHeight: Field(2),
-          deletedPost: Bool(false),
-          deletedAtBlockHeight: Field(0),
-        })
       );
     }).toThrowError(`Field.assertEquals()`);
   });
@@ -656,8 +672,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   test(`if 'latestPostsRoot' of 'postsTransition1Proof' and 'initialPostsRoot'\
   of 'postsTransition2Proof' mismatch, 'proveMergedPostsTransitions()' throws\
   'Constraint unsatisfied' error`, async () => {
-    await localDeploy();
-
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -746,8 +760,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   test(`if 'initialPostsRoot' of 'postsTransition1Proof' and 'initialPostsRoot'\
   of 'mergedPostsTransitions' mismatch, 'proveMergedPostsTransitions()' throws\
   'Constraint unsatisfied' error`, async () => {
-    await localDeploy();
-
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -826,8 +838,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   test(`if 'latestPostsRoot' of 'postsTransition2Proof'  and 'latestPostsRoot'\
   of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
   'Constraint unsatisfied' error`, async () => {
-    await localDeploy();
-
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -906,8 +916,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   test(`if 'latestPostsNumber' of 'postsTransition1Proof' and 'initialPostsNumber'\
   of 'postsTransition2Proof' mismatch, 'provePostsTransition()' throws\
   'Constraint unsatisfied' error`, async () => {
-    await localDeploy();
-
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -986,8 +994,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   test(`if 'initialPostsNumber' of 'postsTransition1Proof' and 'initialPostsNumber'\
   of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
   'Constraint unsatisfied' error`, async () => {
-    await localDeploy();
-
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -1066,8 +1072,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   test(`if 'latestPostsNumber' of 'postsTransition2Proof' and 'latestPostsNumber'\
   of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
   'Constraint unsatisfied' error`, async () => {
-    await localDeploy();
-
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -1146,8 +1150,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   test(`if 'blockHeight' of 'postsTransition1Proof' and 'blockHeight'\
   of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
   'Constraint unsatisfied' error`, async () => {
-    await localDeploy();
-
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -1226,8 +1228,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   test(`if 'blockHeight' of 'postsTransition2Proof' and 'blockHeight'\
   of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
   'Constraint unsatisfied' error`, async () => {
-    await localDeploy();
-
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -1401,5 +1401,244 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
     expect(valid1.latestPostsRoot).not.toEqual(valid2.latestPostsRoot);
     expect(currentPostsNumber).toEqual(Field(1));
+  });
+
+  test(`if 'transition' and 'computedTransition' mismatch,\
+  'Posts.provePostDeletionTransition()' throws 'Constraint unsatisfied' error`, async () => {
+    await localDeploy();
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      senderAccount,
+      valid1.hashedPost,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const proof1 = await Posts.provePostsTransition(
+      transition1,
+      valid1.signature,
+      senderAccount,
+      valid1.hashedPost,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const txn1 = await Mina.transaction(senderAccount, () => {
+      zkApp.update(proof1);
+    });
+
+    await txn1.prove();
+    await txn1.sign([senderKey]).send();
+
+    Local.setGlobalSlot(2);
+
+    const valid2 = createPostDeletionTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      valid1.hashedPost,
+      valid1.postState,
+      Field(2)
+    );
+
+    const transition2 = new PostsTransition({
+      initialPostsRoot: Field(111),
+      latestPostsRoot: valid2.latestPostsRoot,
+      initialPostsNumber: valid2.postState.postNumber,
+      latestPostsNumber: valid2.postState.postNumber,
+      blockHeight: valid2.postState.blockHeight,
+    });
+
+    await expect(async () => {
+      const proof2 = await Posts.provePostDeletionTransition(
+        transition2,
+        valid2.signature,
+        senderAccount,
+        valid2.hashedPost,
+        valid2.initialPostsRoot,
+        valid2.latestPostsRoot,
+        valid2.postWitness,
+        Field(1),
+        Field(2),
+        valid2.postState
+      );
+    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
+  });
+
+  test(`if message to delete post is signed by a different account,\
+  the signature is invalid in 'createPostDeletionTransition()'`, async () => {
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const valid2 = createPostDeletionTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      valid1.hashedPost,
+      valid1.postState,
+      Field(1)
+    );
+
+    expect(() => {
+      PostsTransition.createPostDeletionTransition(
+        valid2.signature,
+        PrivateKey.random().toPublicKey(),
+        valid2.hashedPost,
+        valid2.initialPostsRoot,
+        valid2.latestPostsRoot,
+        valid2.postWitness,
+        Field(1),
+        Field(1),
+        valid2.postState
+      );
+    }).toThrowError(`Bool.assertTrue()`);
+  });
+
+  test(`if 'signature' is invalid for message to delete post,\
+  'createPostDeletionTransition()' throws a 'Bool.assertTrue()' error`, async () => {
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const valid2 = createPostDeletionTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      valid1.hashedPost,
+      valid1.postState,
+      Field(1)
+    );
+
+    expect(() => {
+      PostsTransition.createPostDeletionTransition(
+        valid2.signature,
+        senderAccount,
+        Field(111),
+        valid2.initialPostsRoot,
+        valid2.latestPostsRoot,
+        valid2.postWitness,
+        Field(1),
+        Field(1),
+        valid2.postState
+      );
+    }).toThrowError(`Bool.assertTrue()`);
+  });
+
+  test(`if 'initialPostsRoot' and the root derived from 'postWitness' mismatch,\
+  'createPostDeletionTransition()' throws a 'Field.assertEquals()' error`, async () => {
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const valid2 = createPostDeletionTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      valid1.hashedPost,
+      valid1.postState,
+      Field(1)
+    );
+
+    expect(() => {
+      PostsTransition.createPostDeletionTransition(
+        valid2.signature,
+        senderAccount,
+        valid2.hashedPost,
+        Field(111),
+        valid2.latestPostsRoot,
+        valid2.postWitness,
+        Field(1),
+        Field(1),
+        valid2.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if 'latestPostsRoot' and the updated root mismatch,\
+  'createPostDeletionTransition()' throws a 'Field.assertEquals()' error`, async () => {
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const valid2 = createPostDeletionTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      valid1.hashedPost,
+      valid1.postState,
+      Field(1)
+    );
+
+    expect(() => {
+      PostsTransition.createPostDeletionTransition(
+        valid2.signature,
+        senderAccount,
+        valid2.hashedPost,
+        valid2.initialPostsRoot,
+        Field(111),
+        valid2.postWitness,
+        Field(1),
+        Field(1),
+        valid2.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
+  test(`if the post doesn't exist, 'createPostDeletionTransition()'\
+  throws a 'Field.assertEquals()' error`, async () => {
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const valid2 = createPostDeletionTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      valid1.hashedPost,
+      valid1.postState,
+      Field(1)
+    );
+
+    const emptyTree = new MerkleMap();
+    const emptyTreeRoot = emptyTree.getRoot();
+
+    expect(() => {
+      PostsTransition.createPostDeletionTransition(
+        valid2.signature,
+        senderAccount,
+        valid2.hashedPost,
+        emptyTreeRoot,
+        valid2.latestPostsRoot,
+        valid2.postWitness,
+        Field(1),
+        Field(1),
+        valid2.postState
+      );
+    }).toThrowError(`Field.assertEquals()`);
   });
 });
