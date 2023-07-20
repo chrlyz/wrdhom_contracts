@@ -578,7 +578,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     expect(currentPostsNumber).toEqual(Field(2));
   });
 
-  test(`if it merges 'PostsTransition' proofs from 2 different users`, async () => {
+  it(`it merges 'PostsTransition' proofs from 2 different users`, async () => {
     await localDeploy();
 
     let currentPostsRoot = zkApp.posts.get();
@@ -1640,5 +1640,188 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         valid2.postState
       );
     }).toThrowError(`Field.assertEquals()`);
+  });
+
+  it(`merges post deletion transitions`, async () => {
+    await localDeploy();
+
+    let currentPostsRoot = zkApp.posts.get();
+    let currentPostsNumber = zkApp.postsNumber.get();
+    const postsRoot = postsTree.getRoot();
+    expect(currentPostsRoot).toEqual(postsRoot);
+    expect(currentPostsNumber).toEqual(Field(0));
+
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      Field(777),
+      Field(1),
+      Field(1)
+    );
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      senderAccount,
+      valid1.hashedPost,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+    const proof1 = await Posts.provePostsTransition(
+      transition1,
+      valid1.signature,
+      senderAccount,
+      valid1.hashedPost,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.postWitness,
+      valid1.postState.postNumber.sub(1),
+      valid1.postState
+    );
+
+    const valid2 = createPostsTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      Field(212),
+      Field(2),
+      Field(1)
+    );
+    const transition2 = PostsTransition.createPostsTransition(
+      valid2.signature,
+      deployerAccount,
+      valid2.hashedPost,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+    const proof2 = await Posts.provePostsTransition(
+      transition2,
+      valid2.signature,
+      deployerAccount,
+      valid2.hashedPost,
+      valid2.initialPostsRoot,
+      valid2.latestPostsRoot,
+      valid2.postWitness,
+      valid2.postState.postNumber.sub(1),
+      valid2.postState
+    );
+
+    const mergedTransitions1 = PostsTransition.mergePostsTransitions(
+      transition1,
+      transition2
+    );
+
+    const mergedTransitionsProof1 = await Posts.proveMergedPostsTransitions(
+      mergedTransitions1,
+      proof1,
+      proof2
+    );
+
+    const txn1 = await Mina.transaction(senderAccount, () => {
+      zkApp.update(mergedTransitionsProof1);
+    });
+
+    await txn1.prove();
+    await txn1.sign([senderKey]).send();
+
+    currentPostsRoot = zkApp.posts.get();
+    currentPostsNumber = zkApp.postsNumber.get();
+    expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
+    expect(currentPostsNumber).toEqual(Field(2));
+
+    Local.setGlobalSlot(2);
+
+    const valid3 = createPostDeletionTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      valid1.hashedPost,
+      valid1.postState,
+      Field(2)
+    );
+
+    const transition3 = PostsTransition.createPostDeletionTransition(
+      valid3.signature,
+      senderAccount,
+      valid3.hashedPost,
+      valid3.initialPostsRoot,
+      valid3.latestPostsRoot,
+      valid3.postWitness,
+      Field(2),
+      Field(2),
+      valid3.postState
+    );
+    const proof3 = await Posts.provePostDeletionTransition(
+      transition3,
+      valid3.signature,
+      senderAccount,
+      valid3.hashedPost,
+      valid3.initialPostsRoot,
+      valid3.latestPostsRoot,
+      valid3.postWitness,
+      Field(2),
+      Field(2),
+      valid3.postState
+    );
+
+    const valid4 = createPostDeletionTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      valid2.hashedPost,
+      valid2.postState,
+      Field(2)
+    );
+
+    const transition4 = PostsTransition.createPostDeletionTransition(
+      valid4.signature,
+      deployerAccount,
+      valid4.hashedPost,
+      valid4.initialPostsRoot,
+      valid4.latestPostsRoot,
+      valid4.postWitness,
+      Field(2),
+      Field(2),
+      valid4.postState
+    );
+    const proof4 = await Posts.provePostDeletionTransition(
+      transition4,
+      valid4.signature,
+      deployerAccount,
+      valid4.hashedPost,
+      valid4.initialPostsRoot,
+      valid4.latestPostsRoot,
+      valid4.postWitness,
+      Field(2),
+      Field(2),
+      valid4.postState
+    );
+
+    const mergedTransitions2 = PostsTransition.mergePostsTransitions(
+      transition3,
+      transition4
+    );
+
+    const mergedTransitionsProof2 = await Posts.proveMergedPostsDeletions(
+      mergedTransitions2,
+      proof3,
+      proof4
+    );
+
+    const txn2 = await Mina.transaction(senderAccount, () => {
+      zkApp.update(mergedTransitionsProof2);
+    });
+
+    await txn2.prove();
+    await txn2.sign([senderKey]).send();
+
+    currentPostsRoot = zkApp.posts.get();
+    currentPostsNumber = zkApp.postsNumber.get();
+    expect(currentPostsRoot).toEqual(valid4.latestPostsRoot);
+    expect(valid1.latestPostsRoot).not.toEqual(valid2.latestPostsRoot);
+    expect(valid2.latestPostsRoot).not.toEqual(valid3.latestPostsRoot);
+    expect(valid3.latestPostsRoot).not.toEqual(valid4.latestPostsRoot);
+    expect(currentPostsNumber).toEqual(Field(2));
   });
 });
