@@ -224,6 +224,12 @@ export const Posts = Experimental.ZkProgram({
         postsTransition1Proof.publicInput.latestPostsNumber.assertEquals(
           postsTransition2Proof.publicInput.initialPostsNumber
         );
+        postsTransition1Proof.publicInput.initialPostsNumber
+          .add(1)
+          .assertEquals(postsTransition1Proof.publicInput.latestPostsNumber);
+        postsTransition2Proof.publicInput.initialPostsNumber
+          .add(1)
+          .assertEquals(postsTransition2Proof.publicInput.latestPostsNumber);
         postsTransition1Proof.publicInput.initialPostsNumber.assertEquals(
           mergedPostsTransitions.initialPostsNumber
         );
@@ -277,6 +283,49 @@ export const Posts = Experimental.ZkProgram({
           initialPostState
         );
         PostsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+
+    proveMergedPostsDeletions: {
+      privateInputs: [SelfProof, SelfProof],
+
+      method(
+        mergedPostsDeletions: PostsTransition,
+        postsDeletion1Proof: SelfProof<PostsTransition, undefined>,
+        postsDeletion2Proof: SelfProof<PostsTransition, undefined>
+      ) {
+        postsDeletion1Proof.verify();
+        postsDeletion2Proof.verify();
+
+        postsDeletion1Proof.publicInput.latestPostsRoot.assertEquals(
+          postsDeletion2Proof.publicInput.initialPostsRoot
+        );
+        postsDeletion1Proof.publicInput.initialPostsRoot.assertEquals(
+          mergedPostsDeletions.initialPostsRoot
+        );
+        postsDeletion2Proof.publicInput.latestPostsRoot.assertEquals(
+          mergedPostsDeletions.latestPostsRoot
+        );
+
+        postsDeletion1Proof.publicInput.initialPostsNumber.assertEquals(
+          postsDeletion2Proof.publicInput.initialPostsNumber
+        );
+        postsDeletion1Proof.publicInput.latestPostsNumber.assertEquals(
+          postsDeletion2Proof.publicInput.latestPostsNumber
+        );
+        postsDeletion1Proof.publicInput.initialPostsNumber.assertEquals(
+          mergedPostsDeletions.initialPostsNumber
+        );
+        postsDeletion1Proof.publicInput.latestPostsNumber.assertEquals(
+          mergedPostsDeletions.latestPostsNumber
+        );
+
+        postsDeletion1Proof.publicInput.blockHeight.assertEquals(
+          mergedPostsDeletions.blockHeight
+        );
+        postsDeletion2Proof.publicInput.blockHeight.assertEquals(
+          mergedPostsDeletions.blockHeight
+        );
       },
     },
   },
