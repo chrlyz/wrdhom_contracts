@@ -4,6 +4,7 @@ import {
   PostState,
   Posts,
   fieldToFlagPostsAsDeleted,
+  PostsWitness,
 } from './Posts';
 import {
   Field,
@@ -11,10 +12,10 @@ import {
   PrivateKey,
   PublicKey,
   AccountUpdate,
-  Poseidon,
   Signature,
-  MerkleMap,
   Bool,
+  CircuitString,
+  MerkleTree,
 } from 'snarkyjs';
 
 let proofsEnabled = true;
@@ -27,7 +28,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     zkAppAddress: PublicKey,
     zkAppPrivateKey: PrivateKey,
     zkApp: EventsContract,
-    postsTree: MerkleMap,
+    postsTree: MerkleTree,
     Local: ReturnType<typeof Mina.LocalBlockchain>;
 
   beforeAll(async () => {
@@ -45,7 +46,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     zkAppPrivateKey = PrivateKey.random();
     zkAppAddress = zkAppPrivateKey.toPublicKey();
     zkApp = new EventsContract(zkAppAddress);
-    postsTree = new MerkleMap();
+    postsTree = new MerkleTree(10);
   });
 
   async function localDeploy() {
@@ -58,75 +59,70 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   }
 
   function createPostsTransitionValidInputs(
-    userAccount: PublicKey,
-    userKey: PrivateKey,
-    hashedPost: Field,
-    postNumber: Field,
-    blockHeight: Field
+    posterAddress: PublicKey,
+    posterKey: PrivateKey,
+    postContentID: CircuitString,
+    postedAtBlockHeight: Field,
+    postIndex: bigint
   ) {
-    const signature = Signature.create(userKey, [hashedPost]);
+    const signature = Signature.create(posterKey, [postContentID.hash()]);
     const initialPostsRoot = postsTree.getRoot();
-    const postKey = Poseidon.hash(userAccount.toFields().concat(hashedPost));
-    const postWitness = postsTree.getWitness(postKey);
+    const witness = postsTree.getWitness(postIndex);
+    const postWitness = new PostsWitness(witness);
 
     const postState = new PostState({
-      postNumber: postNumber,
-      blockHeight: blockHeight,
+      posterAddress: posterAddress,
+      postContentID: postContentID,
+      postedAtBlockHeight: postedAtBlockHeight,
       deletedPost: Bool(false),
       deletedAtBlockHeight: Field(0),
     });
 
-    postsTree.set(postKey, postState.hash());
+    postsTree.setLeaf(postIndex, postState.hash());
     const latestPostsRoot = postsTree.getRoot();
 
     return {
       signature: signature,
-      userAddress: userAccount,
-      hashedPost: hashedPost,
-
+      postState: postState,
       initialPostsRoot: initialPostsRoot,
       latestPostsRoot: latestPostsRoot,
       postWitness: postWitness,
-
-      postState: postState,
     };
   }
 
   function createPostDeletionTransitionValidInputs(
-    userAccount: PublicKey,
-    userKey: PrivateKey,
-    hashedPost: Field,
+    posterKey: PrivateKey,
     initialPostState: PostState,
-    blockHeight: Field
+    deletionBlockHeight: Field,
+    postIndex: bigint
   ) {
-    const signature = Signature.create(userKey, [
-      hashedPost,
+    const postStateHash = initialPostState.hash();
+    const signature = Signature.create(posterKey, [
+      postStateHash,
       fieldToFlagPostsAsDeleted,
     ]);
     const initialPostsRoot = postsTree.getRoot();
-    const postKey = Poseidon.hash(userAccount.toFields().concat(hashedPost));
-    const postWitness = postsTree.getWitness(postKey);
+    const witness = postsTree.getWitness(postIndex);
+    const postWitness = new PostsWitness(witness);
 
     const latestPostState = new PostState({
-      postNumber: initialPostState.postNumber,
-      blockHeight: initialPostState.blockHeight,
+      posterAddress: initialPostState.posterAddress,
+      postContentID: initialPostState.postContentID,
+      postedAtBlockHeight: initialPostState.postedAtBlockHeight,
       deletedPost: Bool(true),
-      deletedAtBlockHeight: blockHeight,
+      deletedAtBlockHeight: deletionBlockHeight,
     });
 
-    postsTree.set(postKey, latestPostState.hash());
+    postsTree.setLeaf(postIndex, latestPostState.hash());
     const latestPostsRoot = postsTree.getRoot();
 
     return {
       signature: signature,
-      userAddress: userAccount,
-      hashedPost: hashedPost,
+      initialPostState: initialPostState,
 
       initialPostsRoot: initialPostsRoot,
       latestPostsRoot: latestPostsRoot,
       postWitness: postWitness,
-
-      postState: initialPostState,
     };
   }
 
@@ -152,32 +148,30 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
 
     const transition = PostsTransition.createPostsTransition(
       valid.signature,
-      senderAccount,
-      valid.hashedPost,
+      valid.postState,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.postWitness,
-      valid.postState.postNumber.sub(1),
-      valid.postState
+      valid.postWitness.calculateIndex().sub(1)
     );
 
     const proof = await Posts.provePostsTransition(
       transition,
       valid.signature,
-      senderAccount,
-      valid.hashedPost,
+      valid.postState,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.postWitness,
-      valid.postState.postNumber.sub(1),
-      valid.postState
+      valid.postWitness.calculateIndex().sub(1)
     );
 
     const txn = await Mina.transaction(senderAccount, () => {
@@ -198,30 +192,32 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
+
+    const postIndex = valid.postWitness.calculateIndex();
 
     const transition = new PostsTransition({
       initialPostsRoot: Field(111),
       latestPostsRoot: valid.latestPostsRoot,
-      initialPostsNumber: valid.postState.postNumber.sub(1),
-      latestPostsNumber: valid.postState.postNumber,
-      blockHeight: valid.postState.blockHeight,
+      initialPostsNumber: postIndex.sub(1),
+      latestPostsNumber: postIndex,
+      blockHeight: valid.postState.postedAtBlockHeight,
     });
 
     await expect(async () => {
       const proof = await Posts.provePostsTransition(
         transition,
         valid.signature,
-        senderAccount,
-        valid.hashedPost,
+        valid.postState,
         valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        valid.postState
+        valid.postWitness.calculateIndex().sub(1)
       );
     }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
   });
@@ -234,32 +230,30 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
-      Field(1),
-      Field(2)
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
+      Field(2),
+      1n
     );
 
     const transition = PostsTransition.createPostsTransition(
       valid.signature,
-      senderAccount,
-      valid.hashedPost,
+      valid.postState,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.postWitness,
-      valid.postState.postNumber.sub(1),
-      valid.postState
+      valid.postWitness.calculateIndex().sub(1)
     );
 
     const proof = await Posts.provePostsTransition(
       transition,
       valid.signature,
-      senderAccount,
-      valid.hashedPost,
+      valid.postState,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.postWitness,
-      valid.postState.postNumber.sub(1),
-      valid.postState
+      valid.postWitness.calculateIndex().sub(1)
     );
 
     const txn = await Mina.transaction(senderAccount, () => {
@@ -273,50 +267,68 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     }).rejects.toThrowError(`Valid_while_precondition_unsatisfied`);
   });
 
-  test(`if 'hashedPost' is signed by a different account,\
-  the signature for 'hashedPost' is invalid in 'createPostsTransition()'`, async () => {
+  test(`if 'postContentID' is signed by a different account,\
+  the signature for 'postContentID' is invalid in 'createPostsTransition()'`, async () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
+
+    const invalidPostState = new PostState({
+      posterAddress: deployerAccount,
+      postContentID: valid.postState.postContentID,
+      postedAtBlockHeight: valid.postState.postedAtBlockHeight,
+      deletedPost: valid.postState.deletedPost,
+      deletedAtBlockHeight: valid.postState.deletedAtBlockHeight,
+    });
 
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        PrivateKey.random().toPublicKey(),
-        valid.hashedPost,
+        invalidPostState,
         valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        valid.postState
+        valid.postWitness.calculateIndex().sub(1)
       );
     }).toThrowError(`Bool.assertTrue()`);
   });
 
-  test(`if 'signature' is invalid for 'hashedPost',\
+  test(`if 'signature' is invalid for 'postContentID',\
   'createPostsTransition()' throws a 'Bool.assertTrue()' error`, async () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
+
+    const invalidPostState = new PostState({
+      posterAddress: valid.postState.posterAddress,
+      postContentID: CircuitString.fromString(
+        'bduuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      ),
+      postedAtBlockHeight: valid.postState.postedAtBlockHeight,
+      deletedPost: valid.postState.deletedPost,
+      deletedAtBlockHeight: valid.postState.deletedAtBlockHeight,
+    });
 
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        senderAccount,
-        Field(111),
+        invalidPostState,
         valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        valid.postState
+        valid.postWitness.calculateIndex().sub(1)
       );
     }).toThrowError(`Bool.assertTrue()`);
   });
@@ -326,21 +338,21 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
 
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        senderAccount,
-        valid.hashedPost,
-        Field(111),
+        valid.postState,
+        Field(849),
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        valid.postState
+        valid.postWitness.calculateIndex().sub(1)
       );
     }).toThrowError(`Field.assertEquals()`);
   });
@@ -350,73 +362,45 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
 
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        senderAccount,
-        valid.hashedPost,
+        valid.postState,
         valid.initialPostsRoot,
-        Field(111),
+        Field(849),
         valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        valid.postState
+        valid.postWitness.calculateIndex().sub(1)
       );
     }).toThrowError(`Field.assertEquals()`);
   });
 
-  test(`if the key derived from 'postWitness' and the hash derived from 'userAddress'\
-   and hashedPost mismatch, 'createPostsTransition()' throws a 'Field.assertEquals()' error'`, async () => {
-    const wrongPostWitness = postsTree.getWitness(
-      Poseidon.hash(deployerAccount.toFields().concat(Field(777)))
-    );
-
-    const valid = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-
-    expect(() => {
-      PostsTransition.createPostsTransition(
-        valid.signature,
-        senderAccount,
-        valid.hashedPost,
-        valid.initialPostsRoot,
-        valid.latestPostsRoot,
-        wrongPostWitness,
-        valid.postState.postNumber.sub(1),
-        valid.postState
-      );
-    }).toThrowError(`Field.assertEquals()`);
-  });
-
-  test(`if 'initialPostsNumber' is not equal to 'postState.postNumber' minus one,\
+  test(`if 'initialPostsNumber' is not equal to the key derived from 'postWitness' minus one,\
   'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
 
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        senderAccount,
-        valid.hashedPost,
+        valid.postState,
         valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postState.postNumber,
-        valid.postState
+        Field(849)
       );
     }).toThrowError(`Field.assertEquals()`);
   });
@@ -426,63 +410,29 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
+
+    const invalidPostState = new PostState({
+      posterAddress: valid.postState.posterAddress,
+      postContentID: valid.postState.postContentID,
+      postedAtBlockHeight: Field(849),
+      deletedPost: valid.postState.deletedPost,
+      deletedAtBlockHeight: valid.postState.deletedAtBlockHeight,
+    });
 
     expect(() => {
       PostsTransition.createPostsTransition(
         valid.signature,
-        senderAccount,
-        valid.hashedPost,
+        invalidPostState,
         valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        new PostState({
-          postNumber: Field(2),
-          blockHeight: Field(2),
-          deletedPost: Bool(false),
-          deletedAtBlockHeight: Field(0),
-        })
-      );
-    }).toThrowError(`Field.assertEquals()`);
-  });
-
-  test(`if the post already exists, 'createPostsTransition()' throws\
-  a 'Field.assertEquals()' error`, async () => {
-    const hashedPost = Field(777);
-    const postState = new PostState({
-      postNumber: Field(1),
-      blockHeight: Field(1),
-      deletedPost: Bool(false),
-      deletedAtBlockHeight: Field(0),
-    });
-    postsTree.set(
-      Poseidon.hash(senderAccount.toFields().concat(hashedPost)),
-      postState.hash()
-    );
-    const initialPostsRoot = postsTree.getRoot();
-
-    const valid = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      hashedPost,
-      Field(1),
-      Field(1)
-    );
-
-    expect(() => {
-      PostsTransition.createPostsTransition(
-        valid.signature,
-        senderAccount,
-        valid.hashedPost,
-        initialPostsRoot,
-        valid.latestPostsRoot,
-        valid.postWitness,
-        valid.postState.postNumber.sub(1),
-        valid.postState
+        valid.postWitness.calculateIndex().sub(1)
       );
     }).toThrowError(`Field.assertEquals()`);
   });
@@ -499,59 +449,57 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
+      valid1.postState,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
+      valid1.postWitness.calculateIndex().sub(1)
     );
+
     const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
+      valid1.postState,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
+      valid1.postWitness.calculateIndex().sub(1)
     );
 
     const valid2 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(212),
-      Field(2),
-      Field(1)
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
+      Field(1),
+      2n
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      senderAccount,
-      valid2.hashedPost,
+      valid2.postState,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
+      valid2.postWitness.calculateIndex().sub(1)
     );
+
     const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
-      senderAccount,
-      valid2.hashedPost,
+      valid2.postState,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
+      valid2.postWitness.calculateIndex().sub(1)
     );
 
     const mergedTransitions = PostsTransition.mergePostsTransitions(
@@ -578,7 +526,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     expect(currentPostsNumber).toEqual(Field(2));
   });
 
-  it(`it merges 'PostsTransition' proofs from 2 different users`, async () => {
+  it(`merges 'PostsTransition' proofs from 2 different users`, async () => {
     await localDeploy();
 
     let currentPostsRoot = zkApp.posts.get();
@@ -590,59 +538,57 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
+      valid1.postState,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
+      valid1.postWitness.calculateIndex().sub(1)
     );
+
     const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
+      valid1.postState,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
+      valid1.postWitness.calculateIndex().sub(1)
     );
 
     const valid2 = createPostsTransitionValidInputs(
       deployerAccount,
       deployerKey,
-      Field(212),
-      Field(2),
-      Field(1)
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
+      Field(1),
+      2n
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
+      valid2.postState,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
+      valid2.postWitness.calculateIndex().sub(1)
     );
+
     const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
+      valid2.postState,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
+      valid2.postWitness.calculateIndex().sub(1)
     );
 
     const mergedTransitions = PostsTransition.mergePostsTransitions(
@@ -667,640 +613,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     currentPostsNumber = zkApp.postsNumber.get();
     expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
     expect(currentPostsNumber).toEqual(Field(2));
-  });
-
-  test(`if 'latestPostsRoot' of 'postsTransition1Proof' and 'initialPostsRoot'\
-  of 'postsTransition2Proof' mismatch, 'proveMergedPostsTransitions()' throws\
-  'Constraint unsatisfied' error`, async () => {
-    const valid1 = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-    const transition1 = PostsTransition.createPostsTransition(
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-    const proof1 = await Posts.provePostsTransition(
-      transition1,
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-
-    const divergentPostsTree = new MerkleMap();
-    const divergentInitialPostsRoot = divergentPostsTree.getRoot();
-    const hashedPost = Field(212);
-    const postKey = Poseidon.hash(
-      deployerAccount.toFields().concat(hashedPost)
-    );
-    const divergentPostWitness = divergentPostsTree.getWitness(postKey);
-    const signature = Signature.create(deployerKey, [hashedPost]);
-    const postState = new PostState({
-      postNumber: Field(2),
-      blockHeight: Field(1),
-      deletedPost: Bool(false),
-      deletedAtBlockHeight: Field(0),
-    });
-    divergentPostsTree.set(postKey, postState.hash());
-    const divergentLatestPostsRoot = divergentPostsTree.getRoot();
-
-    const divergentTransition2 = PostsTransition.createPostsTransition(
-      signature,
-      deployerAccount,
-      hashedPost,
-      divergentInitialPostsRoot,
-      divergentLatestPostsRoot,
-      divergentPostWitness,
-      postState.postNumber.sub(1),
-      postState
-    );
-    const proof2 = await Posts.provePostsTransition(
-      divergentTransition2,
-      signature,
-      deployerAccount,
-      hashedPost,
-      divergentInitialPostsRoot,
-      divergentLatestPostsRoot,
-      divergentPostWitness,
-      postState.postNumber.sub(1),
-      postState
-    );
-
-    const mergedTransitions = new PostsTransition({
-      initialPostsRoot: valid1.initialPostsRoot,
-      latestPostsRoot: divergentLatestPostsRoot,
-      initialPostsNumber: valid1.postState.postNumber.sub(1),
-      latestPostsNumber: postState.postNumber,
-      blockHeight: postState.blockHeight,
-    });
-
-    await expect(async () => {
-      await Posts.proveMergedPostsTransitions(
-        mergedTransitions,
-        proof1,
-        proof2
-      );
-    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
-  });
-
-  test(`if 'initialPostsRoot' of 'postsTransition1Proof' and 'initialPostsRoot'\
-  of 'mergedPostsTransitions' mismatch, 'proveMergedPostsTransitions()' throws\
-  'Constraint unsatisfied' error`, async () => {
-    const valid1 = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-    const transition1 = PostsTransition.createPostsTransition(
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-    const proof1 = await Posts.provePostsTransition(
-      transition1,
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-
-    const valid2 = createPostsTransitionValidInputs(
-      deployerAccount,
-      deployerKey,
-      Field(212),
-      Field(2),
-      Field(1)
-    );
-    const transition2 = PostsTransition.createPostsTransition(
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-    const proof2 = await Posts.provePostsTransition(
-      transition2,
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-
-    const mergedTransitions = new PostsTransition({
-      initialPostsRoot: Field(111),
-      latestPostsRoot: valid2.latestPostsRoot,
-      initialPostsNumber: valid1.postState.postNumber.sub(1),
-      latestPostsNumber: valid2.postState.postNumber,
-      blockHeight: valid2.postState.blockHeight,
-    });
-
-    await expect(async () => {
-      await Posts.proveMergedPostsTransitions(
-        mergedTransitions,
-        proof1,
-        proof2
-      );
-    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
-  });
-
-  test(`if 'latestPostsRoot' of 'postsTransition2Proof'  and 'latestPostsRoot'\
-  of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
-  'Constraint unsatisfied' error`, async () => {
-    const valid1 = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-    const transition1 = PostsTransition.createPostsTransition(
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-    const proof1 = await Posts.provePostsTransition(
-      transition1,
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-
-    const valid2 = createPostsTransitionValidInputs(
-      deployerAccount,
-      deployerKey,
-      Field(212),
-      Field(2),
-      Field(1)
-    );
-    const transition2 = PostsTransition.createPostsTransition(
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-    const proof2 = await Posts.provePostsTransition(
-      transition2,
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-
-    const mergedTransitions = new PostsTransition({
-      initialPostsRoot: valid1.initialPostsRoot,
-      latestPostsRoot: Field(111),
-      initialPostsNumber: valid1.postState.postNumber.sub(1),
-      latestPostsNumber: valid2.postState.postNumber,
-      blockHeight: valid2.postState.blockHeight,
-    });
-
-    await expect(async () => {
-      await Posts.proveMergedPostsTransitions(
-        mergedTransitions,
-        proof1,
-        proof2
-      );
-    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
-  });
-
-  test(`if 'latestPostsNumber' of 'postsTransition1Proof' and 'initialPostsNumber'\
-  of 'postsTransition2Proof' mismatch, 'provePostsTransition()' throws\
-  'Constraint unsatisfied' error`, async () => {
-    const valid1 = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-    const transition1 = PostsTransition.createPostsTransition(
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-    const proof1 = await Posts.provePostsTransition(
-      transition1,
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-
-    const valid2 = createPostsTransitionValidInputs(
-      deployerAccount,
-      deployerKey,
-      Field(212),
-      Field(1),
-      Field(1)
-    );
-    const transition2 = PostsTransition.createPostsTransition(
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-    const proof2 = await Posts.provePostsTransition(
-      transition2,
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-
-    const mergedTransitions = new PostsTransition({
-      initialPostsRoot: valid1.initialPostsRoot,
-      latestPostsRoot: valid2.latestPostsRoot,
-      initialPostsNumber: valid1.postState.postNumber.sub(1),
-      latestPostsNumber: valid2.postState.postNumber,
-      blockHeight: valid2.postState.blockHeight,
-    });
-
-    await expect(async () => {
-      await Posts.proveMergedPostsTransitions(
-        mergedTransitions,
-        proof1,
-        proof2
-      );
-    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
-  });
-
-  test(`if 'initialPostsNumber' of 'postsTransition1Proof' and 'initialPostsNumber'\
-  of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
-  'Constraint unsatisfied' error`, async () => {
-    const valid1 = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-    const transition1 = PostsTransition.createPostsTransition(
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-    const proof1 = await Posts.provePostsTransition(
-      transition1,
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-
-    const valid2 = createPostsTransitionValidInputs(
-      deployerAccount,
-      deployerKey,
-      Field(212),
-      Field(2),
-      Field(1)
-    );
-    const transition2 = PostsTransition.createPostsTransition(
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-    const proof2 = await Posts.provePostsTransition(
-      transition2,
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-
-    const mergedTransitions = new PostsTransition({
-      initialPostsRoot: valid1.initialPostsRoot,
-      latestPostsRoot: valid2.latestPostsRoot,
-      initialPostsNumber: Field(6),
-      latestPostsNumber: valid2.postState.postNumber,
-      blockHeight: valid2.postState.blockHeight,
-    });
-
-    await expect(async () => {
-      await Posts.proveMergedPostsTransitions(
-        mergedTransitions,
-        proof1,
-        proof2
-      );
-    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
-  });
-
-  test(`if 'latestPostsNumber' of 'postsTransition2Proof' and 'latestPostsNumber'\
-  of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
-  'Constraint unsatisfied' error`, async () => {
-    const valid1 = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(1)
-    );
-    const transition1 = PostsTransition.createPostsTransition(
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-    const proof1 = await Posts.provePostsTransition(
-      transition1,
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-
-    const valid2 = createPostsTransitionValidInputs(
-      deployerAccount,
-      deployerKey,
-      Field(212),
-      Field(2),
-      Field(1)
-    );
-    const transition2 = PostsTransition.createPostsTransition(
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-    const proof2 = await Posts.provePostsTransition(
-      transition2,
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-
-    const mergedTransitions = new PostsTransition({
-      initialPostsRoot: valid1.initialPostsRoot,
-      latestPostsRoot: valid2.latestPostsRoot,
-      initialPostsNumber: valid1.postState.postNumber.sub(1),
-      latestPostsNumber: Field(6),
-      blockHeight: valid2.postState.blockHeight,
-    });
-
-    await expect(async () => {
-      await Posts.proveMergedPostsTransitions(
-        mergedTransitions,
-        proof1,
-        proof2
-      );
-    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
-  });
-
-  test(`if 'blockHeight' of 'postsTransition1Proof' and 'blockHeight'\
-  of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
-  'Constraint unsatisfied' error`, async () => {
-    const valid1 = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(6)
-    );
-    const transition1 = PostsTransition.createPostsTransition(
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-    const proof1 = await Posts.provePostsTransition(
-      transition1,
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-
-    const valid2 = createPostsTransitionValidInputs(
-      deployerAccount,
-      deployerKey,
-      Field(212),
-      Field(2),
-      Field(5)
-    );
-    const transition2 = PostsTransition.createPostsTransition(
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-    const proof2 = await Posts.provePostsTransition(
-      transition2,
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-
-    const mergedTransitions = new PostsTransition({
-      initialPostsRoot: valid1.initialPostsRoot,
-      latestPostsRoot: valid2.latestPostsRoot,
-      initialPostsNumber: valid1.postState.postNumber.sub(1),
-      latestPostsNumber: valid2.postState.postNumber,
-      blockHeight: Field(5),
-    });
-
-    await expect(async () => {
-      await Posts.proveMergedPostsTransitions(
-        mergedTransitions,
-        proof1,
-        proof2
-      );
-    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
-  });
-
-  test(`if 'blockHeight' of 'postsTransition2Proof' and 'blockHeight'\
-  of 'mergedPostsTransitions' mismatch, 'provePostsTransition()' throws\
-  'Constraint unsatisfied' error`, async () => {
-    const valid1 = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      Field(777),
-      Field(1),
-      Field(7)
-    );
-    const transition1 = PostsTransition.createPostsTransition(
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-    const proof1 = await Posts.provePostsTransition(
-      transition1,
-      valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
-    );
-
-    const valid2 = createPostsTransitionValidInputs(
-      deployerAccount,
-      deployerKey,
-      Field(212),
-      Field(2),
-      Field(6)
-    );
-    const transition2 = PostsTransition.createPostsTransition(
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-    const proof2 = await Posts.provePostsTransition(
-      transition2,
-      valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
-    );
-
-    const mergedTransitions = new PostsTransition({
-      initialPostsRoot: valid1.initialPostsRoot,
-      latestPostsRoot: valid2.latestPostsRoot,
-      initialPostsNumber: valid1.postState.postNumber.sub(1),
-      latestPostsNumber: valid2.postState.postNumber,
-      blockHeight: Field(7),
-    });
-
-    await expect(async () => {
-      await Posts.proveMergedPostsTransitions(
-        mergedTransitions,
-        proof1,
-        proof2
-      );
-    }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
   });
 
   it(`updates the state of the 'EventsContract', when deleting a post`, async () => {
@@ -1315,32 +627,29 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
-
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
+      valid1.postState,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
+      valid1.postWitness.calculateIndex().sub(1)
     );
 
     const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
+      valid1.postState,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
+      valid1.postWitness.calculateIndex().sub(1)
     );
 
     const txn1 = await Mina.transaction(senderAccount, () => {
@@ -1358,35 +667,29 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     Local.setGlobalSlot(2);
 
     const valid2 = createPostDeletionTransitionValidInputs(
-      senderAccount,
       senderKey,
-      valid1.hashedPost,
       valid1.postState,
-      Field(2)
+      Field(2),
+      1n
     );
-
     const transition2 = PostsTransition.createPostDeletionTransition(
       valid2.signature,
-      senderAccount,
-      valid2.hashedPost,
+      valid2.initialPostState,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
       Field(1),
-      Field(2),
-      valid2.postState
+      Field(2)
     );
     const proof2 = await Posts.provePostDeletionTransition(
       transition2,
       valid2.signature,
-      senderAccount,
-      valid2.hashedPost,
+      valid2.initialPostState,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
       Field(1),
-      Field(2),
-      valid2.postState
+      Field(2)
     );
 
     const txn2 = await Mina.transaction(senderAccount, () => {
@@ -1410,32 +713,29 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
-
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
+      valid1.postState,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
+      valid1.postWitness.calculateIndex().sub(1)
     );
 
     const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
+      valid1.postState,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
+      valid1.postWitness.calculateIndex().sub(1)
     );
 
     const txn1 = await Mina.transaction(senderAccount, () => {
@@ -1446,35 +746,32 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await txn1.sign([senderKey]).send();
 
     Local.setGlobalSlot(2);
-
     const valid2 = createPostDeletionTransitionValidInputs(
-      senderAccount,
       senderKey,
-      valid1.hashedPost,
       valid1.postState,
-      Field(2)
+      Field(2),
+      1n
     );
 
+    const numberOfposts = Field(1);
     const transition2 = new PostsTransition({
-      initialPostsRoot: Field(111),
+      initialPostsRoot: Field(849),
       latestPostsRoot: valid2.latestPostsRoot,
-      initialPostsNumber: valid2.postState.postNumber,
-      latestPostsNumber: valid2.postState.postNumber,
-      blockHeight: valid2.postState.blockHeight,
+      initialPostsNumber: numberOfposts,
+      latestPostsNumber: numberOfposts,
+      blockHeight: valid2.initialPostState.deletedAtBlockHeight,
     });
 
     await expect(async () => {
       const proof2 = await Posts.provePostDeletionTransition(
         transition2,
         valid2.signature,
-        senderAccount,
-        valid2.hashedPost,
+        valid2.initialPostState,
         valid2.initialPostsRoot,
         valid2.latestPostsRoot,
         valid2.postWitness,
         Field(1),
-        Field(2),
-        valid2.postState
+        Field(2)
       );
     }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
   });
@@ -1484,29 +781,29 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
+
     const valid2 = createPostDeletionTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      valid1.hashedPost,
+      deployerKey,
       valid1.postState,
-      Field(1)
+      Field(2),
+      1n
     );
 
     expect(() => {
       PostsTransition.createPostDeletionTransition(
         valid2.signature,
-        PrivateKey.random().toPublicKey(),
-        valid2.hashedPost,
+        valid2.initialPostState,
         valid2.initialPostsRoot,
         valid2.latestPostsRoot,
         valid2.postWitness,
         Field(1),
-        Field(1),
-        valid2.postState
+        Field(1)
       );
     }).toThrowError(`Bool.assertTrue()`);
   });
@@ -1516,29 +813,38 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
+    const invalidPostState = new PostState({
+      posterAddress: valid1.postState.posterAddress,
+      postContentID: CircuitString.fromString(
+        'bduuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      ),
+      postedAtBlockHeight: valid1.postState.postedAtBlockHeight,
+      deletedPost: valid1.postState.deletedPost,
+      deletedAtBlockHeight: valid1.postState.deletedAtBlockHeight,
+    });
+
     const valid2 = createPostDeletionTransitionValidInputs(
-      senderAccount,
       senderKey,
-      valid1.hashedPost,
       valid1.postState,
-      Field(1)
+      Field(1),
+      1n
     );
 
     expect(() => {
       PostsTransition.createPostDeletionTransition(
         valid2.signature,
-        senderAccount,
-        Field(111),
+        invalidPostState,
         valid2.initialPostsRoot,
         valid2.latestPostsRoot,
         valid2.postWitness,
         Field(1),
-        Field(1),
-        valid2.postState
+        Field(1)
       );
     }).toThrowError(`Bool.assertTrue()`);
   });
@@ -1548,29 +854,28 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
     const valid2 = createPostDeletionTransitionValidInputs(
-      senderAccount,
       senderKey,
-      valid1.hashedPost,
       valid1.postState,
-      Field(1)
+      Field(1),
+      1n
     );
 
     expect(() => {
       PostsTransition.createPostDeletionTransition(
         valid2.signature,
-        senderAccount,
-        valid2.hashedPost,
-        Field(111),
+        valid2.initialPostState,
+        Field(849),
         valid2.latestPostsRoot,
         valid2.postWitness,
         Field(1),
-        Field(1),
-        valid2.postState
+        Field(1)
       );
     }).toThrowError(`Field.assertEquals()`);
   });
@@ -1580,29 +885,28 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
     const valid2 = createPostDeletionTransitionValidInputs(
-      senderAccount,
       senderKey,
-      valid1.hashedPost,
       valid1.postState,
-      Field(1)
+      Field(1),
+      1n
     );
 
     expect(() => {
       PostsTransition.createPostDeletionTransition(
         valid2.signature,
-        senderAccount,
-        valid2.hashedPost,
+        valid2.initialPostState,
         valid2.initialPostsRoot,
-        Field(111),
+        Field(849),
         valid2.postWitness,
         Field(1),
-        Field(1),
-        valid2.postState
+        Field(1)
       );
     }).toThrowError(`Field.assertEquals()`);
   });
@@ -1612,32 +916,31 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
     const valid2 = createPostDeletionTransitionValidInputs(
-      senderAccount,
       senderKey,
-      valid1.hashedPost,
       valid1.postState,
-      Field(1)
+      Field(1),
+      1n
     );
 
-    const emptyTree = new MerkleMap();
+    const emptyTree = new MerkleTree(10);
     const emptyTreeRoot = emptyTree.getRoot();
 
     expect(() => {
       PostsTransition.createPostDeletionTransition(
         valid2.signature,
-        senderAccount,
-        valid2.hashedPost,
+        valid2.initialPostState,
         emptyTreeRoot,
         valid2.latestPostsRoot,
         valid2.postWitness,
         Field(1),
-        Field(1),
-        valid2.postState
+        Field(1)
       );
     }).toThrowError(`Field.assertEquals()`);
   });
@@ -1654,59 +957,57 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
-      Field(777),
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
       Field(1),
-      Field(1)
+      1n
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
+      valid1.postState,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
+      valid1.postWitness.calculateIndex().sub(1)
     );
+
     const proof1 = await Posts.provePostsTransition(
       transition1,
       valid1.signature,
-      senderAccount,
-      valid1.hashedPost,
+      valid1.postState,
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postState.postNumber.sub(1),
-      valid1.postState
+      valid1.postWitness.calculateIndex().sub(1)
     );
 
     const valid2 = createPostsTransitionValidInputs(
       deployerAccount,
       deployerKey,
-      Field(212),
-      Field(2),
-      Field(1)
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
+      Field(1),
+      2n
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
+      valid2.postState,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
+      valid2.postWitness.calculateIndex().sub(1)
     );
+
     const proof2 = await Posts.provePostsTransition(
       transition2,
       valid2.signature,
-      deployerAccount,
-      valid2.hashedPost,
+      valid2.postState,
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
-      valid2.postState.postNumber.sub(1),
-      valid2.postState
+      valid2.postWitness.calculateIndex().sub(1)
     );
 
     const mergedTransitions1 = PostsTransition.mergePostsTransitions(
@@ -1733,69 +1034,59 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     expect(currentPostsNumber).toEqual(Field(2));
 
     Local.setGlobalSlot(2);
+    const deletedAtBlockHeight = Field(2);
+    const numberOfPosts = Field(2);
 
     const valid3 = createPostDeletionTransitionValidInputs(
-      senderAccount,
       senderKey,
-      valid1.hashedPost,
       valid1.postState,
-      Field(2)
+      deletedAtBlockHeight,
+      1n
     );
-
     const transition3 = PostsTransition.createPostDeletionTransition(
       valid3.signature,
-      senderAccount,
-      valid3.hashedPost,
+      valid3.initialPostState,
       valid3.initialPostsRoot,
       valid3.latestPostsRoot,
       valid3.postWitness,
-      Field(2),
-      Field(2),
-      valid3.postState
+      numberOfPosts,
+      deletedAtBlockHeight
     );
     const proof3 = await Posts.provePostDeletionTransition(
       transition3,
       valid3.signature,
-      senderAccount,
-      valid3.hashedPost,
+      valid3.initialPostState,
       valid3.initialPostsRoot,
       valid3.latestPostsRoot,
       valid3.postWitness,
-      Field(2),
-      Field(2),
-      valid3.postState
+      numberOfPosts,
+      deletedAtBlockHeight
     );
 
     const valid4 = createPostDeletionTransitionValidInputs(
-      deployerAccount,
       deployerKey,
-      valid2.hashedPost,
       valid2.postState,
-      Field(2)
+      deletedAtBlockHeight,
+      2n
     );
-
     const transition4 = PostsTransition.createPostDeletionTransition(
       valid4.signature,
-      deployerAccount,
-      valid4.hashedPost,
+      valid4.initialPostState,
       valid4.initialPostsRoot,
       valid4.latestPostsRoot,
       valid4.postWitness,
-      Field(2),
-      Field(2),
-      valid4.postState
+      numberOfPosts,
+      deletedAtBlockHeight
     );
     const proof4 = await Posts.provePostDeletionTransition(
       transition4,
       valid4.signature,
-      deployerAccount,
-      valid4.hashedPost,
+      valid4.initialPostState,
       valid4.initialPostsRoot,
       valid4.latestPostsRoot,
       valid4.postWitness,
-      Field(2),
-      Field(2),
-      valid4.postState
+      numberOfPosts,
+      deletedAtBlockHeight
     );
 
     const mergedTransitions2 = PostsTransition.mergePostsTransitions(

@@ -1,34 +1,44 @@
 import {
   Field,
   Struct,
-  MerkleMapWitness,
   PublicKey,
   Signature,
   Poseidon,
   Experimental,
   SelfProof,
   Bool,
+  CircuitString,
+  MerkleTree,
+  MerkleWitness,
 } from 'snarkyjs';
 
 // ============================================================================
 
 export const fieldToFlagPostsAsDeleted = Field(93137);
+const postsTree = new MerkleTree(10);
+const postsRoot = postsTree.getRoot();
+export class PostsWitness extends MerkleWitness(10) {}
 
 // ============================================================================
 
 export class PostState extends Struct({
-  postNumber: Field,
-  blockHeight: Field,
+  posterAddress: PublicKey,
+  postContentID: CircuitString,
+  postedAtBlockHeight: Field,
   deletedPost: Bool,
   deletedAtBlockHeight: Field,
 }) {
   hash(): Field {
-    return Poseidon.hash([
-      this.postNumber,
-      this.blockHeight,
-      this.deletedPost.toField(),
-      this.deletedAtBlockHeight,
-    ]);
+    return Poseidon.hash(
+      this.posterAddress
+        .toFields()
+        .concat([
+          this.postContentID.hash(),
+          this.postedAtBlockHeight,
+          this.deletedPost.toField(),
+          this.deletedAtBlockHeight,
+        ])
+    );
   }
 }
 
@@ -43,38 +53,36 @@ export class PostsTransition extends Struct({
 }) {
   static createPostsTransition(
     signature: Signature,
-    userAddress: PublicKey,
-    hashedPost: Field,
+    postState: PostState,
 
     initialPostsRoot: Field,
     latestPostsRoot: Field,
-    postWitness: MerkleMapWitness,
+    postWitness: PostsWitness,
 
-    initialPostsNumber: Field,
-    postState: PostState
+    initialPostsNumber: Field
   ) {
-    const isSigned = signature.verify(userAddress, [hashedPost]);
+    const isSigned = signature.verify(postState.posterAddress, [
+      postState.postContentID.hash(),
+    ]);
     isSigned.assertTrue();
 
-    const [postsRootBefore, postKey] = postWitness.computeRootAndKey(Field(0));
+    const postsRootBefore = postWitness.calculateRoot(Field(0));
+    const postIndex = postWitness.calculateIndex();
     initialPostsRoot.assertEquals(postsRootBefore);
-    Poseidon.hash(userAddress.toFields().concat(hashedPost)).assertEquals(
-      postKey
-    );
 
-    initialPostsNumber.add(Field(1)).assertEquals(postState.postNumber);
+    initialPostsNumber.assertEquals(postIndex.sub(1));
     postState.deletedPost.assertFalse();
     postState.deletedAtBlockHeight.assertEquals(Field(0));
 
-    const postsRootAfter = postWitness.computeRootAndKey(postState.hash())[0];
+    const postsRootAfter = postWitness.calculateRoot(postState.hash());
     postsRootAfter.assertEquals(latestPostsRoot);
 
     return new PostsTransition({
       initialPostsRoot: initialPostsRoot,
       latestPostsRoot: latestPostsRoot,
       initialPostsNumber: initialPostsNumber,
-      latestPostsNumber: postState.postNumber,
-      blockHeight: postState.blockHeight,
+      latestPostsNumber: postIndex,
+      blockHeight: postState.postedAtBlockHeight,
     });
   }
 
@@ -108,43 +116,34 @@ export class PostsTransition extends Struct({
 
   static createPostDeletionTransition(
     signature: Signature,
-    userAddress: PublicKey,
-    hashedPost: Field,
+    initialPostState: PostState,
 
     initialPostsRoot: Field,
     latestPostsRoot: Field,
-    postWitness: MerkleMapWitness,
+    postWitness: PostsWitness,
 
     postsNumber: Field,
-    blockHeight: Field,
-    initialPostState: PostState
+    blockHeight: Field
   ) {
-    const isSigned = signature.verify(userAddress, [
-      hashedPost,
+    const postStateHash = initialPostState.hash();
+    const isSigned = signature.verify(initialPostState.posterAddress, [
+      postStateHash,
       fieldToFlagPostsAsDeleted,
     ]);
     isSigned.assertTrue();
 
-    const [postsRootBefore, postKey] = postWitness.computeRootAndKey(
-      initialPostState.hash()
-    );
+    const postsRootBefore = postWitness.calculateRoot(initialPostState.hash());
     initialPostsRoot.assertEquals(postsRootBefore);
-    Poseidon.hash(userAddress.toFields().concat(hashedPost)).assertEquals(
-      postKey
-    );
-    initialPostState.deletedPost.assertFalse();
-    initialPostState.deletedAtBlockHeight.assertEquals(Field(0));
 
     const latestPostState = new PostState({
-      postNumber: initialPostState.postNumber,
-      blockHeight: initialPostState.blockHeight,
+      posterAddress: initialPostState.posterAddress,
+      postContentID: initialPostState.postContentID,
+      postedAtBlockHeight: initialPostState.postedAtBlockHeight,
       deletedPost: Bool(true),
       deletedAtBlockHeight: blockHeight,
     });
 
-    const postsRootAfter = postWitness.computeRootAndKey(
-      latestPostState.hash()
-    )[0];
+    const postsRootAfter = postWitness.calculateRoot(latestPostState.hash());
     postsRootAfter.assertEquals(latestPostsRoot);
 
     return new PostsTransition({
@@ -164,37 +163,24 @@ export const Posts = Experimental.ZkProgram({
 
   methods: {
     provePostsTransition: {
-      privateInputs: [
-        Signature,
-        PublicKey,
-        Field,
-        Field,
-        Field,
-        MerkleMapWitness,
-        Field,
-        PostState,
-      ],
+      privateInputs: [Signature, PostState, Field, Field, PostsWitness, Field],
 
       method(
         transition: PostsTransition,
         signature: Signature,
-        userAddress: PublicKey,
-        hashedPost: Field,
+        postState: PostState,
         initialPostsRoot: Field,
         latestPostsRoot: Field,
-        postWitness: MerkleMapWitness,
-        initialPostsNumber: Field,
-        postState: PostState
+        postWitness: PostsWitness,
+        initialPostsNumber: Field
       ) {
         const computedTransition = PostsTransition.createPostsTransition(
           signature,
-          userAddress,
-          hashedPost,
+          postState,
           initialPostsRoot,
           latestPostsRoot,
           postWitness,
-          initialPostsNumber,
-          postState
+          initialPostsNumber
         );
         PostsTransition.assertEquals(computedTransition, transition);
       },
@@ -230,6 +216,7 @@ export const Posts = Experimental.ZkProgram({
         postsTransition2Proof.publicInput.initialPostsNumber
           .add(1)
           .assertEquals(postsTransition2Proof.publicInput.latestPostsNumber);
+
         postsTransition1Proof.publicInput.initialPostsNumber.assertEquals(
           mergedPostsTransitions.initialPostsNumber
         );
@@ -249,38 +236,32 @@ export const Posts = Experimental.ZkProgram({
     provePostDeletionTransition: {
       privateInputs: [
         Signature,
-        PublicKey,
-        Field,
-        Field,
-        Field,
-        MerkleMapWitness,
-        Field,
-        Field,
         PostState,
+        Field,
+        Field,
+        PostsWitness,
+        Field,
+        Field,
       ],
 
       method(
         transition: PostsTransition,
         signature: Signature,
-        userAddress: PublicKey,
-        hashedPost: Field,
+        initialPostState: PostState,
         initialPostsRoot: Field,
         latestPostsRoot: Field,
-        postWitness: MerkleMapWitness,
+        postWitness: PostsWitness,
         postsNumber: Field,
-        blockHeight: Field,
-        initialPostState: PostState
+        blockHeight: Field
       ) {
         const computedTransition = PostsTransition.createPostDeletionTransition(
           signature,
-          userAddress,
-          hashedPost,
+          initialPostState,
           initialPostsRoot,
           latestPostsRoot,
           postWitness,
           postsNumber,
-          blockHeight,
-          initialPostState
+          blockHeight
         );
         PostsTransition.assertEquals(computedTransition, transition);
       },
@@ -313,6 +294,7 @@ export const Posts = Experimental.ZkProgram({
         postsDeletion1Proof.publicInput.latestPostsNumber.assertEquals(
           postsDeletion2Proof.publicInput.latestPostsNumber
         );
+
         postsDeletion1Proof.publicInput.initialPostsNumber.assertEquals(
           mergedPostsDeletions.initialPostsNumber
         );
