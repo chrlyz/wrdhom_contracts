@@ -4,12 +4,13 @@ import {
   state,
   State,
   method,
-  MerkleMap,
   UInt32,
+  MerkleTree,
+  MerkleWitness,
 } from 'snarkyjs';
 import { PostsProof } from './Posts';
 
-const postsTree = new MerkleMap();
+const postsTree = new MerkleTree(10);
 const postsRoot = postsTree.getRoot();
 
 export class EventsContract extends SmartContract {
