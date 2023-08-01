@@ -25,7 +25,6 @@ export class PostState extends Struct({
   posterAddress: PublicKey,
   postContentID: CircuitString,
   postedAtBlockHeight: Field,
-  deletedPost: Bool,
   deletedAtBlockHeight: Field,
 }) {
   hash(): Field {
@@ -35,7 +34,6 @@ export class PostState extends Struct({
         .concat([
           this.postContentID.hash(),
           this.postedAtBlockHeight,
-          this.deletedPost.toField(),
           this.deletedAtBlockHeight,
         ])
     );
@@ -71,7 +69,6 @@ export class PostsTransition extends Struct({
     initialPostsRoot.assertEquals(postsRootBefore);
 
     initialPostsNumber.assertEquals(postIndex.sub(1));
-    postState.deletedPost.assertFalse();
     postState.deletedAtBlockHeight.assertEquals(Field(0));
 
     const postsRootAfter = postWitness.calculateRoot(postState.hash());
@@ -139,7 +136,6 @@ export class PostsTransition extends Struct({
       posterAddress: initialPostState.posterAddress,
       postContentID: initialPostState.postContentID,
       postedAtBlockHeight: initialPostState.postedAtBlockHeight,
-      deletedPost: Bool(true),
       deletedAtBlockHeight: blockHeight,
     });
 

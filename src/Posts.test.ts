@@ -74,7 +74,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       posterAddress: posterAddress,
       postContentID: postContentID,
       postedAtBlockHeight: postedAtBlockHeight,
-      deletedPost: Bool(false),
       deletedAtBlockHeight: Field(0),
     });
 
@@ -109,7 +108,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       posterAddress: initialPostState.posterAddress,
       postContentID: initialPostState.postContentID,
       postedAtBlockHeight: initialPostState.postedAtBlockHeight,
-      deletedPost: Bool(true),
       deletedAtBlockHeight: deletionBlockHeight,
     });
 
@@ -283,7 +281,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       posterAddress: deployerAccount,
       postContentID: valid.postState.postContentID,
       postedAtBlockHeight: valid.postState.postedAtBlockHeight,
-      deletedPost: valid.postState.deletedPost,
       deletedAtBlockHeight: valid.postState.deletedAtBlockHeight,
     });
 
@@ -317,7 +314,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bduuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuaaaaaaaaaaaaaaaaaaaaaaaaaa'
       ),
       postedAtBlockHeight: valid.postState.postedAtBlockHeight,
-      deletedPost: valid.postState.deletedPost,
       deletedAtBlockHeight: valid.postState.deletedAtBlockHeight,
     });
 
@@ -421,7 +417,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       posterAddress: valid.postState.posterAddress,
       postContentID: valid.postState.postContentID,
       postedAtBlockHeight: Field(849),
-      deletedPost: valid.postState.deletedPost,
       deletedAtBlockHeight: valid.postState.deletedAtBlockHeight,
     });
 
@@ -825,7 +820,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bduuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuaaaaaaaaaaaaaaaaaaaaaaaaaa'
       ),
       postedAtBlockHeight: valid1.postState.postedAtBlockHeight,
-      deletedPost: valid1.postState.deletedPost,
       deletedAtBlockHeight: valid1.postState.deletedAtBlockHeight,
     });
 
