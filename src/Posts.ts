@@ -6,7 +6,6 @@ import {
   Poseidon,
   Experimental,
   SelfProof,
-  Bool,
   CircuitString,
   MerkleTree,
   MerkleWitness,
@@ -24,6 +23,7 @@ export class PostsWitness extends MerkleWitness(10) {}
 export class PostState extends Struct({
   posterAddress: PublicKey,
   postContentID: CircuitString,
+  postIndex: Field,
   postedAtBlockHeight: Field,
   deletedAtBlockHeight: Field,
 }) {
@@ -33,6 +33,7 @@ export class PostState extends Struct({
         .toFields()
         .concat([
           this.postContentID.hash(),
+          this.postIndex,
           this.postedAtBlockHeight,
           this.deletedAtBlockHeight,
         ])
@@ -45,8 +46,8 @@ export class PostState extends Struct({
 export class PostsTransition extends Struct({
   initialPostsRoot: Field,
   latestPostsRoot: Field,
-  initialPostsNumber: Field,
-  latestPostsNumber: Field,
+  initialNumberOfPosts: Field,
+  latestNumberOfPosts: Field,
   blockHeight: Field,
 }) {
   static createPostsTransition(
@@ -57,18 +58,21 @@ export class PostsTransition extends Struct({
     latestPostsRoot: Field,
     postWitness: PostsWitness,
 
-    initialPostsNumber: Field
+    initialNumberOfPosts: Field
   ) {
     const isSigned = signature.verify(postState.posterAddress, [
       postState.postContentID.hash(),
+      postState.postIndex,
     ]);
     isSigned.assertTrue();
 
     const postsRootBefore = postWitness.calculateRoot(Field(0));
-    const postIndex = postWitness.calculateIndex();
     initialPostsRoot.assertEquals(postsRootBefore);
 
-    initialPostsNumber.assertEquals(postIndex.sub(1));
+    const postIndex = postWitness.calculateIndex();
+    postState.postIndex.assertEquals(postIndex);
+    initialNumberOfPosts.assertEquals(postIndex.sub(1));
+
     postState.deletedAtBlockHeight.assertEquals(Field(0));
 
     const postsRootAfter = postWitness.calculateRoot(postState.hash());
@@ -77,8 +81,8 @@ export class PostsTransition extends Struct({
     return new PostsTransition({
       initialPostsRoot: initialPostsRoot,
       latestPostsRoot: latestPostsRoot,
-      initialPostsNumber: initialPostsNumber,
-      latestPostsNumber: postIndex,
+      initialNumberOfPosts: initialNumberOfPosts,
+      latestNumberOfPosts: postIndex,
       blockHeight: postState.postedAtBlockHeight,
     });
   }
@@ -89,8 +93,12 @@ export class PostsTransition extends Struct({
   ) {
     transition1.initialPostsRoot.assertEquals(transition2.initialPostsRoot);
     transition1.latestPostsRoot.assertEquals(transition2.latestPostsRoot);
-    transition1.initialPostsNumber.assertEquals(transition2.initialPostsNumber);
-    transition1.latestPostsNumber.assertEquals(transition2.latestPostsNumber);
+    transition1.initialNumberOfPosts.assertEquals(
+      transition2.initialNumberOfPosts
+    );
+    transition1.latestNumberOfPosts.assertEquals(
+      transition2.latestNumberOfPosts
+    );
     transition1.blockHeight.assertEquals(transition2.blockHeight);
   }
 
@@ -99,14 +107,16 @@ export class PostsTransition extends Struct({
     transition2: PostsTransition
   ) {
     transition1.latestPostsRoot.assertEquals(transition2.initialPostsRoot);
-    transition1.latestPostsNumber.assertEquals(transition2.initialPostsNumber);
+    transition1.latestNumberOfPosts.assertEquals(
+      transition2.initialNumberOfPosts
+    );
     transition1.blockHeight.assertEquals(transition2.blockHeight);
 
     return new PostsTransition({
       initialPostsRoot: transition1.initialPostsRoot,
       latestPostsRoot: transition2.latestPostsRoot,
-      initialPostsNumber: transition1.initialPostsNumber,
-      latestPostsNumber: transition2.latestPostsNumber,
+      initialNumberOfPosts: transition1.initialNumberOfPosts,
+      latestNumberOfPosts: transition2.latestNumberOfPosts,
       blockHeight: transition2.blockHeight,
     });
   }
@@ -119,7 +129,7 @@ export class PostsTransition extends Struct({
     latestPostsRoot: Field,
     postWitness: PostsWitness,
 
-    postsNumber: Field,
+    numberOfPosts: Field,
     blockHeight: Field
   ) {
     const postStateHash = initialPostState.hash();
@@ -135,6 +145,7 @@ export class PostsTransition extends Struct({
     const latestPostState = new PostState({
       posterAddress: initialPostState.posterAddress,
       postContentID: initialPostState.postContentID,
+      postIndex: initialPostState.postIndex,
       postedAtBlockHeight: initialPostState.postedAtBlockHeight,
       deletedAtBlockHeight: blockHeight,
     });
@@ -145,8 +156,8 @@ export class PostsTransition extends Struct({
     return new PostsTransition({
       initialPostsRoot: initialPostsRoot,
       latestPostsRoot: latestPostsRoot,
-      initialPostsNumber: postsNumber,
-      latestPostsNumber: postsNumber,
+      initialNumberOfPosts: numberOfPosts,
+      latestNumberOfPosts: numberOfPosts,
       blockHeight: blockHeight,
     });
   }
@@ -203,21 +214,21 @@ export const Posts = Experimental.ZkProgram({
           mergedPostsTransitions.latestPostsRoot
         );
 
-        postsTransition1Proof.publicInput.latestPostsNumber.assertEquals(
-          postsTransition2Proof.publicInput.initialPostsNumber
+        postsTransition1Proof.publicInput.latestNumberOfPosts.assertEquals(
+          postsTransition2Proof.publicInput.initialNumberOfPosts
         );
-        postsTransition1Proof.publicInput.initialPostsNumber
+        postsTransition1Proof.publicInput.initialNumberOfPosts
           .add(1)
-          .assertEquals(postsTransition1Proof.publicInput.latestPostsNumber);
-        postsTransition2Proof.publicInput.initialPostsNumber
+          .assertEquals(postsTransition1Proof.publicInput.latestNumberOfPosts);
+        postsTransition2Proof.publicInput.initialNumberOfPosts
           .add(1)
-          .assertEquals(postsTransition2Proof.publicInput.latestPostsNumber);
+          .assertEquals(postsTransition2Proof.publicInput.latestNumberOfPosts);
 
-        postsTransition1Proof.publicInput.initialPostsNumber.assertEquals(
-          mergedPostsTransitions.initialPostsNumber
+        postsTransition1Proof.publicInput.initialNumberOfPosts.assertEquals(
+          mergedPostsTransitions.initialNumberOfPosts
         );
-        postsTransition2Proof.publicInput.latestPostsNumber.assertEquals(
-          mergedPostsTransitions.latestPostsNumber
+        postsTransition2Proof.publicInput.latestNumberOfPosts.assertEquals(
+          mergedPostsTransitions.latestNumberOfPosts
         );
 
         postsTransition1Proof.publicInput.blockHeight.assertEquals(
@@ -284,18 +295,18 @@ export const Posts = Experimental.ZkProgram({
           mergedPostsDeletions.latestPostsRoot
         );
 
-        postsDeletion1Proof.publicInput.initialPostsNumber.assertEquals(
-          postsDeletion2Proof.publicInput.initialPostsNumber
+        postsDeletion1Proof.publicInput.initialNumberOfPosts.assertEquals(
+          postsDeletion2Proof.publicInput.initialNumberOfPosts
         );
-        postsDeletion1Proof.publicInput.latestPostsNumber.assertEquals(
-          postsDeletion2Proof.publicInput.latestPostsNumber
+        postsDeletion1Proof.publicInput.latestNumberOfPosts.assertEquals(
+          postsDeletion2Proof.publicInput.latestNumberOfPosts
         );
 
-        postsDeletion1Proof.publicInput.initialPostsNumber.assertEquals(
-          mergedPostsDeletions.initialPostsNumber
+        postsDeletion1Proof.publicInput.initialNumberOfPosts.assertEquals(
+          mergedPostsDeletions.initialNumberOfPosts
         );
-        postsDeletion1Proof.publicInput.latestPostsNumber.assertEquals(
-          mergedPostsDeletions.latestPostsNumber
+        postsDeletion1Proof.publicInput.latestNumberOfPosts.assertEquals(
+          mergedPostsDeletions.latestNumberOfPosts
         );
 
         postsDeletion1Proof.publicInput.blockHeight.assertEquals(

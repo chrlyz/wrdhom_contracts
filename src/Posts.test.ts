@@ -13,7 +13,6 @@ import {
   PublicKey,
   AccountUpdate,
   Signature,
-  Bool,
   CircuitString,
   MerkleTree,
 } from 'snarkyjs';
@@ -65,7 +64,10 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     postedAtBlockHeight: Field,
     postIndex: bigint
   ) {
-    const signature = Signature.create(posterKey, [postContentID.hash()]);
+    const signature = Signature.create(posterKey, [
+      postContentID.hash(),
+      Field(postIndex),
+    ]);
     const initialPostsRoot = postsTree.getRoot();
     const witness = postsTree.getWitness(postIndex);
     const postWitness = new PostsWitness(witness);
@@ -73,6 +75,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const postState = new PostState({
       posterAddress: posterAddress,
       postContentID: postContentID,
+      postIndex: Field(postIndex),
       postedAtBlockHeight: postedAtBlockHeight,
       deletedAtBlockHeight: Field(0),
     });
@@ -92,8 +95,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   function createPostDeletionTransitionValidInputs(
     posterKey: PrivateKey,
     initialPostState: PostState,
-    deletionBlockHeight: Field,
-    postIndex: bigint
+    deletionBlockHeight: Field
   ) {
     const postStateHash = initialPostState.hash();
     const signature = Signature.create(posterKey, [
@@ -101,17 +103,21 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       fieldToFlagPostsAsDeleted,
     ]);
     const initialPostsRoot = postsTree.getRoot();
-    const witness = postsTree.getWitness(postIndex);
+    const witness = postsTree.getWitness(initialPostState.postIndex.toBigInt());
     const postWitness = new PostsWitness(witness);
 
     const latestPostState = new PostState({
       posterAddress: initialPostState.posterAddress,
       postContentID: initialPostState.postContentID,
+      postIndex: initialPostState.postIndex,
       postedAtBlockHeight: initialPostState.postedAtBlockHeight,
       deletedAtBlockHeight: deletionBlockHeight,
     });
 
-    postsTree.setLeaf(postIndex, latestPostState.hash());
+    postsTree.setLeaf(
+      initialPostState.postIndex.toBigInt(),
+      latestPostState.hash()
+    );
     const latestPostsRoot = postsTree.getRoot();
 
     return {
@@ -127,21 +133,21 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
   it(`generates and deploys the 'EventsContract'`, async () => {
     await localDeploy();
     const currentPostsRoot = zkApp.posts.get();
-    const currentPostsNumber = zkApp.postsNumber.get();
+    const currentNumberOfPosts = zkApp.numberOfPosts.get();
     const postsRoot = postsTree.getRoot();
 
     expect(currentPostsRoot).toEqual(postsRoot);
-    expect(currentPostsNumber).toEqual(Field(0));
+    expect(currentNumberOfPosts).toEqual(Field(0));
   });
 
   it(`updates the state of the 'EventsContract', when publishing a post`, async () => {
     await localDeploy();
 
     let currentPostsRoot = zkApp.posts.get();
-    let currentPostsNumber = zkApp.postsNumber.get();
+    let currentNumberOfPosts = zkApp.numberOfPosts.get();
     const postsRoot = postsTree.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
-    expect(currentPostsNumber).toEqual(Field(0));
+    expect(currentNumberOfPosts).toEqual(Field(0));
 
     const valid = createPostsTransitionValidInputs(
       senderAccount,
@@ -180,9 +186,9 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await txn.sign([senderKey]).send();
 
     currentPostsRoot = zkApp.posts.get();
-    currentPostsNumber = zkApp.postsNumber.get();
+    currentNumberOfPosts = zkApp.numberOfPosts.get();
     expect(currentPostsRoot).toEqual(valid.latestPostsRoot);
-    expect(currentPostsNumber).toEqual(Field(1));
+    expect(currentNumberOfPosts).toEqual(Field(1));
   });
 
   test(`if 'transition' and 'computedTransition' mismatch,\
@@ -202,8 +208,8 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const transition = new PostsTransition({
       initialPostsRoot: Field(111),
       latestPostsRoot: valid.latestPostsRoot,
-      initialPostsNumber: postIndex.sub(1),
-      latestPostsNumber: postIndex,
+      initialNumberOfPosts: postIndex.sub(1),
+      latestNumberOfPosts: postIndex,
       blockHeight: valid.postState.postedAtBlockHeight,
     });
 
@@ -220,7 +226,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
   });
 
-  test(`if 'postState.blockHeight' and 'currentSlot' at the moment of\
+  test(`if 'postState.postedAtBlockHeight' and 'currentSlot' at the moment of\
   transaction inclusion mismatch, 'EventsContract.update()' throws\
   'Valid_while_precondition_unsatisfied' error`, async () => {
     await localDeploy();
@@ -280,6 +286,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const invalidPostState = new PostState({
       posterAddress: deployerAccount,
       postContentID: valid.postState.postContentID,
+      postIndex: valid.postState.postIndex,
       postedAtBlockHeight: valid.postState.postedAtBlockHeight,
       deletedAtBlockHeight: valid.postState.deletedAtBlockHeight,
     });
@@ -313,6 +320,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       postContentID: CircuitString.fromString(
         'bduuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuaaaaaaaaaaaaaaaaaaaaaaaaaa'
       ),
+      postIndex: valid.postState.postIndex,
       postedAtBlockHeight: valid.postState.postedAtBlockHeight,
       deletedAtBlockHeight: valid.postState.deletedAtBlockHeight,
     });
@@ -377,7 +385,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     }).toThrowError(`Field.assertEquals()`);
   });
 
-  test(`if 'initialPostsNumber' is not equal to the key derived from 'postWitness' minus one,\
+  test(`if 'initialNumberOfPosts' is not equal to the key derived from 'postWitness' minus one,\
   'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
@@ -401,6 +409,35 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     }).toThrowError(`Field.assertEquals()`);
   });
 
+  test(`if the signed message doesn't include the correct index of the post,
+  'createPostsTransition()' throws a 'Bool.assertTrue()' error`, async () => {
+    const valid = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
+      Field(1),
+      1n
+    );
+
+    const invalidSignature = Signature.create(senderKey, [
+      valid.postState.postContentID.hash(),
+      Field(2n),
+    ]);
+
+    expect(() => {
+      PostsTransition.createPostsTransition(
+        invalidSignature,
+        valid.postState,
+        valid.initialPostsRoot,
+        valid.latestPostsRoot,
+        valid.postWitness,
+        valid.postWitness.calculateIndex().sub(1)
+      );
+    }).toThrowError(`Bool.assertTrue()`);
+  });
+
   test(`if 'postState' doesn't generate a root equal to 'latestPostsRoot',\
   'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
     const valid = createPostsTransitionValidInputs(
@@ -416,6 +453,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const invalidPostState = new PostState({
       posterAddress: valid.postState.posterAddress,
       postContentID: valid.postState.postContentID,
+      postIndex: valid.postState.postIndex,
       postedAtBlockHeight: Field(849),
       deletedAtBlockHeight: valid.postState.deletedAtBlockHeight,
     });
@@ -436,10 +474,10 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await localDeploy();
 
     let currentPostsRoot = zkApp.posts.get();
-    let currentPostsNumber = zkApp.postsNumber.get();
+    let currentNumberOfPosts = zkApp.numberOfPosts.get();
     const postsRoot = postsTree.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
-    expect(currentPostsNumber).toEqual(Field(0));
+    expect(currentNumberOfPosts).toEqual(Field(0));
 
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
@@ -516,19 +554,19 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await txn.sign([senderKey]).send();
 
     currentPostsRoot = zkApp.posts.get();
-    currentPostsNumber = zkApp.postsNumber.get();
+    currentNumberOfPosts = zkApp.numberOfPosts.get();
     expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
-    expect(currentPostsNumber).toEqual(Field(2));
+    expect(currentNumberOfPosts).toEqual(Field(2));
   });
 
   it(`merges 'PostsTransition' proofs from 2 different users`, async () => {
     await localDeploy();
 
     let currentPostsRoot = zkApp.posts.get();
-    let currentPostsNumber = zkApp.postsNumber.get();
+    let currentNumberOfPosts = zkApp.numberOfPosts.get();
     const postsRoot = postsTree.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
-    expect(currentPostsNumber).toEqual(Field(0));
+    expect(currentNumberOfPosts).toEqual(Field(0));
 
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
@@ -605,19 +643,19 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await txn.sign([senderKey]).send();
 
     currentPostsRoot = zkApp.posts.get();
-    currentPostsNumber = zkApp.postsNumber.get();
+    currentNumberOfPosts = zkApp.numberOfPosts.get();
     expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
-    expect(currentPostsNumber).toEqual(Field(2));
+    expect(currentNumberOfPosts).toEqual(Field(2));
   });
 
   it(`updates the state of the 'EventsContract', when deleting a post`, async () => {
     await localDeploy();
 
     let currentPostsRoot = zkApp.posts.get();
-    let currentPostsNumber = zkApp.postsNumber.get();
+    let currentNumberOfPosts = zkApp.numberOfPosts.get();
     const postsRoot = postsTree.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
-    expect(currentPostsNumber).toEqual(Field(0));
+    expect(currentNumberOfPosts).toEqual(Field(0));
 
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
@@ -655,17 +693,16 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await txn1.sign([senderKey]).send();
 
     currentPostsRoot = zkApp.posts.get();
-    currentPostsNumber = zkApp.postsNumber.get();
+    currentNumberOfPosts = zkApp.numberOfPosts.get();
     expect(currentPostsRoot).toEqual(valid1.latestPostsRoot);
-    expect(currentPostsNumber).toEqual(Field(1));
+    expect(currentNumberOfPosts).toEqual(Field(1));
 
     Local.setGlobalSlot(2);
 
     const valid2 = createPostDeletionTransitionValidInputs(
       senderKey,
       valid1.postState,
-      Field(2),
-      1n
+      Field(2)
     );
     const transition2 = PostsTransition.createPostDeletionTransition(
       valid2.signature,
@@ -695,10 +732,10 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await txn2.sign([senderKey]).send();
 
     currentPostsRoot = zkApp.posts.get();
-    currentPostsNumber = zkApp.postsNumber.get();
+    currentNumberOfPosts = zkApp.numberOfPosts.get();
     expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
     expect(valid1.latestPostsRoot).not.toEqual(valid2.latestPostsRoot);
-    expect(currentPostsNumber).toEqual(Field(1));
+    expect(currentNumberOfPosts).toEqual(Field(1));
   });
 
   test(`if 'transition' and 'computedTransition' mismatch,\
@@ -744,16 +781,15 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid2 = createPostDeletionTransitionValidInputs(
       senderKey,
       valid1.postState,
-      Field(2),
-      1n
+      Field(2)
     );
 
-    const numberOfposts = Field(1);
+    const numberOfPosts = Field(1);
     const transition2 = new PostsTransition({
       initialPostsRoot: Field(849),
       latestPostsRoot: valid2.latestPostsRoot,
-      initialPostsNumber: numberOfposts,
-      latestPostsNumber: numberOfposts,
+      initialNumberOfPosts: numberOfPosts,
+      latestNumberOfPosts: numberOfPosts,
       blockHeight: valid2.initialPostState.deletedAtBlockHeight,
     });
 
@@ -786,8 +822,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid2 = createPostDeletionTransitionValidInputs(
       deployerKey,
       valid1.postState,
-      Field(2),
-      1n
+      Field(2)
     );
 
     expect(() => {
@@ -819,6 +854,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       postContentID: CircuitString.fromString(
         'bduuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuaaaaaaaaaaaaaaaaaaaaaaaaaa'
       ),
+      postIndex: valid1.postState.postIndex,
       postedAtBlockHeight: valid1.postState.postedAtBlockHeight,
       deletedAtBlockHeight: valid1.postState.deletedAtBlockHeight,
     });
@@ -826,8 +862,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid2 = createPostDeletionTransitionValidInputs(
       senderKey,
       valid1.postState,
-      Field(1),
-      1n
+      Field(1)
     );
 
     expect(() => {
@@ -857,8 +892,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid2 = createPostDeletionTransitionValidInputs(
       senderKey,
       valid1.postState,
-      Field(1),
-      1n
+      Field(1)
     );
 
     expect(() => {
@@ -888,8 +922,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid2 = createPostDeletionTransitionValidInputs(
       senderKey,
       valid1.postState,
-      Field(1),
-      1n
+      Field(1)
     );
 
     expect(() => {
@@ -919,8 +952,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid2 = createPostDeletionTransitionValidInputs(
       senderKey,
       valid1.postState,
-      Field(1),
-      1n
+      Field(1)
     );
 
     const emptyTree = new MerkleTree(10);
@@ -943,10 +975,10 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await localDeploy();
 
     let currentPostsRoot = zkApp.posts.get();
-    let currentPostsNumber = zkApp.postsNumber.get();
+    let currentNumberOfPosts = zkApp.numberOfPosts.get();
     const postsRoot = postsTree.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
-    expect(currentPostsNumber).toEqual(Field(0));
+    expect(currentNumberOfPosts).toEqual(Field(0));
 
     const valid1 = createPostsTransitionValidInputs(
       senderAccount,
@@ -1023,9 +1055,9 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await txn1.sign([senderKey]).send();
 
     currentPostsRoot = zkApp.posts.get();
-    currentPostsNumber = zkApp.postsNumber.get();
+    currentNumberOfPosts = zkApp.numberOfPosts.get();
     expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
-    expect(currentPostsNumber).toEqual(Field(2));
+    expect(currentNumberOfPosts).toEqual(Field(2));
 
     Local.setGlobalSlot(2);
     const deletedAtBlockHeight = Field(2);
@@ -1034,8 +1066,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid3 = createPostDeletionTransitionValidInputs(
       senderKey,
       valid1.postState,
-      deletedAtBlockHeight,
-      1n
+      deletedAtBlockHeight
     );
     const transition3 = PostsTransition.createPostDeletionTransition(
       valid3.signature,
@@ -1060,8 +1091,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const valid4 = createPostDeletionTransitionValidInputs(
       deployerKey,
       valid2.postState,
-      deletedAtBlockHeight,
-      2n
+      deletedAtBlockHeight
     );
     const transition4 = PostsTransition.createPostDeletionTransition(
       valid4.signature,
@@ -1102,11 +1132,11 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await txn2.sign([senderKey]).send();
 
     currentPostsRoot = zkApp.posts.get();
-    currentPostsNumber = zkApp.postsNumber.get();
+    currentNumberOfPosts = zkApp.numberOfPosts.get();
     expect(currentPostsRoot).toEqual(valid4.latestPostsRoot);
     expect(valid1.latestPostsRoot).not.toEqual(valid2.latestPostsRoot);
     expect(valid2.latestPostsRoot).not.toEqual(valid3.latestPostsRoot);
     expect(valid3.latestPostsRoot).not.toEqual(valid4.latestPostsRoot);
-    expect(currentPostsNumber).toEqual(Field(2));
+    expect(currentNumberOfPosts).toEqual(Field(2));
   });
 });
