@@ -6,7 +6,6 @@ import {
   method,
   UInt32,
   MerkleTree,
-  MerkleWitness,
 } from 'snarkyjs';
 import { PostsProof } from './Posts';
 
@@ -15,12 +14,12 @@ const postsRoot = postsTree.getRoot();
 
 export class EventsContract extends SmartContract {
   @state(Field) posts = State<Field>();
-  @state(Field) postsNumber = State<Field>();
+  @state(Field) numberOfPosts = State<Field>();
 
   init() {
     super.init();
     this.posts.set(postsRoot);
-    this.postsNumber.set(Field(0));
+    this.numberOfPosts.set(Field(0));
   }
 
   @method update(rollupProof: PostsProof) {
@@ -34,10 +33,12 @@ export class EventsContract extends SmartContract {
     const currentState = this.posts.getAndAssertEquals();
     rollupProof.publicInput.initialPostsRoot.assertEquals(currentState);
 
-    const currentPostsNumber = this.postsNumber.getAndAssertEquals();
-    rollupProof.publicInput.initialPostsNumber.assertEquals(currentPostsNumber);
+    const currentPostsNumber = this.numberOfPosts.getAndAssertEquals();
+    rollupProof.publicInput.initialNumberOfPosts.assertEquals(
+      currentPostsNumber
+    );
 
     this.posts.set(rollupProof.publicInput.latestPostsRoot);
-    this.postsNumber.set(rollupProof.publicInput.latestPostsNumber);
+    this.numberOfPosts.set(rollupProof.publicInput.latestNumberOfPosts);
   }
 }
