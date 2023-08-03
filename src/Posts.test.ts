@@ -4,7 +4,6 @@ import {
   PostState,
   Posts,
   fieldToFlagPostsAsDeleted,
-  PostsWitness,
 } from './Posts';
 import {
   Field,
@@ -15,6 +14,8 @@ import {
   Signature,
   CircuitString,
   MerkleTree,
+  Poseidon,
+  MerkleMap,
 } from 'snarkyjs';
 
 let proofsEnabled = true;
@@ -27,7 +28,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     zkAppAddress: PublicKey,
     zkAppPrivateKey: PrivateKey,
     zkApp: EventsContract,
-    postsTree: MerkleTree,
+    postsTree: MerkleMap,
     Local: ReturnType<typeof Mina.LocalBlockchain>;
 
   beforeAll(async () => {
@@ -45,7 +46,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     zkAppPrivateKey = PrivateKey.random();
     zkAppAddress = zkAppPrivateKey.toPublicKey();
     zkApp = new EventsContract(zkAppAddress);
-    postsTree = new MerkleTree(10);
+    postsTree = new MerkleMap();
   });
 
   async function localDeploy() {
@@ -62,25 +63,24 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     posterKey: PrivateKey,
     postContentID: CircuitString,
     postedAtBlockHeight: Field,
-    postIndex: bigint
+    postIndex: Field
   ) {
-    const signature = Signature.create(posterKey, [
-      postContentID.hash(),
-      Field(postIndex),
-    ]);
+    const signature = Signature.create(posterKey, [postContentID.hash()]);
     const initialPostsRoot = postsTree.getRoot();
-    const witness = postsTree.getWitness(postIndex);
-    const postWitness = new PostsWitness(witness);
+    const postKey = Poseidon.hash(
+      posterAddress.toFields().concat(postContentID.hash())
+    );
+    const postWitness = postsTree.getWitness(postKey);
 
     const postState = new PostState({
       posterAddress: posterAddress,
       postContentID: postContentID,
-      postIndex: Field(postIndex),
+      postIndex: postIndex,
       postedAtBlockHeight: postedAtBlockHeight,
       deletedAtBlockHeight: Field(0),
     });
 
-    postsTree.setLeaf(postIndex, postState.hash());
+    postsTree.set(postKey, postState.hash());
     const latestPostsRoot = postsTree.getRoot();
 
     return {
@@ -103,8 +103,12 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       fieldToFlagPostsAsDeleted,
     ]);
     const initialPostsRoot = postsTree.getRoot();
-    const witness = postsTree.getWitness(initialPostState.postIndex.toBigInt());
-    const postWitness = new PostsWitness(witness);
+    const postKey = Poseidon.hash(
+      initialPostState.posterAddress
+        .toFields()
+        .concat(initialPostState.postContentID.hash())
+    );
+    const postWitness = postsTree.getWitness(postKey);
 
     const latestPostState = new PostState({
       posterAddress: initialPostState.posterAddress,
@@ -114,10 +118,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       deletedAtBlockHeight: deletionBlockHeight,
     });
 
-    postsTree.setLeaf(
-      initialPostState.postIndex.toBigInt(),
-      latestPostState.hash()
-    );
+    postsTree.set(postKey, latestPostState.hash());
     const latestPostsRoot = postsTree.getRoot();
 
     return {
@@ -156,7 +157,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
 
     const transition = PostsTransition.createPostsTransition(
@@ -165,7 +166,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.postWitness,
-      valid.postWitness.calculateIndex().sub(1)
+      valid.postState.postIndex.sub(1)
     );
 
     const proof = await Posts.provePostsTransition(
@@ -175,7 +176,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.postWitness,
-      valid.postWitness.calculateIndex().sub(1)
+      valid.postState.postIndex.sub(1)
     );
 
     const txn = await Mina.transaction(senderAccount, () => {
@@ -200,16 +201,16 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
 
-    const postIndex = valid.postWitness.calculateIndex();
+    valid.postState.postIndex;
 
     const transition = new PostsTransition({
       initialPostsRoot: Field(111),
       latestPostsRoot: valid.latestPostsRoot,
-      initialNumberOfPosts: postIndex.sub(1),
-      latestNumberOfPosts: postIndex,
+      initialNumberOfPosts: valid.postState.postIndex.sub(1),
+      latestNumberOfPosts: valid.postState.postIndex,
       blockHeight: valid.postState.postedAtBlockHeight,
     });
 
@@ -221,7 +222,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postWitness.calculateIndex().sub(1)
+        valid.postState.postIndex.sub(1)
       );
     }).rejects.toThrowError(`Constraint unsatisfied (unreduced)`);
   });
@@ -238,7 +239,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(2),
-      1n
+      Field(1)
     );
 
     const transition = PostsTransition.createPostsTransition(
@@ -247,7 +248,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.postWitness,
-      valid.postWitness.calculateIndex().sub(1)
+      valid.postState.postIndex.sub(1)
     );
 
     const proof = await Posts.provePostsTransition(
@@ -257,7 +258,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid.initialPostsRoot,
       valid.latestPostsRoot,
       valid.postWitness,
-      valid.postWitness.calculateIndex().sub(1)
+      valid.postState.postIndex.sub(1)
     );
 
     const txn = await Mina.transaction(senderAccount, () => {
@@ -271,6 +272,58 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     }).rejects.toThrowError(`Valid_while_precondition_unsatisfied`);
   });
 
+  test(`if the user has already posted the content,\
+  'createPostsTransition()' throws a 'Field.assertEquals()' error `, async () => {
+    const valid1 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
+      Field(1),
+      Field(1)
+    );
+    const transition1 = PostsTransition.createPostsTransition(
+      valid1.signature,
+      valid1.postState,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.postWitness,
+      valid1.postState.postIndex.sub(1)
+    );
+
+    const proof1 = await Posts.provePostsTransition(
+      transition1,
+      valid1.signature,
+      valid1.postState,
+      valid1.initialPostsRoot,
+      valid1.latestPostsRoot,
+      valid1.postWitness,
+      valid1.postState.postIndex.sub(1)
+    );
+
+    const valid2 = createPostsTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
+      Field(1),
+      Field(2)
+    );
+
+    expect(() => {
+      const transition2 = PostsTransition.createPostsTransition(
+        valid2.signature,
+        valid2.postState,
+        valid2.initialPostsRoot,
+        valid2.latestPostsRoot,
+        valid2.postWitness,
+        valid2.postState.postIndex.sub(1)
+      );
+    }).toThrowError(`Field.assertEquals()`);
+  });
+
   test(`if 'postContentID' is signed by a different account,\
   the signature for 'postContentID' is invalid in 'createPostsTransition()'`, async () => {
     const valid = createPostsTransitionValidInputs(
@@ -280,7 +333,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
 
     const invalidPostState = new PostState({
@@ -298,7 +351,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postWitness.calculateIndex().sub(1)
+        valid.postState.postIndex.sub(1)
       );
     }).toThrowError(`Bool.assertTrue()`);
   });
@@ -312,7 +365,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
 
     const invalidPostState = new PostState({
@@ -332,7 +385,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postWitness.calculateIndex().sub(1)
+        valid.postState.postIndex.sub(1)
       );
     }).toThrowError(`Bool.assertTrue()`);
   });
@@ -346,7 +399,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
 
     expect(() => {
@@ -356,7 +409,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         Field(849),
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postWitness.calculateIndex().sub(1)
+        valid.postState.postIndex.sub(1)
       );
     }).toThrowError(`Field.assertEquals()`);
   });
@@ -370,7 +423,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
 
     expect(() => {
@@ -380,7 +433,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         valid.initialPostsRoot,
         Field(849),
         valid.postWitness,
-        valid.postWitness.calculateIndex().sub(1)
+        valid.postState.postIndex.sub(1)
       );
     }).toThrowError(`Field.assertEquals()`);
   });
@@ -394,7 +447,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
 
     expect(() => {
@@ -409,35 +462,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     }).toThrowError(`Field.assertEquals()`);
   });
 
-  test(`if the signed message doesn't include the correct index of the post,
-  'createPostsTransition()' throws a 'Bool.assertTrue()' error`, async () => {
-    const valid = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      CircuitString.fromString(
-        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
-      ),
-      Field(1),
-      1n
-    );
-
-    const invalidSignature = Signature.create(senderKey, [
-      valid.postState.postContentID.hash(),
-      Field(2n),
-    ]);
-
-    expect(() => {
-      PostsTransition.createPostsTransition(
-        invalidSignature,
-        valid.postState,
-        valid.initialPostsRoot,
-        valid.latestPostsRoot,
-        valid.postWitness,
-        valid.postWitness.calculateIndex().sub(1)
-      );
-    }).toThrowError(`Bool.assertTrue()`);
-  });
-
   test(`if 'postState' doesn't generate a root equal to 'latestPostsRoot',\
   'createPostsTransition()' throws a 'Field.assertEquals()' error`, async () => {
     const valid = createPostsTransitionValidInputs(
@@ -447,7 +471,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
 
     const invalidPostState = new PostState({
@@ -465,7 +489,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         valid.initialPostsRoot,
         valid.latestPostsRoot,
         valid.postWitness,
-        valid.postWitness.calculateIndex().sub(1)
+        valid.postState.postIndex.sub(1)
       );
     }).toThrowError(`Field.assertEquals()`);
   });
@@ -486,7 +510,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
@@ -494,7 +518,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postWitness.calculateIndex().sub(1)
+      valid1.postState.postIndex.sub(1)
     );
 
     const proof1 = await Posts.provePostsTransition(
@@ -504,17 +528,17 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postWitness.calculateIndex().sub(1)
+      valid1.postState.postIndex.sub(1)
     );
 
     const valid2 = createPostsTransitionValidInputs(
       senderAccount,
       senderKey,
       CircuitString.fromString(
-        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+        'bafybeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'
       ),
       Field(1),
-      2n
+      Field(2)
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
@@ -522,7 +546,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
-      valid2.postWitness.calculateIndex().sub(1)
+      valid2.postState.postIndex.sub(1)
     );
 
     const proof2 = await Posts.provePostsTransition(
@@ -532,96 +556,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
-      valid2.postWitness.calculateIndex().sub(1)
-    );
-
-    const mergedTransitions = PostsTransition.mergePostsTransitions(
-      transition1,
-      transition2
-    );
-
-    const mergedTransitionsProof = await Posts.proveMergedPostsTransitions(
-      mergedTransitions,
-      proof1,
-      proof2
-    );
-
-    const txn = await Mina.transaction(senderAccount, () => {
-      zkApp.update(mergedTransitionsProof);
-    });
-
-    await txn.prove();
-    await txn.sign([senderKey]).send();
-
-    currentPostsRoot = zkApp.posts.get();
-    currentNumberOfPosts = zkApp.numberOfPosts.get();
-    expect(currentPostsRoot).toEqual(valid2.latestPostsRoot);
-    expect(currentNumberOfPosts).toEqual(Field(2));
-  });
-
-  it(`merges 'PostsTransition' proofs from 2 different users`, async () => {
-    await localDeploy();
-
-    let currentPostsRoot = zkApp.posts.get();
-    let currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsTree.getRoot();
-    expect(currentPostsRoot).toEqual(postsRoot);
-    expect(currentNumberOfPosts).toEqual(Field(0));
-
-    const valid1 = createPostsTransitionValidInputs(
-      senderAccount,
-      senderKey,
-      CircuitString.fromString(
-        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
-      ),
-      Field(1),
-      1n
-    );
-    const transition1 = PostsTransition.createPostsTransition(
-      valid1.signature,
-      valid1.postState,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postWitness.calculateIndex().sub(1)
-    );
-
-    const proof1 = await Posts.provePostsTransition(
-      transition1,
-      valid1.signature,
-      valid1.postState,
-      valid1.initialPostsRoot,
-      valid1.latestPostsRoot,
-      valid1.postWitness,
-      valid1.postWitness.calculateIndex().sub(1)
-    );
-
-    const valid2 = createPostsTransitionValidInputs(
-      deployerAccount,
-      deployerKey,
-      CircuitString.fromString(
-        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
-      ),
-      Field(1),
-      2n
-    );
-    const transition2 = PostsTransition.createPostsTransition(
-      valid2.signature,
-      valid2.postState,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postWitness.calculateIndex().sub(1)
-    );
-
-    const proof2 = await Posts.provePostsTransition(
-      transition2,
-      valid2.signature,
-      valid2.postState,
-      valid2.initialPostsRoot,
-      valid2.latestPostsRoot,
-      valid2.postWitness,
-      valid2.postWitness.calculateIndex().sub(1)
+      valid2.postState.postIndex.sub(1)
     );
 
     const mergedTransitions = PostsTransition.mergePostsTransitions(
@@ -664,7 +599,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
@@ -672,7 +607,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postWitness.calculateIndex().sub(1)
+      valid1.postState.postIndex.sub(1)
     );
 
     const proof1 = await Posts.provePostsTransition(
@@ -682,7 +617,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postWitness.calculateIndex().sub(1)
+      valid1.postState.postIndex.sub(1)
     );
 
     const txn1 = await Mina.transaction(senderAccount, () => {
@@ -749,7 +684,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
@@ -757,7 +692,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postWitness.calculateIndex().sub(1)
+      valid1.postState.postIndex.sub(1)
     );
 
     const proof1 = await Posts.provePostsTransition(
@@ -767,7 +702,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postWitness.calculateIndex().sub(1)
+      valid1.postState.postIndex.sub(1)
     );
 
     const txn1 = await Mina.transaction(senderAccount, () => {
@@ -816,7 +751,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
 
     const valid2 = createPostDeletionTransitionValidInputs(
@@ -847,7 +782,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
     const invalidPostState = new PostState({
       posterAddress: valid1.postState.posterAddress,
@@ -887,7 +822,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
     const valid2 = createPostDeletionTransitionValidInputs(
       senderKey,
@@ -917,7 +852,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
     const valid2 = createPostDeletionTransitionValidInputs(
       senderKey,
@@ -947,7 +882,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
     const valid2 = createPostDeletionTransitionValidInputs(
       senderKey,
@@ -987,7 +922,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      1n
+      Field(1)
     );
     const transition1 = PostsTransition.createPostsTransition(
       valid1.signature,
@@ -995,7 +930,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postWitness.calculateIndex().sub(1)
+      valid1.postState.postIndex.sub(1)
     );
 
     const proof1 = await Posts.provePostsTransition(
@@ -1005,7 +940,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid1.initialPostsRoot,
       valid1.latestPostsRoot,
       valid1.postWitness,
-      valid1.postWitness.calculateIndex().sub(1)
+      valid1.postState.postIndex.sub(1)
     );
 
     const valid2 = createPostsTransitionValidInputs(
@@ -1015,7 +950,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
-      2n
+      Field(2)
     );
     const transition2 = PostsTransition.createPostsTransition(
       valid2.signature,
@@ -1023,7 +958,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
-      valid2.postWitness.calculateIndex().sub(1)
+      valid2.postState.postIndex.sub(1)
     );
 
     const proof2 = await Posts.provePostsTransition(
@@ -1033,7 +968,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       valid2.initialPostsRoot,
       valid2.latestPostsRoot,
       valid2.postWitness,
-      valid2.postWitness.calculateIndex().sub(1)
+      valid2.postState.postIndex.sub(1)
     );
 
     const mergedTransitions1 = PostsTransition.mergePostsTransitions(
