@@ -7,16 +7,14 @@ import {
   Experimental,
   SelfProof,
   CircuitString,
-  MerkleTree,
-  MerkleWitness,
+  MerkleMap,
+  MerkleMapWitness,
 } from 'snarkyjs';
 
 // ============================================================================
 
 export const fieldToFlagPostsAsDeleted = Field(93137);
-const postsTree = new MerkleTree(10);
-const postsRoot = postsTree.getRoot();
-export class PostsWitness extends MerkleWitness(10) {}
+const postsTree = new MerkleMap();
 
 // ============================================================================
 
@@ -56,33 +54,37 @@ export class PostsTransition extends Struct({
 
     initialPostsRoot: Field,
     latestPostsRoot: Field,
-    postWitness: PostsWitness,
+    postWitness: MerkleMapWitness,
 
     initialNumberOfPosts: Field
   ) {
     const isSigned = signature.verify(postState.posterAddress, [
       postState.postContentID.hash(),
-      postState.postIndex,
     ]);
     isSigned.assertTrue();
 
-    const postsRootBefore = postWitness.calculateRoot(Field(0));
-    initialPostsRoot.assertEquals(postsRootBefore);
+    const [postsRootBefore, postKey] = postWitness.computeRootAndKey(Field(0));
+    postsRootBefore.assertEquals(initialPostsRoot);
+    postKey.assertEquals(
+      Poseidon.hash(
+        postState.posterAddress
+          .toFields()
+          .concat(postState.postContentID.hash())
+      )
+    );
 
-    const postIndex = postWitness.calculateIndex();
-    postState.postIndex.assertEquals(postIndex);
-    initialNumberOfPosts.assertEquals(postIndex.sub(1));
+    initialNumberOfPosts.assertEquals(postState.postIndex.sub(1));
 
     postState.deletedAtBlockHeight.assertEquals(Field(0));
 
-    const postsRootAfter = postWitness.calculateRoot(postState.hash());
+    const postsRootAfter = postWitness.computeRootAndKey(postState.hash())[0];
     postsRootAfter.assertEquals(latestPostsRoot);
 
     return new PostsTransition({
       initialPostsRoot: initialPostsRoot,
       latestPostsRoot: latestPostsRoot,
       initialNumberOfPosts: initialNumberOfPosts,
-      latestNumberOfPosts: postIndex,
+      latestNumberOfPosts: postState.postIndex,
       blockHeight: postState.postedAtBlockHeight,
     });
   }
@@ -127,7 +129,7 @@ export class PostsTransition extends Struct({
 
     initialPostsRoot: Field,
     latestPostsRoot: Field,
-    postWitness: PostsWitness,
+    postWitness: MerkleMapWitness,
 
     numberOfPosts: Field,
     blockHeight: Field
@@ -139,8 +141,10 @@ export class PostsTransition extends Struct({
     ]);
     isSigned.assertTrue();
 
-    const postsRootBefore = postWitness.calculateRoot(initialPostState.hash());
-    initialPostsRoot.assertEquals(postsRootBefore);
+    const postsRootBefore = postWitness.computeRootAndKey(
+      initialPostState.hash()
+    )[0];
+    postsRootBefore.assertEquals(initialPostsRoot);
 
     const latestPostState = new PostState({
       posterAddress: initialPostState.posterAddress,
@@ -150,7 +154,9 @@ export class PostsTransition extends Struct({
       deletedAtBlockHeight: blockHeight,
     });
 
-    const postsRootAfter = postWitness.calculateRoot(latestPostState.hash());
+    const postsRootAfter = postWitness.computeRootAndKey(
+      latestPostState.hash()
+    )[0];
     postsRootAfter.assertEquals(latestPostsRoot);
 
     return new PostsTransition({
@@ -170,7 +176,14 @@ export const Posts = Experimental.ZkProgram({
 
   methods: {
     provePostsTransition: {
-      privateInputs: [Signature, PostState, Field, Field, PostsWitness, Field],
+      privateInputs: [
+        Signature,
+        PostState,
+        Field,
+        Field,
+        MerkleMapWitness,
+        Field,
+      ],
 
       method(
         transition: PostsTransition,
@@ -178,7 +191,7 @@ export const Posts = Experimental.ZkProgram({
         postState: PostState,
         initialPostsRoot: Field,
         latestPostsRoot: Field,
-        postWitness: PostsWitness,
+        postWitness: MerkleMapWitness,
         initialPostsNumber: Field
       ) {
         const computedTransition = PostsTransition.createPostsTransition(
@@ -246,7 +259,7 @@ export const Posts = Experimental.ZkProgram({
         PostState,
         Field,
         Field,
-        PostsWitness,
+        MerkleMapWitness,
         Field,
         Field,
       ],
@@ -257,7 +270,7 @@ export const Posts = Experimental.ZkProgram({
         initialPostState: PostState,
         initialPostsRoot: Field,
         latestPostsRoot: Field,
-        postWitness: PostsWitness,
+        postWitness: MerkleMapWitness,
         postsNumber: Field,
         blockHeight: Field
       ) {
