@@ -13,7 +13,6 @@ import {
   AccountUpdate,
   Signature,
   CircuitString,
-  MerkleTree,
   Poseidon,
   MerkleMap,
 } from 'snarkyjs';
@@ -28,7 +27,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     zkAppAddress: PublicKey,
     zkAppPrivateKey: PrivateKey,
     zkApp: EventsContract,
-    postsTree: MerkleMap,
+    postsMap: MerkleMap,
     Local: ReturnType<typeof Mina.LocalBlockchain>;
 
   beforeAll(async () => {
@@ -46,7 +45,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     zkAppPrivateKey = PrivateKey.random();
     zkAppAddress = zkAppPrivateKey.toPublicKey();
     zkApp = new EventsContract(zkAppAddress);
-    postsTree = new MerkleMap();
+    postsMap = new MerkleMap();
   });
 
   async function localDeploy() {
@@ -66,11 +65,11 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     postIndex: Field
   ) {
     const signature = Signature.create(posterKey, [postContentID.hash()]);
-    const initialPostsRoot = postsTree.getRoot();
+    const initialPostsRoot = postsMap.getRoot();
     const postKey = Poseidon.hash(
       posterAddress.toFields().concat(postContentID.hash())
     );
-    const postWitness = postsTree.getWitness(postKey);
+    const postWitness = postsMap.getWitness(postKey);
 
     const postState = new PostState({
       posterAddress: posterAddress,
@@ -80,8 +79,8 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       deletedAtBlockHeight: Field(0),
     });
 
-    postsTree.set(postKey, postState.hash());
-    const latestPostsRoot = postsTree.getRoot();
+    postsMap.set(postKey, postState.hash());
+    const latestPostsRoot = postsMap.getRoot();
 
     return {
       signature: signature,
@@ -102,13 +101,13 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       postStateHash,
       fieldToFlagPostsAsDeleted,
     ]);
-    const initialPostsRoot = postsTree.getRoot();
+    const initialPostsRoot = postsMap.getRoot();
     const postKey = Poseidon.hash(
       initialPostState.posterAddress
         .toFields()
         .concat(initialPostState.postContentID.hash())
     );
-    const postWitness = postsTree.getWitness(postKey);
+    const postWitness = postsMap.getWitness(postKey);
 
     const latestPostState = new PostState({
       posterAddress: initialPostState.posterAddress,
@@ -118,8 +117,8 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       deletedAtBlockHeight: deletionBlockHeight,
     });
 
-    postsTree.set(postKey, latestPostState.hash());
-    const latestPostsRoot = postsTree.getRoot();
+    postsMap.set(postKey, latestPostState.hash());
+    const latestPostsRoot = postsMap.getRoot();
 
     return {
       signature: signature,
@@ -135,7 +134,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await localDeploy();
     const currentPostsRoot = zkApp.posts.get();
     const currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsTree.getRoot();
+    const postsRoot = postsMap.getRoot();
 
     expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentNumberOfPosts).toEqual(Field(0));
@@ -146,7 +145,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
     let currentPostsRoot = zkApp.posts.get();
     let currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsTree.getRoot();
+    const postsRoot = postsMap.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentNumberOfPosts).toEqual(Field(0));
 
@@ -499,7 +498,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
     let currentPostsRoot = zkApp.posts.get();
     let currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsTree.getRoot();
+    const postsRoot = postsMap.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentNumberOfPosts).toEqual(Field(0));
 
@@ -588,7 +587,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
     let currentPostsRoot = zkApp.posts.get();
     let currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsTree.getRoot();
+    const postsRoot = postsMap.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentNumberOfPosts).toEqual(Field(0));
 
@@ -890,14 +889,14 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       Field(1)
     );
 
-    const emptyTree = new MerkleTree(10);
-    const emptyTreeRoot = emptyTree.getRoot();
+    const emptyMap = new MerkleMap();
+    const emptyMapRoot = emptyMap.getRoot();
 
     expect(() => {
       PostsTransition.createPostDeletionTransition(
         valid2.signature,
         valid2.initialPostState,
-        emptyTreeRoot,
+        emptyMapRoot,
         valid2.latestPostsRoot,
         valid2.postWitness,
         Field(1),
@@ -911,7 +910,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
     let currentPostsRoot = zkApp.posts.get();
     let currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsTree.getRoot();
+    const postsRoot = postsMap.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentNumberOfPosts).toEqual(Field(0));
 
