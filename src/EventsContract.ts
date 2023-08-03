@@ -9,8 +9,8 @@ import {
 } from 'snarkyjs';
 import { PostsProof } from './Posts';
 
-const postsTree = new MerkleMap();
-const postsRoot = postsTree.getRoot();
+const postsMap = new MerkleMap();
+const postsRoot = postsMap.getRoot();
 
 export class EventsContract extends SmartContract {
   @state(Field) posts = State<Field>();
