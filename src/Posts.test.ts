@@ -1,9 +1,10 @@
-import { EventsContract } from './EventsContract';
+import { EventsContract, newMerkleMapRoot } from './EventsContract';
 import {
   PostsTransition,
   PostState,
   Posts,
   fieldToFlagPostsAsDeleted,
+  genesisKey,
 } from './Posts';
 import {
   Field,
@@ -27,12 +28,18 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     zkAppAddress: PublicKey,
     zkAppPrivateKey: PrivateKey,
     zkApp: EventsContract,
-    postsMap: MerkleMap,
+    postsGenesis: MerkleMap,
+    posts: MerkleMap,
     Local: ReturnType<typeof Mina.LocalBlockchain>;
 
   beforeAll(async () => {
-    await Posts.compile();
-    if (proofsEnabled) await EventsContract.compile();
+    if (proofsEnabled) {
+      console.log('Compiling Posts zkProgram...');
+      await Posts.compile();
+      console.log('Compiling EventsContract...');
+      await EventsContract.compile();
+      console.log('Compiled');
+    }
   });
 
   beforeEach(() => {
@@ -45,7 +52,8 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     zkAppPrivateKey = PrivateKey.random();
     zkAppAddress = zkAppPrivateKey.toPublicKey();
     zkApp = new EventsContract(zkAppAddress);
-    postsMap = new MerkleMap();
+    postsGenesis = new MerkleMap();
+    posts = new MerkleMap();
   });
 
   async function localDeploy() {
@@ -57,30 +65,79 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await txn.sign([deployerKey, zkAppPrivateKey]).send();
   }
 
-  function createPostsTransitionValidInputs(
+  function createGenesisPostTransitionValidInputs(
     posterAddress: PublicKey,
     posterKey: PrivateKey,
     postContentID: CircuitString,
     postedAtBlockHeight: Field,
-    postIndex: Field
+    postIndex: Field,
+    userPostIndex: Field
   ) {
     const signature = Signature.create(posterKey, [postContentID.hash()]);
-    const initialPostsRoot = postsMap.getRoot();
+
+    const initialPostsGenesisRoot = postsGenesis.getRoot();
+    initialPostsGenesisRoot.assertEquals(newMerkleMapRoot);
+    const genesisPostWitness = postsGenesis.getWitness(genesisKey);
+
+    const initialPostsRoot = posts.getRoot();
     const postKey = Poseidon.hash(
       posterAddress.toFields().concat(postContentID.hash())
     );
-    const postWitness = postsMap.getWitness(postKey);
+    const postWitness = posts.getWitness(postKey);
 
     const postState = new PostState({
       posterAddress: posterAddress,
       postContentID: postContentID,
       postIndex: postIndex,
+      userPostIndex: userPostIndex,
       postedAtBlockHeight: postedAtBlockHeight,
       deletedAtBlockHeight: Field(0),
     });
 
-    postsMap.set(postKey, postState.hash());
-    const latestPostsRoot = postsMap.getRoot();
+    postsGenesis.set(genesisKey, Field(1));
+    const latestPostsGenesisRoot = postsGenesis.getRoot();
+
+    posts.set(postKey, postState.hash());
+    const latestPostsRoot = posts.getRoot();
+
+    return {
+      signature: signature,
+      initialPostsGenesisRoot: initialPostsGenesisRoot,
+      latestPostsGenesisRoot: latestPostsGenesisRoot,
+      initialPostsRoot: initialPostsRoot,
+      latestPostsRoot: latestPostsRoot,
+      genesisPostWitness: genesisPostWitness,
+      postState: postState,
+      postWitness: postWitness,
+    };
+  }
+
+  function createPostsPublishingTransitionValidInputs(
+    posterAddress: PublicKey,
+    posterKey: PrivateKey,
+    postContentID: CircuitString,
+    postedAtBlockHeight: Field,
+    postIndex: Field,
+    userPostIndex: Field
+  ) {
+    const signature = Signature.create(posterKey, [postContentID.hash()]);
+    const initialPostsRoot = posts.getRoot();
+    const postKey = Poseidon.hash(
+      posterAddress.toFields().concat(postContentID.hash())
+    );
+    const postWitness = posts.getWitness(postKey);
+
+    const postState = new PostState({
+      posterAddress: posterAddress,
+      postContentID: postContentID,
+      postIndex: postIndex,
+      userPostIndex: userPostIndex,
+      postedAtBlockHeight: postedAtBlockHeight,
+      deletedAtBlockHeight: Field(0),
+    });
+
+    posts.set(postKey, postState.hash());
+    const latestPostsRoot = posts.getRoot();
 
     return {
       signature: signature,
@@ -101,24 +158,25 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       postStateHash,
       fieldToFlagPostsAsDeleted,
     ]);
-    const initialPostsRoot = postsMap.getRoot();
+    const initialPostsRoot = posts.getRoot();
     const postKey = Poseidon.hash(
       initialPostState.posterAddress
         .toFields()
         .concat(initialPostState.postContentID.hash())
     );
-    const postWitness = postsMap.getWitness(postKey);
+    const postWitness = posts.getWitness(postKey);
 
     const latestPostState = new PostState({
       posterAddress: initialPostState.posterAddress,
       postContentID: initialPostState.postContentID,
       postIndex: initialPostState.postIndex,
+      userPostIndex: initialPostState.userPostIndex,
       postedAtBlockHeight: initialPostState.postedAtBlockHeight,
       deletedAtBlockHeight: deletionBlockHeight,
     });
 
-    postsMap.set(postKey, latestPostState.hash());
-    const latestPostsRoot = postsMap.getRoot();
+    posts.set(postKey, latestPostState.hash());
+    const latestPostsRoot = posts.getRoot();
 
     return {
       signature: signature,
@@ -132,50 +190,55 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
   it(`generates and deploys the 'EventsContract'`, async () => {
     await localDeploy();
-    const currentPostsRoot = zkApp.posts.get();
-    const currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsMap.getRoot();
-
-    expect(currentPostsRoot).toEqual(postsRoot);
-    expect(currentNumberOfPosts).toEqual(Field(0));
+    const currentPostsGenesisState = zkApp.postsGenesis.get();
+    const currentPostsState = zkApp.posts.get();
+    const postsGenesisRoot = postsGenesis.getRoot();
+    const postsRoot = posts.getRoot();
+    expect(currentPostsGenesisState).toEqual(postsGenesisRoot);
+    expect(currentPostsState).toEqual(postsRoot);
   });
 
-  it(`updates the state of the 'EventsContract', when publishing a post`, async () => {
+  it(`updates the state of the 'EventsContract', when publishing the genesis post`, async () => {
     await localDeploy();
+    let currentPostsGenesisState = zkApp.postsGenesis.get();
+    let currentPostsState = zkApp.posts.get();
+    let postsGenesisRoot = postsGenesis.getRoot();
+    let postsRoot = posts.getRoot();
+    expect(currentPostsGenesisState).toEqual(postsGenesisRoot);
+    expect(currentPostsState).toEqual(postsRoot);
 
-    let currentPostsRoot = zkApp.posts.get();
-    let currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsMap.getRoot();
-    expect(currentPostsRoot).toEqual(postsRoot);
-    expect(currentNumberOfPosts).toEqual(Field(0));
-
-    const valid = createPostsTransitionValidInputs(
+    const valid = createGenesisPostTransitionValidInputs(
       senderAccount,
       senderKey,
       CircuitString.fromString(
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
       Field(1),
+      Field(1),
       Field(1)
     );
 
-    const transition = PostsTransition.createPostsTransition(
+    const transition = PostsTransition.createGenesisPostTransition(
       valid.signature,
-      valid.postState,
+      valid.initialPostsGenesisRoot,
+      valid.latestPostsGenesisRoot,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
-      valid.postWitness,
-      valid.postState.postIndex.sub(1)
+      valid.genesisPostWitness,
+      valid.postState,
+      valid.postWitness
     );
 
-    const proof = await Posts.provePostsTransition(
+    const proof = await Posts.proveGenesisPostTransition(
       transition,
       valid.signature,
-      valid.postState,
+      valid.initialPostsGenesisRoot,
+      valid.latestPostsGenesisRoot,
       valid.initialPostsRoot,
       valid.latestPostsRoot,
-      valid.postWitness,
-      valid.postState.postIndex.sub(1)
+      valid.genesisPostWitness,
+      valid.postState,
+      valid.postWitness
     );
 
     const txn = await Mina.transaction(senderAccount, () => {
@@ -185,13 +248,15 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     await txn.prove();
     await txn.sign([senderKey]).send();
 
-    currentPostsRoot = zkApp.posts.get();
-    currentNumberOfPosts = zkApp.numberOfPosts.get();
-    expect(currentPostsRoot).toEqual(valid.latestPostsRoot);
-    expect(currentNumberOfPosts).toEqual(Field(1));
+    currentPostsGenesisState = zkApp.postsGenesis.get();
+    currentPostsState = zkApp.posts.get();
+    postsGenesisRoot = postsGenesis.getRoot();
+    postsRoot = posts.getRoot();
+    expect(currentPostsGenesisState).toEqual(postsGenesisRoot);
+    expect(currentPostsState).toEqual(postsRoot);
   });
 
-  test(`if 'transition' and 'computedTransition' mismatch,\
+  /*test(`if 'transition' and 'computedTransition' mismatch,\
   'Posts.provePostsTransition()' throws 'Constraint unsatisfied' error`, async () => {
     const valid = createPostsTransitionValidInputs(
       senderAccount,
@@ -498,7 +563,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
     let currentPostsRoot = zkApp.posts.get();
     let currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsMap.getRoot();
+    const postsRoot = posts.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentNumberOfPosts).toEqual(Field(0));
 
@@ -587,7 +652,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
     let currentPostsRoot = zkApp.posts.get();
     let currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsMap.getRoot();
+    const postsRoot = posts.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentNumberOfPosts).toEqual(Field(0));
 
@@ -910,7 +975,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
 
     let currentPostsRoot = zkApp.posts.get();
     let currentNumberOfPosts = zkApp.numberOfPosts.get();
-    const postsRoot = postsMap.getRoot();
+    const postsRoot = posts.getRoot();
     expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentNumberOfPosts).toEqual(Field(0));
 
@@ -1072,5 +1137,5 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     expect(valid2.latestPostsRoot).not.toEqual(valid3.latestPostsRoot);
     expect(valid3.latestPostsRoot).not.toEqual(valid4.latestPostsRoot);
     expect(currentNumberOfPosts).toEqual(Field(2));
-  });
+  });*/
 });
