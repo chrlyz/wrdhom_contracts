@@ -31,8 +31,10 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     Local: ReturnType<typeof Mina.LocalBlockchain>;
 
   beforeAll(async () => {
-    await Posts.compile();
-    if (proofsEnabled) await EventsContract.compile();
+    if (proofsEnabled) {
+      await Posts.compile();
+      await EventsContract.compile();
+    }
   });
 
   beforeEach(() => {
@@ -135,7 +137,6 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
     const currentPostsRoot = zkApp.posts.get();
     const currentNumberOfPosts = zkApp.numberOfPosts.get();
     const postsRoot = postsMap.getRoot();
-
     expect(currentPostsRoot).toEqual(postsRoot);
     expect(currentNumberOfPosts).toEqual(Field(0));
   });
