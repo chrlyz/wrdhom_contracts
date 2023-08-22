@@ -300,31 +300,13 @@ export const PostsGenesis = Experimental.ZkProgram({
         postsTransition1Proof.verify();
         postsTransition2Proof.verify();
 
-        postsTransition1Proof.publicInput.latestPostsGenesisRoot.assertEquals(
-          postsTransition2Proof.publicInput.initialPostsGenesisRoot
+        const computedTransition = PostsGenesisTransition.mergePostsTransitions(
+          postsTransition1Proof.publicInput,
+          postsTransition2Proof.publicInput
         );
-        postsTransition1Proof.publicInput.initialPostsGenesisRoot.assertEquals(
-          mergedPostsTransitions.initialPostsGenesisRoot
-        );
-        postsTransition2Proof.publicInput.latestPostsGenesisRoot.assertEquals(
-          mergedPostsTransitions.latestPostsGenesisRoot
-        );
-
-        postsTransition1Proof.publicInput.latestPostsRoot.assertEquals(
-          postsTransition2Proof.publicInput.initialPostsRoot
-        );
-        postsTransition1Proof.publicInput.initialPostsRoot.assertEquals(
-          mergedPostsTransitions.initialPostsRoot
-        );
-        postsTransition2Proof.publicInput.latestPostsRoot.assertEquals(
-          mergedPostsTransitions.latestPostsRoot
-        );
-
-        postsTransition1Proof.publicInput.blockHeight.assertEquals(
-          mergedPostsTransitions.blockHeight
-        );
-        postsTransition2Proof.publicInput.blockHeight.assertEquals(
-          mergedPostsTransitions.blockHeight
+        PostsGenesisTransition.assertEquals(
+          computedTransition,
+          mergedPostsTransitions
         );
       },
     },
@@ -537,21 +519,13 @@ export const Posts = Experimental.ZkProgram({
         postsTransition1Proof.verify();
         postsTransition2Proof.verify();
 
-        postsTransition1Proof.publicInput.latestPostsRoot.assertEquals(
-          postsTransition2Proof.publicInput.initialPostsRoot
+        const computedTransition = PostsTransition.mergePostsTransitions(
+          postsTransition1Proof.publicInput,
+          postsTransition2Proof.publicInput
         );
-        postsTransition1Proof.publicInput.initialPostsRoot.assertEquals(
-          mergedPostsTransitions.initialPostsRoot
-        );
-        postsTransition2Proof.publicInput.latestPostsRoot.assertEquals(
-          mergedPostsTransitions.latestPostsRoot
-        );
-
-        postsTransition1Proof.publicInput.blockHeight.assertEquals(
-          mergedPostsTransitions.blockHeight
-        );
-        postsTransition2Proof.publicInput.blockHeight.assertEquals(
-          mergedPostsTransitions.blockHeight
+        PostsTransition.assertEquals(
+          computedTransition,
+          mergedPostsTransitions
         );
       },
     },
