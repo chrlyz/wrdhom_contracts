@@ -7,7 +7,6 @@ import {
   Experimental,
   SelfProof,
   CircuitString,
-  MerkleMap,
   MerkleMapWitness,
 } from 'snarkyjs';
 
@@ -205,53 +204,6 @@ export const Posts = Experimental.ZkProgram({
       },
     },
 
-    proveMergedPostsTransitions: {
-      privateInputs: [SelfProof, SelfProof],
-
-      method(
-        mergedPostsTransitions: PostsTransition,
-        postsTransition1Proof: SelfProof<PostsTransition, undefined>,
-        postsTransition2Proof: SelfProof<PostsTransition, undefined>
-      ) {
-        postsTransition1Proof.verify();
-        postsTransition2Proof.verify();
-
-        postsTransition1Proof.publicInput.latestPostsRoot.assertEquals(
-          postsTransition2Proof.publicInput.initialPostsRoot
-        );
-        postsTransition1Proof.publicInput.initialPostsRoot.assertEquals(
-          mergedPostsTransitions.initialPostsRoot
-        );
-        postsTransition2Proof.publicInput.latestPostsRoot.assertEquals(
-          mergedPostsTransitions.latestPostsRoot
-        );
-
-        postsTransition1Proof.publicInput.latestNumberOfPosts.assertEquals(
-          postsTransition2Proof.publicInput.initialNumberOfPosts
-        );
-        postsTransition1Proof.publicInput.initialNumberOfPosts
-          .add(1)
-          .assertEquals(postsTransition1Proof.publicInput.latestNumberOfPosts);
-        postsTransition2Proof.publicInput.initialNumberOfPosts
-          .add(1)
-          .assertEquals(postsTransition2Proof.publicInput.latestNumberOfPosts);
-
-        postsTransition1Proof.publicInput.initialNumberOfPosts.assertEquals(
-          mergedPostsTransitions.initialNumberOfPosts
-        );
-        postsTransition2Proof.publicInput.latestNumberOfPosts.assertEquals(
-          mergedPostsTransitions.latestNumberOfPosts
-        );
-
-        postsTransition1Proof.publicInput.blockHeight.assertEquals(
-          mergedPostsTransitions.blockHeight
-        );
-        postsTransition2Proof.publicInput.blockHeight.assertEquals(
-          mergedPostsTransitions.blockHeight
-        );
-      },
-    },
-
     provePostDeletionTransition: {
       privateInputs: [
         Signature,
@@ -286,47 +238,22 @@ export const Posts = Experimental.ZkProgram({
       },
     },
 
-    proveMergedPostsDeletions: {
+    proveMergedPostsTransitions: {
       privateInputs: [SelfProof, SelfProof],
 
       method(
-        mergedPostsDeletions: PostsTransition,
+        mergedPostTransitions: PostsTransition,
         postsDeletion1Proof: SelfProof<PostsTransition, undefined>,
         postsDeletion2Proof: SelfProof<PostsTransition, undefined>
       ) {
         postsDeletion1Proof.verify();
         postsDeletion2Proof.verify();
 
-        postsDeletion1Proof.publicInput.latestPostsRoot.assertEquals(
-          postsDeletion2Proof.publicInput.initialPostsRoot
+        const computedTransition = PostsTransition.mergePostsTransitions(
+          postsDeletion1Proof.publicInput,
+          postsDeletion2Proof.publicInput
         );
-        postsDeletion1Proof.publicInput.initialPostsRoot.assertEquals(
-          mergedPostsDeletions.initialPostsRoot
-        );
-        postsDeletion2Proof.publicInput.latestPostsRoot.assertEquals(
-          mergedPostsDeletions.latestPostsRoot
-        );
-
-        postsDeletion1Proof.publicInput.initialNumberOfPosts.assertEquals(
-          postsDeletion2Proof.publicInput.initialNumberOfPosts
-        );
-        postsDeletion1Proof.publicInput.latestNumberOfPosts.assertEquals(
-          postsDeletion2Proof.publicInput.latestNumberOfPosts
-        );
-
-        postsDeletion1Proof.publicInput.initialNumberOfPosts.assertEquals(
-          mergedPostsDeletions.initialNumberOfPosts
-        );
-        postsDeletion1Proof.publicInput.latestNumberOfPosts.assertEquals(
-          mergedPostsDeletions.latestNumberOfPosts
-        );
-
-        postsDeletion1Proof.publicInput.blockHeight.assertEquals(
-          mergedPostsDeletions.blockHeight
-        );
-        postsDeletion2Proof.publicInput.blockHeight.assertEquals(
-          mergedPostsDeletions.blockHeight
-        );
+        PostsTransition.assertEquals(computedTransition, mergedPostTransitions);
       },
     },
   },
