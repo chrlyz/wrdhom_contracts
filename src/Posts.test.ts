@@ -1053,7 +1053,7 @@ describe(`the 'EventsContract' and the 'Posts' zkProgram`, () => {
       transition4
     );
 
-    const mergedTransitionsProof2 = await Posts.proveMergedPostsDeletions(
+    const mergedTransitionsProof2 = await Posts.proveMergedPostsTransitions(
       mergedTransitions2,
       proof3,
       proof4
