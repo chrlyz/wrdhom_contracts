@@ -1,3 +1,3 @@
-import { EventsContract } from './EventsContract.js';
+import { PostsContract } from './PostsContract.js';
 
-export { EventsContract };
+export { PostsContract };
