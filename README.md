@@ -1,6 +1,6 @@
 # Proof Of Events
 
-Mina smart contract and zkPrograms to power an auditable, resilient, and credibly neutral social media platform.
+Mina smart contracts and zkPrograms to power an auditable, resilient, customizable, user-centric, and credibly-neutral social media platform.
 
 ## Clone
 
