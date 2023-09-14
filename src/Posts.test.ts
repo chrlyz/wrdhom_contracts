@@ -15,7 +15,7 @@ import {
   CircuitString,
   Poseidon,
   MerkleMap,
-} from 'snarkyjs';
+} from 'o1js';
 import { jest } from '@jest/globals';
 
 let proofsEnabled = true;

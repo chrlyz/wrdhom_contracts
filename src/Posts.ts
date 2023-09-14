@@ -8,7 +8,7 @@ import {
   SelfProof,
   CircuitString,
   MerkleMapWitness,
-} from 'snarkyjs';
+} from 'o1js';
 
 // ============================================================================
 

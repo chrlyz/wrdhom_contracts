@@ -6,7 +6,7 @@ import {
   method,
   UInt32,
   MerkleMap,
-} from 'snarkyjs';
+} from 'o1js';
 import { PostsProof } from './Posts';
 
 const newMerkleMap = new MerkleMap();
