@@ -7,7 +7,7 @@ import {
   UInt32,
   MerkleMap,
 } from 'o1js';
-import { PostsProof } from './Posts';
+import { PostsProof } from './Posts.js';
 
 const newMerkleMap = new MerkleMap();
 const newMerkleMapRoot = newMerkleMap.getRoot();
