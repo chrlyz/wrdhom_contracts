@@ -16,7 +16,6 @@ import {
   Poseidon,
   MerkleMap,
 } from 'o1js';
-import { jest } from '@jest/globals';
 
 let proofsEnabled = true;
 
