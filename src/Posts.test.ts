@@ -15,6 +15,7 @@ import {
   CircuitString,
   Poseidon,
   MerkleMap,
+  UInt32,
 } from 'o1js';
 
 let proofsEnabled = true;
@@ -70,7 +71,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     postContentID: CircuitString,
     allPostsCounter: Field,
     userPostsCounter: Field,
-    postingSlot: Field
+    postBlockHeight: Field
   ) {
     const signature = Signature.create(posterKey, [postContentID.hash()]);
 
@@ -88,8 +89,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       postContentID: postContentID,
       allPostsCounter: allPostsCounter,
       userPostsCounter: userPostsCounter,
-      postingSlot: postingSlot,
-      deletionSlot: Field(0),
+      postBlockHeight: postBlockHeight,
+      deletionBlockHeight: Field(0),
     });
 
     usersPostsCountersMap.set(posterAddressAsField, userPostsCounter);
@@ -114,7 +115,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     posterKey: PrivateKey,
     allPostsCounter: Field,
     initialPostState: PostState,
-    deletionSlot: Field
+    deletionBlockHeight: Field
   ) {
     const postStateHash = initialPostState.hash();
     const signature = Signature.create(posterKey, [
@@ -139,8 +140,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       postContentID: initialPostState.postContentID,
       allPostsCounter: initialPostState.allPostsCounter,
       userPostsCounter: initialPostState.userPostsCounter,
-      postingSlot: initialPostState.postingSlot,
-      deletionSlot: deletionSlot,
+      postBlockHeight: initialPostState.postBlockHeight,
+      deletionBlockHeight: deletionBlockHeight,
     });
 
     postsMap.set(postKey, latestPostState.hash());
@@ -185,7 +186,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       ),
       Field(1),
       Field(1),
-      Field(1)
+      Field(0)
     );
 
     const transition1 = PostsTransition.createPostPublishingTransition(
@@ -221,6 +222,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     await txn1.prove();
     await txn1.sign([deployerKey]).send();
+    Local.setBlockchainLength(UInt32.from(1));
 
     const allPostsCounterState1 = zkApp.allPostsCounter.get();
     const usersPostsCountersState1 = zkApp.usersPostsCounters.get();
@@ -254,7 +256,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid2.latestPosts,
       valid2.initialPostState,
       valid2.postWitness,
-      valid2.latestPostState.deletionSlot
+      valid2.latestPostState.deletionBlockHeight
     );
 
     const proof2 = await Posts.provePostDeletionTransition(
@@ -266,7 +268,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid2.latestPosts,
       valid2.initialPostState,
       valid2.postWitness,
-      valid2.latestPostState.deletionSlot
+      valid2.latestPostState.deletionBlockHeight
     );
 
     const txn2 = await Mina.transaction(deployerAccount, () => {
@@ -275,6 +277,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     await txn2.prove();
     await txn2.sign([deployerKey]).send();
+    Local.setBlockchainLength(UInt32.from(2));
 
     const allPostsCounterState2 = zkApp.allPostsCounter.get();
     const usersPostsCountersState2 = zkApp.usersPostsCounters.get();
@@ -300,7 +303,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       ),
       Field(2),
       Field(2),
-      Field(1)
+      Field(2)
     );
 
     const transition3 = PostsTransition.createPostPublishingTransition(
@@ -338,7 +341,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       ),
       Field(3),
       Field(1),
-      Field(1)
+      Field(2)
     );
 
     const transition4 = PostsTransition.createPostPublishingTransition(
@@ -384,6 +387,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     await txn3.prove();
     await txn3.sign([deployerKey, senderKey]).send();
+    Local.setBlockchainLength(UInt32.from(3));
 
     const allPostsCounterState3 = zkApp.allPostsCounter.get();
     const usersPostsCountersState3 = zkApp.usersPostsCounters.get();
@@ -406,7 +410,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       senderKey,
       Field(3),
       valid4.postState,
-      Field(1)
+      Field(3)
     );
 
     const transition5 = PostsTransition.createPostDeletionTransition(
@@ -417,7 +421,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid5.latestPosts,
       valid5.initialPostState,
       valid5.postWitness,
-      valid5.latestPostState.deletionSlot
+      valid5.latestPostState.deletionBlockHeight
     );
 
     const proof5 = await Posts.provePostDeletionTransition(
@@ -429,7 +433,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid5.latestPosts,
       valid5.initialPostState,
       valid5.postWitness,
-      valid5.latestPostState.deletionSlot
+      valid5.latestPostState.deletionBlockHeight
     );
 
     const valid6 = createPostPublishingTransitionValidInputs(
@@ -440,7 +444,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       ),
       Field(4),
       Field(2),
-      Field(1)
+      Field(3)
     );
 
     const transition6 = PostsTransition.createPostPublishingTransition(
@@ -486,6 +490,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     await txn4.prove();
     await txn4.sign([senderKey]).send();
+    Local.setBlockchainLength(UInt32.from(4));
 
     const allPostsCounterState4 = zkApp.allPostsCounter.get();
     const usersPostsCountersState4 = zkApp.usersPostsCounters.get();
@@ -518,32 +523,32 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       postContentID: valid1.postState.postContentID,
       allPostsCounter: valid1.postState.allPostsCounter,
       userPostsCounter: valid1.postState.userPostsCounter,
-      postingSlot: valid1.postState.postingSlot,
-      deletionSlot: Field(1),
+      postBlockHeight: valid1.postState.postBlockHeight,
+      deletionBlockHeight: Field(1),
     });
     const post2 = new PostState({
       posterAddress: valid3.postState.posterAddress,
       postContentID: valid3.postState.postContentID,
       allPostsCounter: valid3.postState.allPostsCounter,
       userPostsCounter: valid3.postState.userPostsCounter,
-      postingSlot: valid3.postState.postingSlot,
-      deletionSlot: valid3.postState.deletionSlot,
+      postBlockHeight: valid3.postState.postBlockHeight,
+      deletionBlockHeight: valid3.postState.deletionBlockHeight,
     });
     const post3 = new PostState({
       posterAddress: valid4.postState.posterAddress,
       postContentID: valid4.postState.postContentID,
       allPostsCounter: valid4.postState.allPostsCounter,
       userPostsCounter: valid4.postState.userPostsCounter,
-      postingSlot: valid4.postState.postingSlot,
-      deletionSlot: Field(1),
+      postBlockHeight: valid4.postState.postBlockHeight,
+      deletionBlockHeight: Field(3),
     });
     const post4 = new PostState({
       posterAddress: valid6.postState.posterAddress,
       postContentID: valid6.postState.postContentID,
       allPostsCounter: valid6.postState.allPostsCounter,
       userPostsCounter: valid6.postState.userPostsCounter,
-      postingSlot: valid6.postState.postingSlot,
-      deletionSlot: valid6.postState.deletionSlot,
+      postBlockHeight: valid6.postState.postBlockHeight,
+      deletionBlockHeight: valid6.postState.deletionBlockHeight,
     });
 
     const newPostsMap = new MerkleMap();
