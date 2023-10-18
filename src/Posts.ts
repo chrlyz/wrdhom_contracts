@@ -21,8 +21,8 @@ export class PostState extends Struct({
   postContentID: CircuitString,
   allPostsCounter: Field,
   userPostsCounter: Field,
-  postingSlot: Field,
-  deletionSlot: Field,
+  postBlockHeight: Field,
+  deletionBlockHeight: Field,
 }) {
   hash(): Field {
     return Poseidon.hash(
@@ -32,8 +32,8 @@ export class PostState extends Struct({
           this.postContentID.hash(),
           this.allPostsCounter,
           this.userPostsCounter,
-          this.postingSlot,
-          this.deletionSlot,
+          this.postBlockHeight,
+          this.deletionBlockHeight,
         ])
     );
   }
@@ -48,7 +48,7 @@ export class PostsTransition extends Struct({
   latestUsersPostsCounters: Field,
   initialPosts: Field,
   latestPosts: Field,
-  slot: Field,
+  blockHeight: Field,
 }) {
   static createPostPublishingTransition(
     signature: Signature,
@@ -63,7 +63,7 @@ export class PostsTransition extends Struct({
     postWitness: MerkleMapWitness
   ) {
     initialAllPostsCounter.assertEquals(postState.allPostsCounter.sub(1));
-    postState.deletionSlot.assertEquals(Field(0));
+    postState.deletionBlockHeight.assertEquals(Field(0));
 
     const isSigned = signature.verify(postState.posterAddress, [
       postState.postContentID.hash(),
@@ -100,7 +100,7 @@ export class PostsTransition extends Struct({
       latestUsersPostsCounters: usersPostsCountersAfter,
       initialPosts: initialPosts,
       latestPosts: postsAfter,
-      slot: postState.postingSlot,
+      blockHeight: postState.postBlockHeight,
     });
   }
 
@@ -122,7 +122,7 @@ export class PostsTransition extends Struct({
     );
     transition1.initialPosts.assertEquals(transition2.initialPosts);
     transition1.latestPosts.assertEquals(transition2.latestPosts);
-    transition1.slot.assertEquals(transition2.slot);
+    transition1.blockHeight.assertEquals(transition2.blockHeight);
   }
 
   static mergePostsTransitions(
@@ -136,7 +136,7 @@ export class PostsTransition extends Struct({
       transition2.initialUsersPostsCounters
     );
     transition1.latestPosts.assertEquals(transition2.initialPosts);
-    transition1.slot.assertEquals(transition2.slot);
+    transition1.blockHeight.assertEquals(transition2.blockHeight);
 
     return new PostsTransition({
       initialAllPostsCounter: transition1.initialAllPostsCounter,
@@ -145,7 +145,7 @@ export class PostsTransition extends Struct({
       latestUsersPostsCounters: transition2.latestUsersPostsCounters,
       initialPosts: transition1.initialPosts,
       latestPosts: transition2.latestPosts,
-      slot: transition1.slot,
+      blockHeight: transition1.blockHeight,
     });
   }
 
@@ -157,7 +157,7 @@ export class PostsTransition extends Struct({
     latestPosts: Field,
     initialPostState: PostState,
     postWitness: MerkleMapWitness,
-    slot: Field
+    blockHeight: Field
   ) {
     const initialPostStateHash = initialPostState.hash();
     const isSigned = signature.verify(initialPostState.posterAddress, [
@@ -174,8 +174,8 @@ export class PostsTransition extends Struct({
       postContentID: initialPostState.postContentID,
       allPostsCounter: initialPostState.allPostsCounter,
       userPostsCounter: initialPostState.userPostsCounter,
-      postingSlot: initialPostState.postingSlot,
-      deletionSlot: slot,
+      postBlockHeight: initialPostState.postBlockHeight,
+      deletionBlockHeight: blockHeight,
     });
 
     const postsAfter = postWitness.computeRootAndKey(latestPostState.hash())[0];
@@ -188,7 +188,7 @@ export class PostsTransition extends Struct({
       latestUsersPostsCounters: usersPostsCounters,
       initialPosts: initialPosts,
       latestPosts: postsAfter,
-      slot: slot,
+      blockHeight: blockHeight,
     });
   }
 }
@@ -264,7 +264,7 @@ export const Posts = Experimental.ZkProgram({
         latestPosts: Field,
         initialPostState: PostState,
         postWitness: MerkleMapWitness,
-        slot: Field
+        blockHeight: Field
       ) {
         const computedTransition = PostsTransition.createPostDeletionTransition(
           signature,
@@ -274,7 +274,7 @@ export const Posts = Experimental.ZkProgram({
           latestPosts,
           initialPostState,
           postWitness,
-          slot
+          blockHeight
         );
         PostsTransition.assertEquals(computedTransition, transition);
       },

@@ -27,9 +27,8 @@ export class PostsContract extends SmartContract {
   @method update(proof: PostsProof) {
     proof.verify();
 
-    this.currentSlot.assertBetween(
-      UInt32.from(proof.publicInput.slot.sub(Field(1))),
-      UInt32.from(proof.publicInput.slot.add(Field(1)))
+    this.network.blockchainLength.assertEquals(
+      UInt32.from(proof.publicInput.blockHeight)
     );
 
     const currentAllPostsCounter = this.allPostsCounter.getAndAssertEquals();
