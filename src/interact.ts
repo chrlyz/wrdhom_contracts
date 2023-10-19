@@ -72,7 +72,7 @@ const valid1 = createPostPublishingTransitionValidInputs(
   ),
   Field(1),
   Field(1),
-  Field(lastBlock.blockchainLength.add(1).toBigint())
+  Field(lastBlock.blockchainLength.toBigint())
 );
 
 const transition1 = PostsTransition.createPostPublishingTransition(
