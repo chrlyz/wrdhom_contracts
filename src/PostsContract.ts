@@ -28,7 +28,7 @@ export class PostsContract extends SmartContract {
     proof.verify();
 
     this.network.blockchainLength.assertBetween(
-      UInt32.from(proof.publicInput.blockHeight).sub(1),
+      UInt32.from(proof.publicInput.blockHeight),
       UInt32.from(proof.publicInput.blockHeight).add(1)
     );
 
