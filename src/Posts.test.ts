@@ -178,8 +178,6 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     // 2. Publishes the first post
     // ==============================================================================
 
-    Local.setBlockchainLength(UInt32.from(1));
-
     const valid1 = createPostPublishingTransitionValidInputs(
       deployerAccount,
       deployerKey,
@@ -188,7 +186,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       ),
       Field(1),
       Field(1),
-      Field(1)
+      Field(0)
     );
 
     const transition1 = PostsTransition.createPostPublishingTransition(
@@ -224,7 +222,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     await txn1.prove();
     await txn1.sign([deployerKey]).send();
-    Local.setBlockchainLength(UInt32.from(2));
+    Local.setBlockchainLength(UInt32.from(1));
 
     const allPostsCounterState1 = zkApp.allPostsCounter.get();
     const usersPostsCountersState1 = zkApp.usersPostsCounters.get();
@@ -247,7 +245,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       deployerKey,
       Field(1),
       valid1.postState,
-      Field(2)
+      Field(1)
     );
 
     const transition2 = PostsTransition.createPostDeletionTransition(
@@ -279,7 +277,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     await txn2.prove();
     await txn2.sign([deployerKey]).send();
-    Local.setBlockchainLength(UInt32.from(3));
+    Local.setBlockchainLength(UInt32.from(2));
 
     const allPostsCounterState2 = zkApp.allPostsCounter.get();
     const usersPostsCountersState2 = zkApp.usersPostsCounters.get();
@@ -305,7 +303,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       ),
       Field(2),
       Field(2),
-      Field(3)
+      Field(2)
     );
 
     const transition3 = PostsTransition.createPostPublishingTransition(
@@ -343,7 +341,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       ),
       Field(3),
       Field(1),
-      Field(3)
+      Field(2)
     );
 
     const transition4 = PostsTransition.createPostPublishingTransition(
@@ -389,7 +387,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     await txn3.prove();
     await txn3.sign([deployerKey, senderKey]).send();
-    Local.setBlockchainLength(UInt32.from(4));
+    Local.setBlockchainLength(UInt32.from(3));
 
     const allPostsCounterState3 = zkApp.allPostsCounter.get();
     const usersPostsCountersState3 = zkApp.usersPostsCounters.get();
@@ -412,7 +410,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       senderKey,
       Field(3),
       valid4.postState,
-      Field(4)
+      Field(3)
     );
 
     const transition5 = PostsTransition.createPostDeletionTransition(
@@ -446,7 +444,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       ),
       Field(4),
       Field(2),
-      Field(4)
+      Field(3)
     );
 
     const transition6 = PostsTransition.createPostPublishingTransition(
@@ -492,7 +490,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     await txn4.prove();
     await txn4.sign([senderKey]).send();
-    Local.setBlockchainLength(UInt32.from(5));
+    Local.setBlockchainLength(UInt32.from(4));
 
     const allPostsCounterState4 = zkApp.allPostsCounter.get();
     const usersPostsCountersState4 = zkApp.usersPostsCounters.get();
@@ -526,7 +524,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       allPostsCounter: valid1.postState.allPostsCounter,
       userPostsCounter: valid1.postState.userPostsCounter,
       postBlockHeight: valid1.postState.postBlockHeight,
-      deletionBlockHeight: Field(2),
+      deletionBlockHeight: Field(1),
     });
     const post2 = new PostState({
       posterAddress: valid3.postState.posterAddress,
@@ -542,7 +540,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       allPostsCounter: valid4.postState.allPostsCounter,
       userPostsCounter: valid4.postState.userPostsCounter,
       postBlockHeight: valid4.postState.postBlockHeight,
-      deletionBlockHeight: Field(4),
+      deletionBlockHeight: Field(3),
     });
     const post4 = new PostState({
       posterAddress: valid6.postState.posterAddress,
