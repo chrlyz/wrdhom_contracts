@@ -59,6 +59,7 @@ const feepayerAddress = feepayerKey.toPublicKey();
 const feepayerAddressAsField = Poseidon.hash(feepayerAddress.toFields());
 const zkAppAddress = zkAppKey.toPublicKey();
 const zkApp = new PostsContract(zkAppAddress);
+const zkAppAddressAsField = Poseidon.hash(zkAppAddress.toFields());
 
 console.log('Compiling Posts zkProgram...');
 await Posts.compile();
@@ -68,6 +69,10 @@ console.log('Compiled');
 
 const usersPostsCountersMap = new MerkleMap();
 const postsMap = new MerkleMap();
+
+// ==============================================================================
+// 1. Publishes on-chain proof for publication of 1st post
+// ==============================================================================
 
 if (numberOfTransaction === 1) {
   const lastBlock1 = await fetchLastBlock(config.url);
@@ -126,18 +131,28 @@ if (numberOfTransaction === 1) {
   }
   if (sentTxn1?.hash() !== undefined) {
     console.log(`
-  Success! Root of MekleMap containing proof
-  for first post has been published on-chain.
+  Success! Roots of merkle maps to prove publication
+  of 1st post have been sent to be published on-chain.
 
   Your smart contract state will be updated
   as soon as the transaction is included in a block:
   https://berkeley.minaexplorer.com/transaction/${sentTxn1.hash()}
+
+  If the transaction fails, execute this step again. The transaction
+  probably took too long to be included in a block, so the block height
+  associated to the post deletion or publication is no longer valid
+  (block length is used as a way to timestamp at which point a post was
+  posted or deleted).
   `);
 
     const post1JSON = JSON.stringify(valid1.postState);
     await fs.writeFile('./build/src/post1.json', post1JSON, 'utf-8');
   }
 }
+
+// ==============================================================================
+// 2. Publishes on-chain proof for deletion of 1st post
+// ==============================================================================
 
 if (numberOfTransaction === 2) {
   const post1: PostState = JSON.parse(
@@ -214,16 +229,365 @@ if (numberOfTransaction === 2) {
   }
   if (sentTxn2?.hash() !== undefined) {
     console.log(`
-  Success! Root of MekleMap containing proof
-  for deletion of first post has been published on-chain.
+  Success! Root of merkle map to prove deletion
+  of 1st post has been sent to be updated on-chain.
   
   Your smart contract state will be updated
   as soon as the transaction is included in a block:
   https://berkeley.minaexplorer.com/transaction/${sentTxn2.hash()}
+
+  If the transaction fails, execute this step again. The transaction
+  probably took too long to be included in a block, so the block height
+  associated to the post deletion or publication is no longer valid
+  (block length is used as a way to timestamp at which point a post was
+  posted or deleted).
   `);
 
     const post1JSON = JSON.stringify(valid2.latestPostState);
     await fs.writeFile('./build/src/post1.json', post1JSON, 'utf-8');
+  }
+}
+
+// ==============================================================================
+// 3. Publishes on-chain proof for publication of 2nd and 3rd posts
+// ==============================================================================
+
+if (numberOfTransaction === 3) {
+  const post1: PostState = JSON.parse(
+    await fs.readFile('./build/src/post1.json', 'utf8')
+  );
+
+  // Restore PostState for post1 produced in transaction 2
+  const post1Restored = new PostState({
+    posterAddress: feepayerAddress,
+    postContentID: CircuitString.fromString(
+      'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+    ),
+    allPostsCounter: Field(post1.allPostsCounter),
+    userPostsCounter: Field(post1.userPostsCounter),
+    postBlockHeight: Field(post1.postBlockHeight),
+    deletionBlockHeight: Field(post1.deletionBlockHeight),
+  });
+
+  // Restore MerkleMap produced in transaction 2
+  usersPostsCountersMap.set(
+    feepayerAddressAsField,
+    Field(post1Restored.userPostsCounter)
+  );
+  postsMap.set(
+    Poseidon.hash([feepayerAddressAsField, post1Restored.postContentID.hash()]),
+    post1Restored.hash()
+  );
+
+  const lastBlock3 = await fetchLastBlock(config.url);
+
+  const valid3 = createPostPublishingTransitionValidInputs(
+    feepayerAddress,
+    feepayerKey,
+    CircuitString.fromString(
+      'b3333333333333333333333333333333333333333333333333333333333'
+    ),
+    Field(2),
+    Field(2),
+    Field(lastBlock3.blockchainLength.toBigint())
+  );
+
+  const transition3 = PostsTransition.createPostPublishingTransition(
+    valid3.signature,
+    valid3.postState.allPostsCounter.sub(1),
+    valid3.initialUsersPostsCounters,
+    valid3.latestUsersPostsCounters,
+    valid3.postState.userPostsCounter.sub(1),
+    valid3.userPostsCounterWitness,
+    valid3.initialPosts,
+    valid3.latestPosts,
+    valid3.postState,
+    valid3.postWitness
+  );
+
+  const proof3 = await Posts.provePostPublishingTransition(
+    transition3,
+    valid3.signature,
+    valid3.postState.allPostsCounter.sub(1),
+    valid3.initialUsersPostsCounters,
+    valid3.latestUsersPostsCounters,
+    valid3.postState.userPostsCounter.sub(1),
+    valid3.userPostsCounterWitness,
+    valid3.initialPosts,
+    valid3.latestPosts,
+    valid3.postState,
+    valid3.postWitness
+  );
+
+  const valid4 = createPostPublishingTransitionValidInputs(
+    zkAppAddress,
+    zkAppKey,
+    CircuitString.fromString(
+      'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+    ),
+    Field(3),
+    Field(1),
+    Field(lastBlock3.blockchainLength.toBigint())
+  );
+
+  const transition4 = PostsTransition.createPostPublishingTransition(
+    valid4.signature,
+    valid4.postState.allPostsCounter.sub(1),
+    valid4.initialUsersPostsCounters,
+    valid4.latestUsersPostsCounters,
+    valid4.postState.userPostsCounter.sub(1),
+    valid4.userPostsCounterWitness,
+    valid4.initialPosts,
+    valid4.latestPosts,
+    valid4.postState,
+    valid4.postWitness
+  );
+
+  const proof4 = await Posts.provePostPublishingTransition(
+    transition4,
+    valid4.signature,
+    valid4.postState.allPostsCounter.sub(1),
+    valid4.initialUsersPostsCounters,
+    valid4.latestUsersPostsCounters,
+    valid4.postState.userPostsCounter.sub(1),
+    valid4.userPostsCounterWitness,
+    valid4.initialPosts,
+    valid4.latestPosts,
+    valid4.postState,
+    valid4.postWitness
+  );
+
+  const mergedTransitions1 = PostsTransition.mergePostsTransitions(
+    transition3,
+    transition4
+  );
+  const mergedTransitionProofs1 = await Posts.proveMergedPostsTransitions(
+    mergedTransitions1,
+    proof3,
+    proof4
+  );
+
+  let sentTxn3;
+
+  try {
+    const txn3 = await Mina.transaction(
+      { sender: feepayerAddress, fee: fee },
+      () => {
+        zkApp.update(mergedTransitionProofs1);
+      }
+    );
+    await txn3.prove();
+    sentTxn3 = await txn3.sign([feepayerKey]).send();
+  } catch (err) {
+    console.log(err);
+  }
+  if (sentTxn3?.hash() !== undefined) {
+    console.log(`
+  Success! Roots of merkle maps to prove publication of
+  2nd and 3rd posts have been sent to be published on-chain.
+  
+  Your smart contract state will be updated
+  as soon as the transaction is included in a block:
+  https://berkeley.minaexplorer.com/transaction/${sentTxn3.hash()}
+
+  If the transaction fails, execute this step again. The transaction
+  probably took too long to be included in a block, so the block height
+  associated to the post deletion or publication is no longer valid
+  (block length is used as a way to timestamp at which point a post was
+  posted or deleted).
+  `);
+
+    const post2JSON = JSON.stringify(valid3.postState);
+    const post3JSON = JSON.stringify(valid4.postState);
+    await fs.writeFile('./build/src/post2.json', post2JSON, 'utf-8');
+    await fs.writeFile('./build/src/post3.json', post3JSON, 'utf-8');
+  }
+}
+
+// ==============================================================================
+// 4. Publishes on-chain proof for deletion of 3rd post
+//    and publication of 4th post
+// ==============================================================================
+
+if (numberOfTransaction === 4) {
+  const post1: PostState = JSON.parse(
+    await fs.readFile('./build/src/post1.json', 'utf8')
+  );
+  const post2: PostState = JSON.parse(
+    await fs.readFile('./build/src/post2.json', 'utf8')
+  );
+  const post3: PostState = JSON.parse(
+    await fs.readFile('./build/src/post3.json', 'utf8')
+  );
+
+  // Restore PostState for posts produced in previous transactions
+  const post1Restored = new PostState({
+    posterAddress: feepayerAddress,
+    postContentID: CircuitString.fromString(
+      'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+    ),
+    allPostsCounter: Field(post1.allPostsCounter),
+    userPostsCounter: Field(post1.userPostsCounter),
+    postBlockHeight: Field(post1.postBlockHeight),
+    deletionBlockHeight: Field(post1.deletionBlockHeight),
+  });
+  const post2Restored = new PostState({
+    posterAddress: feepayerAddress,
+    postContentID: CircuitString.fromString(
+      'b3333333333333333333333333333333333333333333333333333333333'
+    ),
+    allPostsCounter: Field(post2.allPostsCounter),
+    userPostsCounter: Field(post2.userPostsCounter),
+    postBlockHeight: Field(post2.postBlockHeight),
+    deletionBlockHeight: Field(post2.deletionBlockHeight),
+  });
+  const post3Restored = new PostState({
+    posterAddress: zkAppAddress,
+    postContentID: CircuitString.fromString(
+      'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+    ),
+    allPostsCounter: Field(post3.allPostsCounter),
+    userPostsCounter: Field(post3.userPostsCounter),
+    postBlockHeight: Field(post3.postBlockHeight),
+    deletionBlockHeight: Field(post3.deletionBlockHeight),
+  });
+
+  // Restore MerkleMap produced in previous transactions
+  postsMap.set(
+    Poseidon.hash([feepayerAddressAsField, post1Restored.postContentID.hash()]),
+    post1Restored.hash()
+  );
+  usersPostsCountersMap.set(
+    feepayerAddressAsField,
+    Field(post2Restored.userPostsCounter)
+  );
+  postsMap.set(
+    Poseidon.hash([feepayerAddressAsField, post2Restored.postContentID.hash()]),
+    post2Restored.hash()
+  );
+  usersPostsCountersMap.set(
+    zkAppAddressAsField,
+    Field(post3Restored.userPostsCounter)
+  );
+  postsMap.set(
+    Poseidon.hash([zkAppAddressAsField, post3Restored.postContentID.hash()]),
+    post3Restored.hash()
+  );
+
+  const lastBlock4 = await fetchLastBlock(config.url);
+
+  const valid5 = createPostDeletionTransitionValidInputs(
+    zkAppKey,
+    Field(3),
+    post3Restored,
+    Field(lastBlock4.blockchainLength.toBigint())
+  );
+
+  const transition5 = PostsTransition.createPostDeletionTransition(
+    valid5.signature,
+    valid5.allPostsCounter,
+    valid5.usersPostsCounters,
+    valid5.initialPosts,
+    valid5.latestPosts,
+    valid5.initialPostState,
+    valid5.postWitness,
+    valid5.latestPostState.deletionBlockHeight
+  );
+
+  const proof5 = await Posts.provePostDeletionTransition(
+    transition5,
+    valid5.signature,
+    valid5.allPostsCounter,
+    valid5.usersPostsCounters,
+    valid5.initialPosts,
+    valid5.latestPosts,
+    valid5.initialPostState,
+    valid5.postWitness,
+    valid5.latestPostState.deletionBlockHeight
+  );
+
+  const valid6 = createPostPublishingTransitionValidInputs(
+    zkAppAddress,
+    zkAppKey,
+    CircuitString.fromString(
+      'b4444444444444444444444444444444444444444444444444444444444'
+    ),
+    Field(4),
+    Field(2),
+    Field(lastBlock4.blockchainLength.toBigint())
+  );
+
+  const transition6 = PostsTransition.createPostPublishingTransition(
+    valid6.signature,
+    valid6.postState.allPostsCounter.sub(1),
+    valid6.initialUsersPostsCounters,
+    valid6.latestUsersPostsCounters,
+    valid6.postState.userPostsCounter.sub(1),
+    valid6.userPostsCounterWitness,
+    valid6.initialPosts,
+    valid6.latestPosts,
+    valid6.postState,
+    valid6.postWitness
+  );
+
+  const proof6 = await Posts.provePostPublishingTransition(
+    transition6,
+    valid6.signature,
+    valid6.postState.allPostsCounter.sub(1),
+    valid6.initialUsersPostsCounters,
+    valid6.latestUsersPostsCounters,
+    valid6.postState.userPostsCounter.sub(1),
+    valid6.userPostsCounterWitness,
+    valid6.initialPosts,
+    valid6.latestPosts,
+    valid6.postState,
+    valid6.postWitness
+  );
+
+  const mergedTransitions2 = PostsTransition.mergePostsTransitions(
+    transition5,
+    transition6
+  );
+  const mergedTransitionProofs2 = await Posts.proveMergedPostsTransitions(
+    mergedTransitions2,
+    proof5,
+    proof6
+  );
+
+  let sentTxn4;
+
+  try {
+    const txn4 = await Mina.transaction(
+      { sender: feepayerAddress, fee: fee },
+      () => {
+        zkApp.update(mergedTransitionProofs2);
+      }
+    );
+    await txn4.prove();
+    sentTxn4 = await txn4.sign([feepayerKey]).send();
+  } catch (err) {
+    console.log(err);
+  }
+  if (sentTxn4?.hash() !== undefined) {
+    console.log(`
+  Success! Roots of merkle maps to prove deletion of 3rd post
+  and publication of 4th post have been sent to be published on-chain.
+  
+  Your smart contract state will be updated
+  as soon as the transaction is included in a block:
+  https://berkeley.minaexplorer.com/transaction/${sentTxn4.hash()}
+
+  If the transaction fails, execute this step again. The transaction
+  probably took too long to be included in a block, so the block height
+  associated to the post deletion or publication is no longer valid
+  (block length is used as a way to timestamp at which point a post was
+  posted or deleted).
+  `);
+
+    const post3JSON = JSON.stringify(valid5.latestPostState);
+    const post4JSON = JSON.stringify(valid6.postState);
+    await fs.writeFile('./build/src/post3.json', post3JSON, 'utf-8');
+    await fs.writeFile('./build/src/post4.json', post4JSON, 'utf-8');
   }
 }
 
