@@ -175,7 +175,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     expect(postsState).toEqual(postsRoot);
 
     // ==============================================================================
-    // 2. Publishes the first post
+    // 2. Publishes on-chain proof for publication of 1st post
     // ==============================================================================
 
     const valid1 = createPostPublishingTransitionValidInputs(
@@ -238,7 +238,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     console.log('First post published');
 
     // ==============================================================================
-    // 3. Deletes the first post
+    // 3. Publishes on-chain proof for deletion of 1st post
     // ==============================================================================
 
     const valid2 = createPostDeletionTransitionValidInputs(
@@ -292,7 +292,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     console.log('First post deleted');
 
     // ==============================================================================
-    // 4. Publishes second and third posts through merged proofs
+    // 4. Publishes on-chain proof for publication of 2nd and 3rd posts
     // ==============================================================================
 
     const valid3 = createPostPublishingTransitionValidInputs(
@@ -403,7 +403,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     console.log('Second and third posts published through merged proofs');
 
     // ==============================================================================
-    // 5. Deletes third post and publishes fourth post through merged proofs
+    // 5. Publishes on-chain proof for deletion of 3rd post
+    //    and publication of 4th post
     // ==============================================================================
 
     const valid5 = createPostDeletionTransitionValidInputs(
