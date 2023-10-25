@@ -75,8 +75,10 @@ const postsMap = new MerkleMap();
 // ==============================================================================
 
 if (numberOfTransaction === 1) {
+  // Get last block to target next block to timestamp our post state
   const lastBlock1 = await fetchLastBlock(config.url);
 
+  // Prepare inputs to create a valid state transition
   const valid1 = createPostPublishingTransitionValidInputs(
     feepayerAddress,
     feepayerKey,
@@ -88,6 +90,7 @@ if (numberOfTransaction === 1) {
     Field(lastBlock1.blockchainLength.toBigint())
   );
 
+  // Create a valid state transition
   const transition1 = PostsTransition.createPostPublishingTransition(
     valid1.signature,
     valid1.postState.allPostsCounter.sub(1),
@@ -101,6 +104,7 @@ if (numberOfTransaction === 1) {
     valid1.postWitness
   );
 
+  // Create valid proof for our state transition
   const proof1 = await Posts.provePostPublishingTransition(
     transition1,
     valid1.signature,
@@ -115,8 +119,8 @@ if (numberOfTransaction === 1) {
     valid1.postWitness
   );
 
+  // Send valid proof to update our on-chain state
   let sentTxn1;
-
   try {
     const txn1 = await Mina.transaction(
       { sender: feepayerAddress, fee: fee },
@@ -155,21 +159,11 @@ if (numberOfTransaction === 1) {
 // ==============================================================================
 
 if (numberOfTransaction === 2) {
-  const post1: PostState = JSON.parse(
-    await fs.readFile('./build/src/post1.json', 'utf8')
+  // Restore PostState for post1 after transaction 1
+  const post1 = PostState.fromJSON(
+    JSON.parse(await fs.readFile('./build/src/post1.json', 'utf8'))
   );
-
-  // Restore PostState for post1 produced in transaction 1
-  const post1Restored = new PostState({
-    posterAddress: feepayerAddress,
-    postContentID: CircuitString.fromString(
-      'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
-    ),
-    allPostsCounter: Field(post1.allPostsCounter),
-    userPostsCounter: Field(post1.userPostsCounter),
-    postBlockHeight: Field(post1.postBlockHeight),
-    deletionBlockHeight: Field(post1.deletionBlockHeight),
-  });
+  const post1Restored: PostState = new PostState(post1);
 
   // Restore MerkleMap produced in transaction 1
   usersPostsCountersMap.set(
@@ -181,8 +175,10 @@ if (numberOfTransaction === 2) {
     post1Restored.hash()
   );
 
+  // Get last block to target next block to timestamp our post state
   const lastBlock2 = await fetchLastBlock(config.url);
 
+  // Prepare inputs to create a valid state transition
   const valid2 = createPostDeletionTransitionValidInputs(
     feepayerKey,
     Field(1),
@@ -190,6 +186,7 @@ if (numberOfTransaction === 2) {
     Field(lastBlock2.blockchainLength.toBigint())
   );
 
+  // Create a valid state transition
   const transition2 = PostsTransition.createPostDeletionTransition(
     valid2.signature,
     valid2.allPostsCounter,
@@ -201,6 +198,7 @@ if (numberOfTransaction === 2) {
     valid2.latestPostState.deletionBlockHeight
   );
 
+  // Create valid proof for our state transition
   const proof2 = await Posts.provePostDeletionTransition(
     transition2,
     valid2.signature,
@@ -213,8 +211,8 @@ if (numberOfTransaction === 2) {
     valid2.latestPostState.deletionBlockHeight
   );
 
+  // Send valid proof to update our on-chain state
   let sentTxn2;
-
   try {
     const txn2 = await Mina.transaction(
       { sender: feepayerAddress, fee: fee },
@@ -253,21 +251,11 @@ if (numberOfTransaction === 2) {
 // ==============================================================================
 
 if (numberOfTransaction === 3) {
-  const post1: PostState = JSON.parse(
-    await fs.readFile('./build/src/post1.json', 'utf8')
+  // Restore PostState for post1 after transaction 2
+  const post1 = PostState.fromJSON(
+    JSON.parse(await fs.readFile('./build/src/post1.json', 'utf8'))
   );
-
-  // Restore PostState for post1 produced in transaction 2
-  const post1Restored = new PostState({
-    posterAddress: feepayerAddress,
-    postContentID: CircuitString.fromString(
-      'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
-    ),
-    allPostsCounter: Field(post1.allPostsCounter),
-    userPostsCounter: Field(post1.userPostsCounter),
-    postBlockHeight: Field(post1.postBlockHeight),
-    deletionBlockHeight: Field(post1.deletionBlockHeight),
-  });
+  const post1Restored: PostState = new PostState(post1);
 
   // Restore MerkleMap produced in transaction 2
   usersPostsCountersMap.set(
@@ -279,8 +267,10 @@ if (numberOfTransaction === 3) {
     post1Restored.hash()
   );
 
+  // Get last block to target next block to timestamp our post states
   const lastBlock3 = await fetchLastBlock(config.url);
 
+  // Prepare inputs to create a valid state transition
   const valid3 = createPostPublishingTransitionValidInputs(
     feepayerAddress,
     feepayerKey,
@@ -292,6 +282,7 @@ if (numberOfTransaction === 3) {
     Field(lastBlock3.blockchainLength.toBigint())
   );
 
+  // Create a valid state transition
   const transition3 = PostsTransition.createPostPublishingTransition(
     valid3.signature,
     valid3.postState.allPostsCounter.sub(1),
@@ -305,6 +296,7 @@ if (numberOfTransaction === 3) {
     valid3.postWitness
   );
 
+  // Create valid proof for our state transition
   const proof3 = await Posts.provePostPublishingTransition(
     transition3,
     valid3.signature,
@@ -319,6 +311,7 @@ if (numberOfTransaction === 3) {
     valid3.postWitness
   );
 
+  // Prepare inputs to create a valid state transition
   const valid4 = createPostPublishingTransitionValidInputs(
     zkAppAddress,
     zkAppKey,
@@ -330,6 +323,7 @@ if (numberOfTransaction === 3) {
     Field(lastBlock3.blockchainLength.toBigint())
   );
 
+  // Create a valid state transition
   const transition4 = PostsTransition.createPostPublishingTransition(
     valid4.signature,
     valid4.postState.allPostsCounter.sub(1),
@@ -343,6 +337,7 @@ if (numberOfTransaction === 3) {
     valid4.postWitness
   );
 
+  // Create valid proof for our state transition
   const proof4 = await Posts.provePostPublishingTransition(
     transition4,
     valid4.signature,
@@ -357,18 +352,21 @@ if (numberOfTransaction === 3) {
     valid4.postWitness
   );
 
+  // Merge valid state transitions
   const mergedTransitions1 = PostsTransition.mergePostsTransitions(
     transition3,
     transition4
   );
+
+  // Create proof of valid merged state transitions
   const mergedTransitionProofs1 = await Posts.proveMergedPostsTransitions(
     mergedTransitions1,
     proof3,
     proof4
   );
 
+  // Send valid proof to update our on-chain state
   let sentTxn3;
-
   try {
     const txn3 = await Mina.transaction(
       { sender: feepayerAddress, fee: fee },
@@ -410,47 +408,19 @@ if (numberOfTransaction === 3) {
 // ==============================================================================
 
 if (numberOfTransaction === 4) {
-  const post1: PostState = JSON.parse(
-    await fs.readFile('./build/src/post1.json', 'utf8')
+  // Restore PostState for posts after transaction 3
+  const post1 = PostState.fromJSON(
+    JSON.parse(await fs.readFile('./build/src/post1.json', 'utf8'))
   );
-  const post2: PostState = JSON.parse(
-    await fs.readFile('./build/src/post2.json', 'utf8')
+  const post2 = PostState.fromJSON(
+    JSON.parse(await fs.readFile('./build/src/post2.json', 'utf8'))
   );
-  const post3: PostState = JSON.parse(
-    await fs.readFile('./build/src/post3.json', 'utf8')
+  const post3 = PostState.fromJSON(
+    JSON.parse(await fs.readFile('./build/src/post3.json', 'utf8'))
   );
-
-  // Restore PostState for posts produced in previous transactions
-  const post1Restored = new PostState({
-    posterAddress: feepayerAddress,
-    postContentID: CircuitString.fromString(
-      'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
-    ),
-    allPostsCounter: Field(post1.allPostsCounter),
-    userPostsCounter: Field(post1.userPostsCounter),
-    postBlockHeight: Field(post1.postBlockHeight),
-    deletionBlockHeight: Field(post1.deletionBlockHeight),
-  });
-  const post2Restored = new PostState({
-    posterAddress: feepayerAddress,
-    postContentID: CircuitString.fromString(
-      'b3333333333333333333333333333333333333333333333333333333333'
-    ),
-    allPostsCounter: Field(post2.allPostsCounter),
-    userPostsCounter: Field(post2.userPostsCounter),
-    postBlockHeight: Field(post2.postBlockHeight),
-    deletionBlockHeight: Field(post2.deletionBlockHeight),
-  });
-  const post3Restored = new PostState({
-    posterAddress: zkAppAddress,
-    postContentID: CircuitString.fromString(
-      'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
-    ),
-    allPostsCounter: Field(post3.allPostsCounter),
-    userPostsCounter: Field(post3.userPostsCounter),
-    postBlockHeight: Field(post3.postBlockHeight),
-    deletionBlockHeight: Field(post3.deletionBlockHeight),
-  });
+  const post1Restored: PostState = new PostState(post1);
+  const post2Restored: PostState = new PostState(post2);
+  const post3Restored: PostState = new PostState(post3);
 
   // Restore MerkleMap produced in previous transactions
   postsMap.set(
@@ -474,8 +444,10 @@ if (numberOfTransaction === 4) {
     post3Restored.hash()
   );
 
+  // Get last block to target next block to timestamp our post states
   const lastBlock4 = await fetchLastBlock(config.url);
 
+  // Prepare inputs to create a valid state transition
   const valid5 = createPostDeletionTransitionValidInputs(
     zkAppKey,
     Field(3),
@@ -483,6 +455,7 @@ if (numberOfTransaction === 4) {
     Field(lastBlock4.blockchainLength.toBigint())
   );
 
+  // Create a valid state transition
   const transition5 = PostsTransition.createPostDeletionTransition(
     valid5.signature,
     valid5.allPostsCounter,
@@ -494,6 +467,7 @@ if (numberOfTransaction === 4) {
     valid5.latestPostState.deletionBlockHeight
   );
 
+  // Create valid proof for our state transition
   const proof5 = await Posts.provePostDeletionTransition(
     transition5,
     valid5.signature,
@@ -506,6 +480,7 @@ if (numberOfTransaction === 4) {
     valid5.latestPostState.deletionBlockHeight
   );
 
+  // Prepare inputs to create a valid state transition
   const valid6 = createPostPublishingTransitionValidInputs(
     zkAppAddress,
     zkAppKey,
@@ -517,6 +492,7 @@ if (numberOfTransaction === 4) {
     Field(lastBlock4.blockchainLength.toBigint())
   );
 
+  // Create a valid state transition
   const transition6 = PostsTransition.createPostPublishingTransition(
     valid6.signature,
     valid6.postState.allPostsCounter.sub(1),
@@ -530,6 +506,7 @@ if (numberOfTransaction === 4) {
     valid6.postWitness
   );
 
+  // Create valid proof for our state transition
   const proof6 = await Posts.provePostPublishingTransition(
     transition6,
     valid6.signature,
@@ -544,18 +521,21 @@ if (numberOfTransaction === 4) {
     valid6.postWitness
   );
 
+  // Merge valid state transitions
   const mergedTransitions2 = PostsTransition.mergePostsTransitions(
     transition5,
     transition6
   );
+
+  // Create proof of valid merged state transitions
   const mergedTransitionProofs2 = await Posts.proveMergedPostsTransitions(
     mergedTransitions2,
     proof5,
     proof6
   );
 
+  // Send valid proof to update our on-chain state
   let sentTxn4;
-
   try {
     const txn4 = await Mina.transaction(
       { sender: feepayerAddress, fee: fee },

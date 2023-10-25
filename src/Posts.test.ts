@@ -178,6 +178,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     // 2. Publishes on-chain proof for publication of 1st post
     // ==============================================================================
 
+    // Prepare inputs to create a valid state transition
     const valid1 = createPostPublishingTransitionValidInputs(
       deployerAccount,
       deployerKey,
@@ -189,6 +190,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       Field(0)
     );
 
+    // Create a valid state transition
     const transition1 = PostsTransition.createPostPublishingTransition(
       valid1.signature,
       valid1.postState.allPostsCounter.sub(1),
@@ -202,6 +204,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid1.postWitness
     );
 
+    // Create valid proof for our state transition
     const proof1 = await Posts.provePostPublishingTransition(
       transition1,
       valid1.signature,
@@ -216,10 +219,10 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid1.postWitness
     );
 
+    // Send valid proof to update our on-chain state
     const txn1 = await Mina.transaction(deployerAccount, () => {
       zkApp.update(proof1);
     });
-
     await txn1.prove();
     await txn1.sign([deployerKey]).send();
     Local.setBlockchainLength(UInt32.from(1));
@@ -241,6 +244,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     // 3. Publishes on-chain proof for deletion of 1st post
     // ==============================================================================
 
+    // Prepare inputs to create a valid state transition
     const valid2 = createPostDeletionTransitionValidInputs(
       deployerKey,
       Field(1),
@@ -248,6 +252,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       Field(1)
     );
 
+    // Create a valid state transition
     const transition2 = PostsTransition.createPostDeletionTransition(
       valid2.signature,
       valid2.allPostsCounter,
@@ -259,6 +264,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid2.latestPostState.deletionBlockHeight
     );
 
+    // Create valid proof for our state transition
     const proof2 = await Posts.provePostDeletionTransition(
       transition2,
       valid2.signature,
@@ -271,10 +277,10 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid2.latestPostState.deletionBlockHeight
     );
 
+    // Send valid proof to update our on-chain state
     const txn2 = await Mina.transaction(deployerAccount, () => {
       zkApp.update(proof2);
     });
-
     await txn2.prove();
     await txn2.sign([deployerKey]).send();
     Local.setBlockchainLength(UInt32.from(2));
@@ -295,6 +301,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     // 4. Publishes on-chain proof for publication of 2nd and 3rd posts
     // ==============================================================================
 
+    // Prepare inputs to create a valid state transition
     const valid3 = createPostPublishingTransitionValidInputs(
       deployerAccount,
       deployerKey,
@@ -306,6 +313,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       Field(2)
     );
 
+    // Prepare inputs to create a valid state transition
     const transition3 = PostsTransition.createPostPublishingTransition(
       valid3.signature,
       valid3.postState.allPostsCounter.sub(1),
@@ -319,6 +327,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid3.postWitness
     );
 
+    // Create valid proof for our state transition
     const proof3 = await Posts.provePostPublishingTransition(
       transition3,
       valid3.signature,
@@ -333,6 +342,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid3.postWitness
     );
 
+    // Prepare inputs to create a valid state transition
     const valid4 = createPostPublishingTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -344,6 +354,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       Field(2)
     );
 
+    // Prepare inputs to create a valid state transition
     const transition4 = PostsTransition.createPostPublishingTransition(
       valid4.signature,
       valid4.postState.allPostsCounter.sub(1),
@@ -357,6 +368,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid4.postWitness
     );
 
+    // Create valid proof for our state transition
     const proof4 = await Posts.provePostPublishingTransition(
       transition4,
       valid4.signature,
@@ -371,20 +383,23 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid4.postWitness
     );
 
+    // Merge valid state transitions
     const mergedTransitions1 = PostsTransition.mergePostsTransitions(
       transition3,
       transition4
     );
+
+    // Create proof of valid merged state transitions
     const mergedTransitionProofs1 = await Posts.proveMergedPostsTransitions(
       mergedTransitions1,
       proof3,
       proof4
     );
 
+    // Send valid proof to update our on-chain state
     const txn3 = await Mina.transaction(deployerAccount, () => {
       zkApp.update(mergedTransitionProofs1);
     });
-
     await txn3.prove();
     await txn3.sign([deployerKey, senderKey]).send();
     Local.setBlockchainLength(UInt32.from(3));
@@ -407,6 +422,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     //    and publication of 4th post
     // ==============================================================================
 
+    // Prepare inputs to create a valid state transition
     const valid5 = createPostDeletionTransitionValidInputs(
       senderKey,
       Field(3),
@@ -414,6 +430,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       Field(3)
     );
 
+    // Prepare inputs to create a valid state transition
     const transition5 = PostsTransition.createPostDeletionTransition(
       valid5.signature,
       valid5.allPostsCounter,
@@ -425,6 +442,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid5.latestPostState.deletionBlockHeight
     );
 
+    // Create valid proof for our state transition
     const proof5 = await Posts.provePostDeletionTransition(
       transition5,
       valid5.signature,
@@ -437,6 +455,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid5.latestPostState.deletionBlockHeight
     );
 
+    // Prepare inputs to create a valid state transition
     const valid6 = createPostPublishingTransitionValidInputs(
       senderAccount,
       senderKey,
@@ -448,6 +467,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       Field(3)
     );
 
+    // Prepare inputs to create a valid state transition
     const transition6 = PostsTransition.createPostPublishingTransition(
       valid6.signature,
       valid6.postState.allPostsCounter.sub(1),
@@ -461,6 +481,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid6.postWitness
     );
 
+    // Create valid proof for our state transition
     const proof6 = await Posts.provePostPublishingTransition(
       transition6,
       valid6.signature,
@@ -475,20 +496,23 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
       valid6.postWitness
     );
 
+    // Merge valid state transitions
     const mergedTransitions2 = PostsTransition.mergePostsTransitions(
       transition5,
       transition6
     );
+
+    // Create proof of valid merged state transitions
     const mergedTransitionProofs2 = await Posts.proveMergedPostsTransitions(
       mergedTransitions2,
       proof5,
       proof6
     );
 
+    // Send valid proof to update our on-chain state
     const txn4 = await Mina.transaction(senderAccount, () => {
       zkApp.update(mergedTransitionProofs2);
     });
-
     await txn4.prove();
     await txn4.sign([senderKey]).send();
     Local.setBlockchainLength(UInt32.from(4));
