@@ -162,17 +162,16 @@ if (numberOfTransaction === 2) {
   // Restore PostState for post1 after transaction 1
   const post1 = PostState.fromJSON(
     JSON.parse(await fs.readFile('./build/src/post1.json', 'utf8'))
-  );
-  const post1Restored: PostState = new PostState(post1);
+  ) as PostState;
 
   // Restore MerkleMap produced in transaction 1
   usersPostsCountersMap.set(
     feepayerAddressAsField,
-    Field(post1Restored.userPostsCounter)
+    Field(post1.userPostsCounter)
   );
   postsMap.set(
-    Poseidon.hash([feepayerAddressAsField, post1Restored.postContentID.hash()]),
-    post1Restored.hash()
+    Poseidon.hash([feepayerAddressAsField, post1.postContentID.hash()]),
+    post1.hash()
   );
 
   // Get last block to target next block to timestamp our post state
@@ -182,7 +181,7 @@ if (numberOfTransaction === 2) {
   const valid2 = createPostDeletionTransitionValidInputs(
     feepayerKey,
     Field(1),
-    post1Restored,
+    post1,
     Field(lastBlock2.blockchainLength.toBigint())
   );
 
@@ -254,17 +253,16 @@ if (numberOfTransaction === 3) {
   // Restore PostState for post1 after transaction 2
   const post1 = PostState.fromJSON(
     JSON.parse(await fs.readFile('./build/src/post1.json', 'utf8'))
-  );
-  const post1Restored: PostState = new PostState(post1);
+  ) as PostState;
 
   // Restore MerkleMap produced in transaction 2
   usersPostsCountersMap.set(
     feepayerAddressAsField,
-    Field(post1Restored.userPostsCounter)
+    Field(post1.userPostsCounter)
   );
   postsMap.set(
-    Poseidon.hash([feepayerAddressAsField, post1Restored.postContentID.hash()]),
-    post1Restored.hash()
+    Poseidon.hash([feepayerAddressAsField, post1.postContentID.hash()]),
+    post1.hash()
   );
 
   // Get last block to target next block to timestamp our post states
@@ -411,37 +409,31 @@ if (numberOfTransaction === 4) {
   // Restore PostState for posts after transaction 3
   const post1 = PostState.fromJSON(
     JSON.parse(await fs.readFile('./build/src/post1.json', 'utf8'))
-  );
+  ) as PostState;
   const post2 = PostState.fromJSON(
     JSON.parse(await fs.readFile('./build/src/post2.json', 'utf8'))
-  );
+  ) as PostState;
   const post3 = PostState.fromJSON(
     JSON.parse(await fs.readFile('./build/src/post3.json', 'utf8'))
-  );
-  const post1Restored: PostState = new PostState(post1);
-  const post2Restored: PostState = new PostState(post2);
-  const post3Restored: PostState = new PostState(post3);
+  ) as PostState;
 
   // Restore MerkleMap produced in previous transactions
   postsMap.set(
-    Poseidon.hash([feepayerAddressAsField, post1Restored.postContentID.hash()]),
-    post1Restored.hash()
+    Poseidon.hash([feepayerAddressAsField, post1.postContentID.hash()]),
+    post1.hash()
   );
   usersPostsCountersMap.set(
     feepayerAddressAsField,
-    Field(post2Restored.userPostsCounter)
+    Field(post2.userPostsCounter)
   );
   postsMap.set(
-    Poseidon.hash([feepayerAddressAsField, post2Restored.postContentID.hash()]),
-    post2Restored.hash()
+    Poseidon.hash([feepayerAddressAsField, post2.postContentID.hash()]),
+    post2.hash()
   );
-  usersPostsCountersMap.set(
-    zkAppAddressAsField,
-    Field(post3Restored.userPostsCounter)
-  );
+  usersPostsCountersMap.set(zkAppAddressAsField, Field(post3.userPostsCounter));
   postsMap.set(
-    Poseidon.hash([zkAppAddressAsField, post3Restored.postContentID.hash()]),
-    post3Restored.hash()
+    Poseidon.hash([zkAppAddressAsField, post3.postContentID.hash()]),
+    post3.hash()
   );
 
   // Get last block to target next block to timestamp our post states
@@ -451,7 +443,7 @@ if (numberOfTransaction === 4) {
   const valid5 = createPostDeletionTransitionValidInputs(
     zkAppKey,
     Field(3),
-    post3Restored,
+    post3,
     Field(lastBlock4.blockchainLength.toBigint())
   );
 
