@@ -20,8 +20,8 @@ So far we have implemented the smart contract and zkProgram that could enable a 
 
 A successful long-term vision for this project would be establishing a popular social media platform with millions of users. Normalizing the expectations for transparency, auditability, credible neutrality, user-owned identity, resiliency, and composability in our general internet experience. With hundreds of developers contributing to the project, and several nodes globally distributed, processing the transactions for updating the state of the platform, and serving requests.
 
-<img src="https://github.com/chrlyz/proof_of_events/blob/dev/img/posts_diagram1.png?raw=true&sanitize=true">
-<img src="https://github.com/chrlyz/proof_of_events/blob/dev/img/posts_diagram2.png?raw=true&sanitize=true">
+<img src="https://github.com/chrlyz/proof_of_events/blob/main/img/posts_diagram1.png?raw=true&sanitize=true">
+<img src="https://github.com/chrlyz/proof_of_events/blob/main/img/posts_diagram2.png?raw=true&sanitize=true">
 
 ## Clone
 
