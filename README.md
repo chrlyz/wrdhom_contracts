@@ -83,13 +83,13 @@ node build/src/zkProgramEnabledDeploy.js < name_from_step_1 >
 Wait for the transaction to confirm. Then you can do some test transactions already available in `/src/PostInteract.ts`. To make the first transaction:
 
 ```sh
-node build/src/zkProgramEnabledDeploy.js < name_from_step_1 > 1
+node build/src/PostsInteract.js < name_from_step_1 > 1
 ```
 
 Wait for the transaction to confirm, then to make the second transaction:
 
 ```sh
-node build/src/zkProgramEnabledDeploy.js < name_from_step_1 > 2
+node build/src/PostsInteract.js < name_from_step_1 > 2
 ```
 
 And so on, up to transaction 4.
