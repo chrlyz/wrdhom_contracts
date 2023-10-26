@@ -1,6 +1,10 @@
 # Proof Of Events
 
-Break free from obscure algorithms. No more shadow banning and manipulation of the content you see, to boost the narratives that benefit the private interests of whoever is currently in charge. Experience social media your way. Customize the criteria for the content you want to see, get the peace of mind that your criteria will be honored (through cryptographic proofs), and that your content and social graph will remain available in the future.
+Break free from obscure algorithms. No more manipulation of the content you see or not see; guided by the private interests and inherent biases of third-parties. Experience social media your way. Customize the criteria for the content you want to see and be certain (through cryptographic proofs) that your criteria is being honored.
+
+Open sourcing algorithms is a step in the right direction, but  it is far from enough, since verifying that the open-sourced code matches the code running on the servers is extremely costly and difficult, given that you would need to mirror the servers of a social media platform, apply the open-sourced algorithm, and compare the results. This is unrealistic, since the cost of even one audit like this would be prohibitive, let alone auditing the system in real-time permanently. Also, most platforms provide little access to their data, so even collecting the data for the audit would be very challenging, and they could implement ways to cheat the auditing.
+
+Furthermore, we need more than guarantees that a specific algorithm is being used. We should be able to create, share, modify, and use our own algorithms, based on our own interests. It’s time to take the internet back and establish solid foundations for human interactions and coordination. Creating digital spaces where we can explore and exchange ideas without the interference of opaque third-parties, imposing their biases and agendas; and constraining the way we explore the internet.
 
 The purpose for this repository is to host the source code for Mina smart contracts and zkPrograms that enable auditable, resilient, customizable, user-centric, and credibly-neutral social media.
 
@@ -16,12 +20,14 @@ This way when a user makes a request like “give me all the posts from these us
 
 Following this approach we can implement more features like post deletion; by the user submitting a signed message, targeting a post that the user published before, and the server using this to set the block length at which the post was deleted, signaling that it shouldn’t be stored or delivered anymore, allowing responses that skip that post in a valid way, while still enabling people to prove that the user posted that in the past, and when it was deleted.
 
-So far we have implemented the smart contract and zkProgram that could enable a server and client to implement the described functionality. This project plans to build on these ideas to add even more features, like reactions, reposts, comments and more.
-
-A successful long-term vision for this project would be establishing a popular social media platform with millions of users. Normalizing the expectations for transparency, auditability, credible neutrality, user-owned identity, resiliency, and composability in our general internet experience. With hundreds of developers contributing to the project, and several nodes globally distributed, processing the transactions for updating the state of the platform, and serving requests.
-
 <img src="https://github.com/chrlyz/proof_of_events/blob/main/img/posts_diagram1.png?raw=true&sanitize=true">
 <img src="https://github.com/chrlyz/proof_of_events/blob/main/img/posts_diagram2.png?raw=true&sanitize=true">
+
+So far we have implemented the smart contract and zkProgram that could enable a server and client to implement the described functionality. This project plans to build on these ideas to add even more features, like reactions, reposts, comments and more.
+
+A successful long-term vision for this project would be establishing a popular social media platform with millions of users. Normalizing the expectations for transparency, auditability, credible neutrality, user-owned identity, resiliency, and composability in our general internet experience.
+
+
 
 ## Clone
 
