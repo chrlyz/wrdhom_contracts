@@ -159,6 +159,7 @@ export class PostsTransition extends Struct({
     postWitness: MerkleMapWitness,
     blockHeight: Field
   ) {
+    initialPostState.deletionBlockHeight.assertEquals(Field(0));
     const initialPostStateHash = initialPostState.hash();
     const isSigned = signature.verify(initialPostState.posterAddress, [
       initialPostStateHash,
