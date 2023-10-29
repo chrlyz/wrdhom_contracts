@@ -13,6 +13,7 @@ import {
 // ============================================================================
 
 export const fieldToFlagPostsAsDeleted = Field(93137);
+export const fieldToFlagPostsAsRestored = Field(1010);
 
 // ============================================================================
 
@@ -204,13 +205,14 @@ export class PostsTransition extends Struct({
     blockHeight: Field
   ) {
     initialPostState.deletionBlockHeight.assertNotEquals(0);
-    const postStateHash = initialPostState.hash();
+    const initialPostStateHash = initialPostState.hash();
     const isSigned = signature.verify(initialPostState.posterAddress, [
-      postStateHash,
+      initialPostStateHash,
+      fieldToFlagPostsAsRestored,
     ]);
     isSigned.assertTrue();
 
-    const postsBefore = postWitness.computeRootAndKey(postStateHash)[0];
+    const postsBefore = postWitness.computeRootAndKey(initialPostStateHash)[0];
     postsBefore.assertEquals(initialPosts);
 
     const latestPostState = new PostState({

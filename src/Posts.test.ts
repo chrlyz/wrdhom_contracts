@@ -4,6 +4,7 @@ import {
   PostState,
   Posts,
   fieldToFlagPostsAsDeleted,
+  fieldToFlagPostsAsRestored,
 } from './Posts';
 import {
   Field,
@@ -159,12 +160,75 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     };
   }
 
-  test(`PostsContract and Posts zkProgram functionality`, async () => {
+  function createPostRestorationTransitionValidInputs(
+    posterKey: PrivateKey,
+    allPostsCounter: Field,
+    initialPostState: PostState,
+    restorationBlockHeight: Field
+  ) {
+    const postStateHash = initialPostState.hash();
+    const signature = Signature.create(posterKey, [
+      postStateHash,
+      fieldToFlagPostsAsRestored,
+    ]);
+
+    const usersPostsCounters = usersPostsCountersMap.getRoot();
+
+    const posterAddressAsField = Poseidon.hash(
+      initialPostState.posterAddress.toFields()
+    );
+    const initialPosts = postsMap.getRoot();
+    const postKey = Poseidon.hash([
+      posterAddressAsField,
+      initialPostState.postContentID.hash(),
+    ]);
+    const postWitness = postsMap.getWitness(postKey);
+
+    const latestPostState = new PostState({
+      posterAddress: initialPostState.posterAddress,
+      postContentID: initialPostState.postContentID,
+      allPostsCounter: initialPostState.allPostsCounter,
+      userPostsCounter: initialPostState.userPostsCounter,
+      postBlockHeight: initialPostState.postBlockHeight,
+      deletionBlockHeight: Field(0),
+    });
+
+    postsMap.set(postKey, latestPostState.hash());
+    const latestPosts = postsMap.getRoot();
+
+    return {
+      signature: signature,
+      allPostsCounter: allPostsCounter,
+      usersPostsCounters: usersPostsCounters,
+      initialPosts: initialPosts,
+      latestPosts: latestPosts,
+      initialPostState: initialPostState,
+      latestPostState: latestPostState,
+      postWitness: postWitness,
+      restorationBlockHeight: restorationBlockHeight,
+    };
+  }
+
+  // ==============================================================================
+  // Tests are structured in batches for 2 reasons:
+  //
+  // 1. To avoid time consuming redundant operations when preparing the context
+  //    for a test.
+  //
+  // 2. Due to memory limitations of wasm32 and how memory for proofs and
+  //    transactions is currently managed by a process, which cause an error
+  //    after too many proofs and transactions have been generated within the
+  //    same process.
+  // ==============================================================================
+
+  test(`PostsContract and Posts zkProgram functionality. 1st batch of tests.`, async () => {
     // ==============================================================================
-    // 1. Deploys PostsContract
+    // 1. Deploys PostsContract.
     // ==============================================================================
 
     await localDeploy();
+
+    // Validate expected state
     const allPostsCounterState = zkApp.allPostsCounter.get();
     const usersPostsCountersState = zkApp.usersPostsCounters.get();
     const postsState = zkApp.posts.get();
@@ -175,7 +239,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     expect(postsState).toEqual(postsRoot);
 
     // ==============================================================================
-    // 2. Publishes on-chain proof for publication of 1st post
+    // 2. Publishes on-chain proof for publication of 1st post.
     // ==============================================================================
 
     // Prepare inputs to create a valid state transition
@@ -227,6 +291,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     await txn1.sign([deployerKey]).send();
     Local.setBlockchainLength(UInt32.from(1));
 
+    // Validate expected state
     const allPostsCounterState1 = zkApp.allPostsCounter.get();
     const usersPostsCountersState1 = zkApp.usersPostsCounters.get();
     const postsState1 = zkApp.posts.get();
@@ -241,7 +306,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     console.log('First post published');
 
     // ==============================================================================
-    // 3. Publishes on-chain proof for deletion of 1st post
+    // 3. Publishes on-chain proof for deletion of 1st post.
     // ==============================================================================
 
     // Prepare inputs to create a valid state transition
@@ -285,6 +350,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     await txn2.sign([deployerKey]).send();
     Local.setBlockchainLength(UInt32.from(2));
 
+    // Validate expected state
     const allPostsCounterState2 = zkApp.allPostsCounter.get();
     const usersPostsCountersState2 = zkApp.usersPostsCounters.get();
     const postsState2 = zkApp.posts.get();
@@ -298,7 +364,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     console.log('First post deleted');
 
     // ==============================================================================
-    // 4. Publishes on-chain proof for publication of 2nd and 3rd posts
+    // 4. Publishes on-chain proof (from merged proofs) for publication of 2nd
+    //    and 3rd posts.
     // ==============================================================================
 
     // Prepare inputs to create a valid state transition
@@ -404,6 +471,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     await txn3.sign([deployerKey, senderKey]).send();
     Local.setBlockchainLength(UInt32.from(3));
 
+    // Validate expected state
     const allPostsCounterState3 = zkApp.allPostsCounter.get();
     const usersPostsCountersState3 = zkApp.usersPostsCounters.get();
     const postsState3 = zkApp.posts.get();
@@ -418,8 +486,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     console.log('Second and third posts published through merged proofs');
 
     // ==============================================================================
-    // 5. Publishes on-chain proof for deletion of 3rd post
-    //    and publication of 4th post
+    // 5. Publishes on-chain proof (from merged proofs) for deletion of 3rd post
+    //    and publication of 4th post.
     // ==============================================================================
 
     // Prepare inputs to create a valid state transition
@@ -517,6 +585,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     await txn4.sign([senderKey]).send();
     Local.setBlockchainLength(UInt32.from(4));
 
+    // Validate expected state
     const allPostsCounterState4 = zkApp.allPostsCounter.get();
     const usersPostsCountersState4 = zkApp.usersPostsCounters.get();
     const postsState4 = zkApp.posts.get();
@@ -596,5 +665,542 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     expect(newPostsMap.getRoot()).toEqual(postsState4);
 
     console.log('Successful extra validation of all the state updates');
+  });
+
+  test(`PostsContract and Posts zkProgram functionality. 2nd batch of tests.`, async () => {
+    // ==============================================================================
+    // 1. Deploys PostsContract
+    // ==============================================================================
+
+    await localDeploy();
+
+    // Validate expected state
+    const allPostsCounterState = zkApp.allPostsCounter.get();
+    const usersPostsCountersState = zkApp.usersPostsCounters.get();
+    const postsState = zkApp.posts.get();
+    const usersPostsCountersRoot = usersPostsCountersMap.getRoot();
+    const postsRoot = postsMap.getRoot();
+    expect(allPostsCounterState).toEqual(Field(0));
+    expect(usersPostsCountersState).toEqual(usersPostsCountersRoot);
+    expect(postsState).toEqual(postsRoot);
+
+    // ==============================================================================
+    // 2. Publishes on-chain proof for publication of 1st post
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid1 = createPostPublishingTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
+      Field(1),
+      Field(1),
+      Field(0)
+    );
+
+    // Create a valid state transition
+    const transition1 = PostsTransition.createPostPublishingTransition(
+      valid1.signature,
+      valid1.postState.allPostsCounter.sub(1),
+      valid1.initialUsersPostsCounters,
+      valid1.latestUsersPostsCounters,
+      valid1.postState.userPostsCounter.sub(1),
+      valid1.userPostsCounterWitness,
+      valid1.initialPosts,
+      valid1.latestPosts,
+      valid1.postState,
+      valid1.postWitness
+    );
+
+    // Create valid proof for our state transition
+    const proof1 = await Posts.provePostPublishingTransition(
+      transition1,
+      valid1.signature,
+      valid1.postState.allPostsCounter.sub(1),
+      valid1.initialUsersPostsCounters,
+      valid1.latestUsersPostsCounters,
+      valid1.postState.userPostsCounter.sub(1),
+      valid1.userPostsCounterWitness,
+      valid1.initialPosts,
+      valid1.latestPosts,
+      valid1.postState,
+      valid1.postWitness
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn1 = await Mina.transaction(deployerAccount, () => {
+      zkApp.update(proof1);
+    });
+    await txn1.prove();
+    await txn1.sign([deployerKey]).send();
+    Local.setBlockchainLength(UInt32.from(1));
+
+    // Validate expected state
+    const allPostsCounterState1 = zkApp.allPostsCounter.get();
+    const usersPostsCountersState1 = zkApp.usersPostsCounters.get();
+    const postsState1 = zkApp.posts.get();
+    const usersPostsCountersRoot1 = usersPostsCountersMap.getRoot();
+    const postsRoot1 = postsMap.getRoot();
+    expect(allPostsCounterState1).toEqual(Field(1));
+    expect(usersPostsCountersState1).toEqual(usersPostsCountersRoot1);
+    expect(usersPostsCountersState1).not.toEqual(usersPostsCountersState);
+    expect(postsState1).toEqual(postsRoot1);
+    expect(postsState1).not.toEqual(postsState);
+
+    console.log('First post published');
+
+    // ==============================================================================
+    // 3. Publishes on-chain proof for deletion of 1st post
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid2 = createPostDeletionTransitionValidInputs(
+      deployerKey,
+      Field(1),
+      valid1.postState,
+      Field(1)
+    );
+
+    // Create a valid state transition
+    const transition2 = PostsTransition.createPostDeletionTransition(
+      valid2.signature,
+      valid2.allPostsCounter,
+      valid2.usersPostsCounters,
+      valid2.initialPosts,
+      valid2.latestPosts,
+      valid2.initialPostState,
+      valid2.postWitness,
+      valid2.latestPostState.deletionBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof2 = await Posts.provePostDeletionTransition(
+      transition2,
+      valid2.signature,
+      valid2.allPostsCounter,
+      valid2.usersPostsCounters,
+      valid2.initialPosts,
+      valid2.latestPosts,
+      valid2.initialPostState,
+      valid2.postWitness,
+      valid2.latestPostState.deletionBlockHeight
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn2 = await Mina.transaction(deployerAccount, () => {
+      zkApp.update(proof2);
+    });
+    await txn2.prove();
+    await txn2.sign([deployerKey]).send();
+    Local.setBlockchainLength(UInt32.from(2));
+
+    // Validate expected state
+    const allPostsCounterState2 = zkApp.allPostsCounter.get();
+    const usersPostsCountersState2 = zkApp.usersPostsCounters.get();
+    const postsState2 = zkApp.posts.get();
+    const usersPostsCountersRoot2 = usersPostsCountersMap.getRoot();
+    const postsRoot2 = postsMap.getRoot();
+    expect(allPostsCounterState2).toEqual(allPostsCounterState1);
+    expect(usersPostsCountersState2).toEqual(usersPostsCountersState1);
+    expect(usersPostsCountersState2).toEqual(usersPostsCountersRoot2);
+    expect(postsState2).toEqual(postsRoot2);
+    expect(postsState2).not.toEqual(postsState1);
+
+    console.log('First post deleted');
+
+    // ==============================================================================
+    // 4. Publishes on-chain proof for restoration of 1st post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid3 = createPostRestorationTransitionValidInputs(
+      deployerKey,
+      Field(1),
+      valid2.latestPostState,
+      Field(2)
+    );
+
+    // Create a valid state transition
+    const transition3 = PostsTransition.createPostRestorationTransition(
+      valid3.signature,
+      valid3.allPostsCounter,
+      valid3.usersPostsCounters,
+      valid3.initialPosts,
+      valid3.latestPosts,
+      valid3.initialPostState,
+      valid3.postWitness,
+      valid3.restorationBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof3 = await Posts.provePostRestorationTransition(
+      transition3,
+      valid3.signature,
+      valid3.allPostsCounter,
+      valid3.usersPostsCounters,
+      valid3.initialPosts,
+      valid3.latestPosts,
+      valid3.initialPostState,
+      valid3.postWitness,
+      valid3.restorationBlockHeight
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn3 = await Mina.transaction(deployerAccount, () => {
+      zkApp.update(proof3);
+    });
+    await txn3.prove();
+    await txn3.sign([deployerKey]).send();
+    Local.setBlockchainLength(UInt32.from(3));
+
+    // Validate expected state
+    const allPostsCounterState3 = zkApp.allPostsCounter.get();
+    const usersPostsCountersState3 = zkApp.usersPostsCounters.get();
+    const postsState3 = zkApp.posts.get();
+    const usersPostsCountersRoot3 = usersPostsCountersMap.getRoot();
+    const postsRoot3 = postsMap.getRoot();
+    expect(allPostsCounterState3).toEqual(allPostsCounterState2);
+    expect(usersPostsCountersState3).toEqual(usersPostsCountersState2);
+    expect(usersPostsCountersState3).toEqual(usersPostsCountersRoot3);
+    expect(postsState3).toEqual(postsRoot3);
+    expect(postsState3).not.toEqual(postsRoot2);
+
+    console.log('First post restored');
+
+    // ==============================================================================
+    // 5. Publishes on-chain proof (from merged proofs) for publication of 2nd
+    //    and 3rd posts.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid4 = createPostPublishingTransitionValidInputs(
+      deployerAccount,
+      deployerKey,
+      CircuitString.fromString(
+        'b3333333333333333333333333333333333333333333333333333333333'
+      ),
+      Field(2),
+      Field(2),
+      Field(3)
+    );
+
+    // Prepare inputs to create a valid state transition
+    const transition4 = PostsTransition.createPostPublishingTransition(
+      valid4.signature,
+      valid4.postState.allPostsCounter.sub(1),
+      valid4.initialUsersPostsCounters,
+      valid4.latestUsersPostsCounters,
+      valid4.postState.userPostsCounter.sub(1),
+      valid4.userPostsCounterWitness,
+      valid4.initialPosts,
+      valid4.latestPosts,
+      valid4.postState,
+      valid4.postWitness
+    );
+
+    // Create valid proof for our state transition
+    const proof4 = await Posts.provePostPublishingTransition(
+      transition4,
+      valid4.signature,
+      valid4.postState.allPostsCounter.sub(1),
+      valid4.initialUsersPostsCounters,
+      valid4.latestUsersPostsCounters,
+      valid4.postState.userPostsCounter.sub(1),
+      valid4.userPostsCounterWitness,
+      valid4.initialPosts,
+      valid4.latestPosts,
+      valid4.postState,
+      valid4.postWitness
+    );
+
+    // Prepare inputs to create a valid state transition
+    const valid5 = createPostPublishingTransitionValidInputs(
+      senderAccount,
+      senderKey,
+      CircuitString.fromString(
+        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+      ),
+      Field(3),
+      Field(1),
+      Field(3)
+    );
+
+    // Prepare inputs to create a valid state transition
+    const transition5 = PostsTransition.createPostPublishingTransition(
+      valid5.signature,
+      valid5.postState.allPostsCounter.sub(1),
+      valid5.initialUsersPostsCounters,
+      valid5.latestUsersPostsCounters,
+      valid5.postState.userPostsCounter.sub(1),
+      valid5.userPostsCounterWitness,
+      valid5.initialPosts,
+      valid5.latestPosts,
+      valid5.postState,
+      valid5.postWitness
+    );
+
+    // Create valid proof for our state transition
+    const proof5 = await Posts.provePostPublishingTransition(
+      transition5,
+      valid5.signature,
+      valid5.postState.allPostsCounter.sub(1),
+      valid5.initialUsersPostsCounters,
+      valid5.latestUsersPostsCounters,
+      valid5.postState.userPostsCounter.sub(1),
+      valid5.userPostsCounterWitness,
+      valid5.initialPosts,
+      valid5.latestPosts,
+      valid5.postState,
+      valid5.postWitness
+    );
+
+    // Merge valid state transitions
+    const mergedTransitions1 = PostsTransition.mergePostsTransitions(
+      transition4,
+      transition5
+    );
+
+    // Create proof of valid merged state transitions
+    const mergedTransitionProofs1 = await Posts.proveMergedPostsTransitions(
+      mergedTransitions1,
+      proof4,
+      proof5
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn4 = await Mina.transaction(deployerAccount, () => {
+      zkApp.update(mergedTransitionProofs1);
+    });
+    await txn4.prove();
+    await txn4.sign([deployerKey]).send();
+    Local.setBlockchainLength(UInt32.from(4));
+
+    // Validate expected state
+    const allPostsCounterState4 = zkApp.allPostsCounter.get();
+    const usersPostsCountersState4 = zkApp.usersPostsCounters.get();
+    const postsState4 = zkApp.posts.get();
+    const usersPostsCountersRoot4 = usersPostsCountersMap.getRoot();
+    const postsRoot4 = postsMap.getRoot();
+    expect(allPostsCounterState4).toEqual(Field(3));
+    expect(usersPostsCountersState4).toEqual(usersPostsCountersRoot4);
+    expect(usersPostsCountersState4).not.toEqual(usersPostsCountersRoot3);
+    expect(postsState4).toEqual(postsRoot4);
+    expect(postsState4).not.toEqual(postsRoot3);
+
+    console.log('Second and third posts published through merged proofs');
+
+    // ==============================================================================
+    // 5. Publishes on-chain proof (from merged proofs) for deletion of 2nd
+    //    and 3rd posts.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid6 = createPostDeletionTransitionValidInputs(
+      deployerKey,
+      Field(3),
+      valid4.postState,
+      Field(4)
+    );
+
+    // Create a valid state transition
+    const transition6 = PostsTransition.createPostDeletionTransition(
+      valid6.signature,
+      valid6.allPostsCounter,
+      valid6.usersPostsCounters,
+      valid6.initialPosts,
+      valid6.latestPosts,
+      valid6.initialPostState,
+      valid6.postWitness,
+      valid6.latestPostState.deletionBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof6 = await Posts.provePostDeletionTransition(
+      transition6,
+      valid6.signature,
+      valid6.allPostsCounter,
+      valid6.usersPostsCounters,
+      valid6.initialPosts,
+      valid6.latestPosts,
+      valid6.initialPostState,
+      valid6.postWitness,
+      valid6.latestPostState.deletionBlockHeight
+    );
+
+    // Prepare inputs to create a valid state transition
+    const valid7 = createPostDeletionTransitionValidInputs(
+      senderKey,
+      Field(3),
+      valid5.postState,
+      Field(4)
+    );
+
+    // Create a valid state transition
+    const transition7 = PostsTransition.createPostDeletionTransition(
+      valid7.signature,
+      valid7.allPostsCounter,
+      valid7.usersPostsCounters,
+      valid7.initialPosts,
+      valid7.latestPosts,
+      valid7.initialPostState,
+      valid7.postWitness,
+      valid7.latestPostState.deletionBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof7 = await Posts.provePostDeletionTransition(
+      transition7,
+      valid7.signature,
+      valid7.allPostsCounter,
+      valid7.usersPostsCounters,
+      valid7.initialPosts,
+      valid7.latestPosts,
+      valid7.initialPostState,
+      valid7.postWitness,
+      valid7.latestPostState.deletionBlockHeight
+    );
+
+    // Merge valid state transitions
+    const mergedTransitions2 = PostsTransition.mergePostsTransitions(
+      transition6,
+      transition7
+    );
+
+    // Create proof of valid merged state transitions
+    const mergedTransitionProofs2 = await Posts.proveMergedPostsTransitions(
+      mergedTransitions2,
+      proof6,
+      proof7
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn5 = await Mina.transaction(deployerAccount, () => {
+      zkApp.update(mergedTransitionProofs2);
+    });
+    await txn5.prove();
+    await txn5.sign([deployerKey]).send();
+    Local.setBlockchainLength(UInt32.from(5));
+
+    // Validate expected state
+    const allPostsCounterState5 = zkApp.allPostsCounter.get();
+    const usersPostsCountersState5 = zkApp.usersPostsCounters.get();
+    const postsState5 = zkApp.posts.get();
+    const usersPostsCountersRoot5 = usersPostsCountersMap.getRoot();
+    const postsRoot5 = postsMap.getRoot();
+    expect(allPostsCounterState5).toEqual(allPostsCounterState4);
+    expect(usersPostsCountersState5).toEqual(usersPostsCountersState4);
+    expect(usersPostsCountersState5).toEqual(usersPostsCountersRoot5);
+    expect(postsState5).toEqual(postsRoot5);
+    expect(postsState5).not.toEqual(postsState4);
+
+    console.log('Second and third posts deleted through merged proofs');
+
+    // ==============================================================================
+    // 6. Publishes on-chain proof (from merged proofs) for restoration of 2nd
+    //    and 3rd posts.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid8 = createPostRestorationTransitionValidInputs(
+      deployerKey,
+      Field(3),
+      valid6.latestPostState,
+      Field(5)
+    );
+
+    // Create a valid state transition
+    const transition8 = PostsTransition.createPostRestorationTransition(
+      valid8.signature,
+      valid8.allPostsCounter,
+      valid8.usersPostsCounters,
+      valid8.initialPosts,
+      valid8.latestPosts,
+      valid8.initialPostState,
+      valid8.postWitness,
+      valid8.restorationBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof8 = await Posts.provePostRestorationTransition(
+      transition8,
+      valid8.signature,
+      valid8.allPostsCounter,
+      valid8.usersPostsCounters,
+      valid8.initialPosts,
+      valid8.latestPosts,
+      valid8.initialPostState,
+      valid8.postWitness,
+      valid8.restorationBlockHeight
+    );
+
+    // Prepare inputs to create a valid state transition
+    const valid9 = createPostRestorationTransitionValidInputs(
+      senderKey,
+      Field(3),
+      valid7.latestPostState,
+      Field(5)
+    );
+
+    // Create a valid state transition
+    const transition9 = PostsTransition.createPostRestorationTransition(
+      valid9.signature,
+      valid9.allPostsCounter,
+      valid9.usersPostsCounters,
+      valid9.initialPosts,
+      valid9.latestPosts,
+      valid9.initialPostState,
+      valid9.postWitness,
+      valid9.restorationBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof9 = await Posts.provePostRestorationTransition(
+      transition9,
+      valid9.signature,
+      valid9.allPostsCounter,
+      valid9.usersPostsCounters,
+      valid9.initialPosts,
+      valid9.latestPosts,
+      valid9.initialPostState,
+      valid9.postWitness,
+      valid9.restorationBlockHeight
+    );
+
+    // Merge valid state transitions
+    const mergedTransitions3 = PostsTransition.mergePostsTransitions(
+      transition8,
+      transition9
+    );
+
+    // Create proof of valid merged state transitions
+    const mergedTransitionProofs3 = await Posts.proveMergedPostsTransitions(
+      mergedTransitions3,
+      proof8,
+      proof9
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn6 = await Mina.transaction(deployerAccount, () => {
+      zkApp.update(mergedTransitionProofs3);
+    });
+    await txn6.prove();
+    await txn6.sign([deployerKey]).send();
+    Local.setBlockchainLength(UInt32.from(6));
+
+    // Validate expected state
+    const allPostsCounterState6 = zkApp.allPostsCounter.get();
+    const usersPostsCountersState6 = zkApp.usersPostsCounters.get();
+    const postsState6 = zkApp.posts.get();
+    const usersPostsCountersRoot6 = usersPostsCountersMap.getRoot();
+    const postsRoot6 = postsMap.getRoot();
+    expect(allPostsCounterState6).toEqual(allPostsCounterState5);
+    expect(usersPostsCountersState6).toEqual(usersPostsCountersState5);
+    expect(usersPostsCountersState6).toEqual(usersPostsCountersRoot6);
+    expect(postsState6).toEqual(postsRoot6);
+    expect(postsState6).not.toEqual(postsState5);
+
+    console.log('Second and third posts restored through merged proofs');
   });
 });
