@@ -192,6 +192,49 @@ export class PostsTransition extends Struct({
       blockHeight: blockHeight,
     });
   }
+
+  static createPostRestorationTransition(
+    signature: Signature,
+    allPostsCounter: Field,
+    usersPostsCounters: Field,
+    initialPosts: Field,
+    latestPosts: Field,
+    initialPostState: PostState,
+    postWitness: MerkleMapWitness,
+    blockHeight: Field
+  ) {
+    initialPostState.deletionBlockHeight.assertNotEquals(0);
+    const postStateHash = initialPostState.hash();
+    const isSigned = signature.verify(initialPostState.posterAddress, [
+      postStateHash,
+    ]);
+    isSigned.assertTrue();
+
+    const postsBefore = postWitness.computeRootAndKey(postStateHash)[0];
+    postsBefore.assertEquals(initialPosts);
+
+    const latestPostState = new PostState({
+      posterAddress: initialPostState.posterAddress,
+      postContentID: initialPostState.postContentID,
+      allPostsCounter: initialPostState.allPostsCounter,
+      userPostsCounter: initialPostState.userPostsCounter,
+      postBlockHeight: initialPostState.postBlockHeight,
+      deletionBlockHeight: Field(0),
+    });
+
+    const postsAfter = postWitness.computeRootAndKey(latestPostState.hash())[0];
+    postsAfter.assertEquals(latestPosts);
+
+    return new PostsTransition({
+      initialAllPostsCounter: allPostsCounter,
+      latestAllPostsCounter: allPostsCounter,
+      initialUsersPostsCounters: usersPostsCounters,
+      latestUsersPostsCounters: usersPostsCounters,
+      initialPosts: initialPosts,
+      latestPosts: postsAfter,
+      blockHeight: blockHeight,
+    });
+  }
 }
 
 // ============================================================================
@@ -297,6 +340,44 @@ export const Posts = Experimental.ZkProgram({
           postsDeletion2Proof.publicInput
         );
         PostsTransition.assertEquals(computedTransition, mergedPostTransitions);
+      },
+    },
+
+    provePostRestorationTransition: {
+      privateInputs: [
+        Signature,
+        Field,
+        Field,
+        Field,
+        Field,
+        PostState,
+        MerkleMapWitness,
+        Field,
+      ],
+
+      method(
+        transition: PostsTransition,
+        signature: Signature,
+        allPostsCounter: Field,
+        usersPostsCounters: Field,
+        initialPosts: Field,
+        latestPosts: Field,
+        initialPostState: PostState,
+        postWitness: MerkleMapWitness,
+        blockHeight: Field
+      ) {
+        const computedTransition =
+          PostsTransition.createPostRestorationTransition(
+            signature,
+            allPostsCounter,
+            usersPostsCounters,
+            initialPosts,
+            latestPosts,
+            initialPostState,
+            postWitness,
+            blockHeight
+          );
+        PostsTransition.assertEquals(computedTransition, transition);
       },
     },
   },
