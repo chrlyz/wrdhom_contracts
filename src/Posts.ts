@@ -4,7 +4,7 @@ import {
   PublicKey,
   Signature,
   Poseidon,
-  Experimental,
+  ZkProgram,
   SelfProof,
   CircuitString,
   MerkleMapWitness,
@@ -241,7 +241,8 @@ export class PostsTransition extends Struct({
 
 // ============================================================================
 
-export const Posts = Experimental.ZkProgram({
+export const Posts = ZkProgram({
+  name: 'Posts',
   publicInput: PostsTransition,
 
   methods: {
@@ -385,7 +386,7 @@ export const Posts = Experimental.ZkProgram({
   },
 });
 
-export let PostsProof_ = Experimental.ZkProgram.Proof(Posts);
+export let PostsProof_ = ZkProgram.Proof(Posts);
 export class PostsProof extends PostsProof_ {}
 
 // ============================================================================
