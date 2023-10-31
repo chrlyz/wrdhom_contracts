@@ -298,8 +298,9 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot1 = usersPostsCountersMap.getRoot();
     const postsRoot1 = postsMap.getRoot();
     expect(allPostsCounterState1).toEqual(Field(1));
+    expect(allPostsCounterState1).not.toEqual(allPostsCounterState);
     expect(usersPostsCountersState1).toEqual(usersPostsCountersRoot1);
-    expect(usersPostsCountersState1).not.toEqual(usersPostsCountersRoot);
+    expect(usersPostsCountersState1).not.toEqual(usersPostsCountersState);
     expect(postsState1).toEqual(postsRoot1);
     expect(postsState1).not.toEqual(postsRoot);
 
@@ -356,8 +357,9 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const postsState2 = zkApp.posts.get();
     const usersPostsCountersRoot2 = usersPostsCountersMap.getRoot();
     const postsRoot2 = postsMap.getRoot();
-    expect(allPostsCounterState2).toEqual(Field(1));
+    expect(allPostsCounterState2).toEqual(allPostsCounterState1);
     expect(usersPostsCountersState2).toEqual(usersPostsCountersRoot2);
+    expect(usersPostsCountersState2).toEqual(usersPostsCountersState1);
     expect(postsState2).toEqual(postsRoot2);
     expect(postsState2).not.toEqual(postsRoot1);
 
@@ -478,6 +480,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot3 = usersPostsCountersMap.getRoot();
     const postsRoot3 = postsMap.getRoot();
     expect(allPostsCounterState3).toEqual(Field(3));
+    expect(allPostsCounterState3).not.toEqual(allPostsCounterState2);
     expect(usersPostsCountersState3).toEqual(usersPostsCountersRoot3);
     expect(usersPostsCountersState3).not.toEqual(usersPostsCountersRoot2);
     expect(postsState3).toEqual(postsRoot3);
@@ -592,10 +595,11 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot4 = usersPostsCountersMap.getRoot();
     const postsRoot4 = postsMap.getRoot();
     expect(allPostsCounterState4).toEqual(Field(4));
+    expect(allPostsCounterState4).not.toEqual(allPostsCounterState3);
     expect(usersPostsCountersState4).toEqual(usersPostsCountersRoot4);
     expect(usersPostsCountersState4).not.toEqual(usersPostsCountersRoot3);
     expect(postsState4).toEqual(postsRoot4);
-    expect(postsState4).not.toEqual(postsRoot3);
+    expect(postsState4).not.toEqual(postsState3);
 
     console.log(
       'Third post deleted and fourth post published through merged proofs'
@@ -744,6 +748,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot1 = usersPostsCountersMap.getRoot();
     const postsRoot1 = postsMap.getRoot();
     expect(allPostsCounterState1).toEqual(Field(1));
+    expect(allPostsCounterState1).not.toEqual(allPostsCounterState);
     expect(usersPostsCountersState1).toEqual(usersPostsCountersRoot1);
     expect(usersPostsCountersState1).not.toEqual(usersPostsCountersState);
     expect(postsState1).toEqual(postsRoot1);
@@ -803,8 +808,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot2 = usersPostsCountersMap.getRoot();
     const postsRoot2 = postsMap.getRoot();
     expect(allPostsCounterState2).toEqual(allPostsCounterState1);
-    expect(usersPostsCountersState2).toEqual(usersPostsCountersState1);
     expect(usersPostsCountersState2).toEqual(usersPostsCountersRoot2);
+    expect(usersPostsCountersState2).toEqual(usersPostsCountersState1);
     expect(postsState2).toEqual(postsRoot2);
     expect(postsState2).not.toEqual(postsState1);
 
@@ -862,10 +867,10 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot3 = usersPostsCountersMap.getRoot();
     const postsRoot3 = postsMap.getRoot();
     expect(allPostsCounterState3).toEqual(allPostsCounterState2);
-    expect(usersPostsCountersState3).toEqual(usersPostsCountersState2);
     expect(usersPostsCountersState3).toEqual(usersPostsCountersRoot3);
+    expect(usersPostsCountersState3).toEqual(usersPostsCountersState2);
     expect(postsState3).toEqual(postsRoot3);
-    expect(postsState3).not.toEqual(postsRoot2);
+    expect(postsState3).not.toEqual(postsState2);
 
     console.log('First post restored');
 
@@ -984,10 +989,11 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot4 = usersPostsCountersMap.getRoot();
     const postsRoot4 = postsMap.getRoot();
     expect(allPostsCounterState4).toEqual(Field(3));
+    expect(allPostsCounterState4).not.toEqual(allPostsCounterState3);
     expect(usersPostsCountersState4).toEqual(usersPostsCountersRoot4);
-    expect(usersPostsCountersState4).not.toEqual(usersPostsCountersRoot3);
+    expect(usersPostsCountersState4).not.toEqual(usersPostsCountersState3);
     expect(postsState4).toEqual(postsRoot4);
-    expect(postsState4).not.toEqual(postsRoot3);
+    expect(postsState4).not.toEqual(postsState3);
 
     console.log('Second and third posts published through merged proofs');
 
@@ -1090,8 +1096,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot5 = usersPostsCountersMap.getRoot();
     const postsRoot5 = postsMap.getRoot();
     expect(allPostsCounterState5).toEqual(allPostsCounterState4);
-    expect(usersPostsCountersState5).toEqual(usersPostsCountersState4);
     expect(usersPostsCountersState5).toEqual(usersPostsCountersRoot5);
+    expect(usersPostsCountersState5).toEqual(usersPostsCountersState4);
     expect(postsState5).toEqual(postsRoot5);
     expect(postsState5).not.toEqual(postsState4);
 
@@ -1196,8 +1202,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot6 = usersPostsCountersMap.getRoot();
     const postsRoot6 = postsMap.getRoot();
     expect(allPostsCounterState6).toEqual(allPostsCounterState5);
-    expect(usersPostsCountersState6).toEqual(usersPostsCountersState5);
     expect(usersPostsCountersState6).toEqual(usersPostsCountersRoot6);
+    expect(usersPostsCountersState6).toEqual(usersPostsCountersState5);
     expect(postsState6).toEqual(postsRoot6);
     expect(postsState6).not.toEqual(postsState5);
 
@@ -1255,8 +1261,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot7 = usersPostsCountersMap.getRoot();
     const postsRoot7 = postsMap.getRoot();
     expect(allPostsCounterState7).toEqual(allPostsCounterState6);
-    expect(usersPostsCountersState7).toEqual(usersPostsCountersState6);
     expect(usersPostsCountersState7).toEqual(usersPostsCountersRoot7);
+    expect(usersPostsCountersState7).toEqual(usersPostsCountersState6);
     expect(postsState7).toEqual(postsRoot7);
     expect(postsState7).not.toEqual(postsState6);
 
@@ -1361,8 +1367,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot8 = usersPostsCountersMap.getRoot();
     const postsRoot8 = postsMap.getRoot();
     expect(allPostsCounterState8).toEqual(allPostsCounterState7);
-    expect(usersPostsCountersState8).toEqual(usersPostsCountersState7);
     expect(usersPostsCountersState8).toEqual(usersPostsCountersRoot8);
+    expect(usersPostsCountersState8).toEqual(usersPostsCountersState7);
     expect(postsState8).toEqual(postsRoot8);
     expect(postsState8).not.toEqual(postsState7);
 
@@ -1475,8 +1481,9 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     const usersPostsCountersRoot9 = usersPostsCountersMap.getRoot();
     const postsRoot9 = postsMap.getRoot();
     expect(allPostsCounterState9).toEqual(Field(4));
-    expect(usersPostsCountersState9).not.toEqual(usersPostsCountersState8);
+    expect(allPostsCounterState9).not.toEqual(allPostsCounterState8);
     expect(usersPostsCountersState9).toEqual(usersPostsCountersRoot9);
+    expect(usersPostsCountersState9).not.toEqual(usersPostsCountersState8);
     expect(postsState9).toEqual(postsRoot9);
     expect(postsState9).not.toEqual(postsState8);
 
