@@ -97,9 +97,9 @@ export class PostsTransition extends Struct({
     return new PostsTransition({
       initialAllPostsCounter: initialAllPostsCounter,
       latestAllPostsCounter: postState.allPostsCounter,
-      initialUsersPostsCounters: initialUsersPostsCounters,
+      initialUsersPostsCounters: usersPostsCountersBefore,
       latestUsersPostsCounters: usersPostsCountersAfter,
-      initialPosts: initialPosts,
+      initialPosts: postsBefore,
       latestPosts: postsAfter,
       blockHeight: postState.postBlockHeight,
     });
