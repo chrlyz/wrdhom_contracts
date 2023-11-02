@@ -18,6 +18,8 @@ import {
   MerkleMap,
   UInt32,
 } from 'o1js';
+import { Config } from './PostsDeploy';
+import fs from 'fs/promises';
 
 let proofsEnabled = true;
 
@@ -43,18 +45,23 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     }
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     Local = Mina.LocalBlockchain({ proofsEnabled });
     Mina.setActiveInstance(Local);
     ({ privateKey: deployerKey, publicKey: deployerAccount } =
       Local.testAccounts[0]);
     ({ privateKey: senderKey, publicKey: senderAccount } =
       Local.testAccounts[1]);
-    zkAppPrivateKey = PrivateKey.random();
-    zkAppAddress = zkAppPrivateKey.toPublicKey();
-    zkApp = new PostsContract(zkAppAddress);
     usersPostsCountersMap = new MerkleMap();
     postsMap = new MerkleMap();
+    const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
+    const config = configJson.deployAliases['test'];
+    const zkAppKeysBase58: { privateKey: string; publicKey: string } = JSON.parse(
+      await fs.readFile(config.keyPath, 'utf8')
+    );
+    zkAppPrivateKey = PrivateKey.fromBase58(zkAppKeysBase58.privateKey);
+    zkAppAddress = zkAppPrivateKey.toPublicKey();
+    zkApp = new PostsContract(zkAppAddress);
   });
 
   async function localDeploy() {

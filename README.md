@@ -41,6 +41,32 @@ git clone git@github.com:chrlyz/proof_of_events.git
 npm install
 ```
 
+## Config
+
+Before building, running tests or deploying the project, configure set some parameters in the `config.json` of the project, and generate keys for the `fee-payer` and the `PostsContract`. To do this start by installing the [zkApp-CLI](https://github.com/o1-labs/zkapp-cli):
+
+```sh
+npm install -g zkapp-cli
+```
+
+Then:
+
+```sh
+zk config
+```
+
+And go through the prompted instructions:
+
+1. Set the name to: `test`.
+
+2. Set the Mina GraphQL API URL to: `https://proxy.berkeley.minaexplorer.com/graphql`
+
+3. Set transaction fee to: `0.1`
+
+4. Create a new fee-payer key or use one that you already have (just use keys that hold testnet tokens, don’t expose keys holding real tokens that have value, be careful with how you manage your keys).
+
+5. Make sure the fee-payer key has funds to make transactions (the zkApp-CLI will point you to a faucet to request testnet tokens in case you need to).
+
 ## Build
 
 ```sh
@@ -56,51 +82,27 @@ npm run testw # watch mode
 
 ## Deploy
 
-If you want to play around with a deployed contract in the Berkeley testnet, start by installing the [zkApp-CLI](https://github.com/o1-labs/zkapp-cli):
+To deploy the `PostsContract` on the Berkeley testnet, start by installing the [zkApp-CLI](https://github.com/o1-labs/zkapp-cli):
 
 ```sh
-npm install -g zkapp-cli
-```
-
-Then to configure the project:
-
-```sh
-zk config
-```
-
-And go through the prompted instructions:
-
-1. Name can be anything you want.
-
-2. Set the Mina GraphQL API URL to: `https://proxy.berkeley.minaexplorer.com/graphql`
-
-3. Set transaction fee to: `0.1`
-
-4. Create a new fee payer key or use one that you already have (just use keys that hold testnet tokens, don’t expose keys holding real tokens that have value, be careful with how you manage your keys).
-
-5. Make sure the fee payer key has funds to make transactions (the zkApp-CLI will point you to a faucet to request testnet tokens).
-
-Now you can deploy the contract:
-
-```sh
-node build/src/zkProgramEnabledDeploy.js < name_from_step_1 >
+node build/src/PostsDeploy.js test
 ```
 
 Wait for the transaction to confirm. Then you can do some test transactions already available in `/src/PostInteract.ts`. To make the first transaction:
 
 ```sh
-node build/src/PostsInteract.js < name_from_step_1 > 1
+node build/src/PostsInteract.js test 1
 ```
 
 Wait for the transaction to confirm, then to make the second transaction:
 
 ```sh
-node build/src/PostsInteract.js < name_from_step_1 > 2
+node build/src/PostsInteract.js test 2
 ```
 
 And so on, up to transaction 4.
 
-Congrats!!! You have successfully deployed the `PostsContract`, and updated the on-chain state representing the posting and deletion of some posts, by executing the zkProgram.
+Congrats!!! You have successfully deployed the `PostsContract`, and updated the on-chain state for proving the posting and deletion of some posts, through individual and merged proofs, created through the `Posts` ZkProgram.
 
 ## License
 
