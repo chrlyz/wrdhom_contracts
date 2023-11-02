@@ -129,4 +129,26 @@ export class RepostsTransition extends Struct({
       blockHeight: repostState.repostBlockHeight,
     });
   }
+
+  static assertEquals(
+    transition1: RepostsTransition,
+    transition2: RepostsTransition
+  ) {
+    transition1.initialAllRepostsCounter.assertEquals(
+      transition2.initialAllRepostsCounter
+    );
+    transition1.latestAllRepostsCounter.assertEquals(
+      transition2.latestAllRepostsCounter
+    );
+    transition1.initialUsersRepostsCounters.assertEquals(
+      transition2.initialUsersRepostsCounters
+    );
+    transition1.latestUsersRepostsCounters.assertEquals(
+      transition2.latestUsersRepostsCounters
+    );
+    transition1.posts.assertEquals(transition2.posts);
+    transition1.initialReposts.assertEquals(transition2.initialReposts);
+    transition1.latestReposts.assertEquals(transition2.latestReposts);
+    transition1.blockHeight.assertEquals(transition2.blockHeight);
+  }
 }
