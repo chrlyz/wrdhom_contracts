@@ -6,6 +6,7 @@ import {
   Poseidon,
   Signature,
   MerkleMapWitness,
+  ZkProgram,
 } from 'o1js';
 import { PostState } from './Posts';
 
@@ -152,3 +153,69 @@ export class RepostsTransition extends Struct({
     transition1.blockHeight.assertEquals(transition2.blockHeight);
   }
 }
+
+// ============================================================================
+
+export const Reposts = ZkProgram({
+  name: 'Reposts',
+  publicInput: RepostsTransition,
+
+  methods: {
+    proveRepostTransition: {
+      privateInputs: [
+        Signature,
+        Field,
+        Field,
+        Field,
+        Field,
+        MerkleMapWitness,
+        Field,
+        PostState,
+        MerkleMapWitness,
+        Field,
+        Field,
+        RepostState,
+        MerkleMapWitness,
+      ],
+
+      method(
+        transition: RepostsTransition,
+        signature: Signature,
+        initialAllRepostsCounter: Field,
+        initialUsersRepostsCounters: Field,
+        latestUsersRepostsCounters: Field,
+        initialUserRepostsCounter: Field,
+        userRepostsCounterWitness: MerkleMapWitness,
+        posts: Field,
+        postState: PostState,
+        postWitness: MerkleMapWitness,
+        initialReposts: Field,
+        latestReposts: Field,
+        repostState: RepostState,
+        repostWitness: MerkleMapWitness
+      ) {
+        const computedTransition = RepostsTransition.createRepostTransition(
+          signature,
+          initialAllRepostsCounter,
+          initialUsersRepostsCounters,
+          latestUsersRepostsCounters,
+          initialUserRepostsCounter,
+          userRepostsCounterWitness,
+          posts,
+          postState,
+          postWitness,
+          initialReposts,
+          latestReposts,
+          repostState,
+          repostWitness
+        );
+        RepostsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+  },
+});
+
+export let RepostsProof_ = ZkProgram.Proof(Reposts);
+export class RepostsProof extends RepostsProof_ {}
+
+// ============================================================================
