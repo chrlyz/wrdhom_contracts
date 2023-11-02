@@ -3,16 +3,7 @@ import fs from 'fs/promises';
 import { Posts } from './Posts.js';
 import { PostsContract } from './PostsContract.js';
 
-const deployAlias = process.argv[2];
-if (!deployAlias)
-  throw Error(`Missing <deployAlias> argument.
-
-Usage:
-node build/src/zkProgramEnabledDeploy.js <deployAlias>
-`);
-Error.stackTraceLimit = 1000;
-
-type Config = {
+export type Config = {
   deployAliases: Record<
     string,
     {
@@ -25,7 +16,7 @@ type Config = {
   >;
 };
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
-const config = configJson.deployAliases[deployAlias];
+const config = configJson.deployAliases['test'];
 
 const feepayerKeysBase58: { privateKey: string; publicKey: string } =
   JSON.parse(await fs.readFile(config.feepayerKeyPath, 'utf8'));
