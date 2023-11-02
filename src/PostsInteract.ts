@@ -17,31 +17,18 @@ import {
   fieldToFlagPostsAsDeleted,
 } from './Posts.js';
 import { PostsContract } from './PostsContract.js';
+import { Config } from './PostsDeploy.js';
 
-const deployAlias = process.argv[2];
-const numberOfTransaction = Number(process.argv[3]);
-if (!deployAlias || !numberOfTransaction)
+const numberOfTransaction = Number(process.argv[2]);
+if (!numberOfTransaction)
   throw Error(`Missing argument.
 
 Usage:
-node build/src/interact.js <deployAlias> <numberOfTransaction>
+node build/src/PostsInteract.js <numberOfTransaction>
 `);
-Error.stackTraceLimit = 1000;
 
-type Config = {
-  deployAliases: Record<
-    string,
-    {
-      url: string;
-      keyPath: string;
-      fee: string;
-      feepayerKeyPath: string;
-      feepayerAlias: string;
-    }
-  >;
-};
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
-const config = configJson.deployAliases[deployAlias];
+const config = configJson.deployAliases['test'];
 const feepayerKeysBase58: { privateKey: string; publicKey: string } =
   JSON.parse(await fs.readFile(config.feepayerKeyPath, 'utf8'));
 

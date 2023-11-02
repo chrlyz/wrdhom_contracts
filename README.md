@@ -82,22 +82,22 @@ npm run testw # watch mode
 
 ## Deploy
 
-To deploy the `PostsContract` on the Berkeley testnet, start by installing the [zkApp-CLI](https://github.com/o1-labs/zkapp-cli):
+To deploy the `PostsContract` on the Berkeley testnet:
 
 ```sh
-node build/src/PostsDeploy.js test
+node build/src/PostsDeploy.js
 ```
 
 Wait for the transaction to confirm. Then you can do some test transactions already available in `/src/PostInteract.ts`. To make the first transaction:
 
 ```sh
-node build/src/PostsInteract.js test 1
+node build/src/PostsInteract.js 1
 ```
 
 Wait for the transaction to confirm, then to make the second transaction:
 
 ```sh
-node build/src/PostsInteract.js test 2
+node build/src/PostsInteract.js 2
 ```
 
 And so on, up to transaction 4.
