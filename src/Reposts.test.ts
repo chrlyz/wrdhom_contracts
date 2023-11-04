@@ -2,9 +2,7 @@ import { PostsContract } from './PostsContract';
 import {
   PostsTransition,
   PostState,
-  Posts,
-  fieldToFlagPostsAsDeleted,
-  fieldToFlagPostsAsRestored,
+  Posts
 } from './Posts';
 import { RepostsContract } from './RepostsContract';
 import { RepostsTransition, RepostState, Reposts } from './Reposts';
@@ -18,8 +16,7 @@ import {
   CircuitString,
   Poseidon,
   Signature,
-  UInt32,
-  MerkleMapWitness,
+  UInt32
 } from 'o1js';
 import { Config } from './PostsDeploy';
 import fs from 'fs/promises';
@@ -221,7 +218,7 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     };
   }
 
-  test(`RepostsContract and Reposts zkProgram functionality.`, async () => {
+  test(`RepostsContract and Reposts zkProgram functionality`, async () => {
     // ==============================================================================
     // 1. Deploys PostsContract and RepostsContract.
     // ==============================================================================

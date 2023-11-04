@@ -217,7 +217,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     };
   }
 
-  test(`PostsContract and Posts ZkProgram functionality.`, async () => {
+  test(`PostsContract and Posts ZkProgram functionality`, async () => {
     // ==============================================================================
     // 1. Deploys PostsContract.
     // ==============================================================================
