@@ -52,9 +52,9 @@ export class RepostsTransition extends Struct({
   static createRepostTransition(
     signature: Signature,
     initialAllRepostsCounter: Field,
+    initialUserRepostsCounter: Field,
     initialUsersRepostsCounters: Field,
     latestUsersRepostsCounters: Field,
-    initialUserRepostsCounter: Field,
     userRepostsCounterWitness: MerkleMapWitness,
     posts: Field,
     postState: PostState,
@@ -66,7 +66,7 @@ export class RepostsTransition extends Struct({
   ) {
     // Assure proper values for post being reposted
     repostState.posterAddress.assertEquals(postState.posterAddress);
-    repostState.postContentID.assertEquals(postState.posterAddress);
+    repostState.postContentID.assertEquals(postState.postContentID);
     // Assure global reposts ordering
     repostState.allRepostsCounter.sub(1).assertEquals(initialAllRepostsCounter);
     // Assure that a new repost isn't created flagged as deleted
@@ -94,12 +94,15 @@ export class RepostsTransition extends Struct({
     usersRepostsCountersAfter.assertEquals(latestUsersRepostsCounters);
 
     // Verify reposter signature for repost
-    const isSigned = signature.verify(
-      repostState.reposterAddress,
-      postState.posterAddress
-        .toFields()
-        .concat(postState.postContentID.hash(), initialUserRepostsCounter)
+    const posterAddressAsField = Poseidon.hash(
+      postState.posterAddress.toFields()
     );
+    const postContentIDHash = postState.postContentID.hash();
+    const isSigned = signature.verify(repostState.reposterAddress, [
+      posterAddressAsField,
+      postContentIDHash,
+      repostState.userRepostsCounter,
+    ]);
     isSigned.assertTrue();
 
     // Verify that the post being reposted exists
@@ -112,7 +115,12 @@ export class RepostsTransition extends Struct({
     );
     repostsBefore.assertEquals(initialReposts);
     repostKey.assertEquals(
-      Poseidon.hash([reposterAddressAsField, repostState.userRepostsCounter])
+      Poseidon.hash([
+        reposterAddressAsField,
+        posterAddressAsField,
+        postContentIDHash,
+        repostState.userRepostsCounter,
+      ])
     );
 
     // Update initial root with new repost state
@@ -182,9 +190,9 @@ export const Reposts = ZkProgram({
         transition: RepostsTransition,
         signature: Signature,
         initialAllRepostsCounter: Field,
+        initialUserRepostsCounter: Field,
         initialUsersRepostsCounters: Field,
         latestUsersRepostsCounters: Field,
-        initialUserRepostsCounter: Field,
         userRepostsCounterWitness: MerkleMapWitness,
         posts: Field,
         postState: PostState,
@@ -197,9 +205,9 @@ export const Reposts = ZkProgram({
         const computedTransition = RepostsTransition.createRepostTransition(
           signature,
           initialAllRepostsCounter,
+          initialUserRepostsCounter,
           initialUsersRepostsCounters,
           latestUsersRepostsCounters,
-          initialUserRepostsCounter,
           userRepostsCounterWitness,
           posts,
           postState,

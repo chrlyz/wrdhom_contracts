@@ -23,21 +23,21 @@ import fs from 'fs/promises';
 
 let proofsEnabled = true;
 
-describe(`the PostsContract and the Posts zkProgram`, () => {
-  let deployerAccount: PublicKey,
-    deployerKey: PrivateKey,
-    senderAccount: PublicKey,
-    senderKey: PrivateKey,
-    zkAppAddress: PublicKey,
-    zkAppPrivateKey: PrivateKey,
-    zkApp: PostsContract,
+describe(`the PostsContract and the Posts ZkProgram`, () => {
+  let user1Address: PublicKey,
+    user1Key: PrivateKey,
+    user2Address: PublicKey,
+    user2Key: PrivateKey,
+    postsContractAddress: PublicKey,
+    postsContractKey: PrivateKey,
+    postsContract: PostsContract,
     usersPostsCountersMap: MerkleMap,
     postsMap: MerkleMap,
     Local: ReturnType<typeof Mina.LocalBlockchain>;
 
   beforeAll(async () => {
     if (proofsEnabled) {
-      console.log('Compiling Posts zkProgram...');
+      console.log('Compiling Posts ZkProgram...');
       await Posts.compile();
       console.log('Compiling PostsContract...');
       await PostsContract.compile();
@@ -48,29 +48,30 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
   beforeEach(async () => {
     Local = Mina.LocalBlockchain({ proofsEnabled });
     Mina.setActiveInstance(Local);
-    ({ privateKey: deployerKey, publicKey: deployerAccount } =
-      Local.testAccounts[0]);
-    ({ privateKey: senderKey, publicKey: senderAccount } =
-      Local.testAccounts[1]);
+    ({ privateKey: user1Key, publicKey: user1Address } = Local.testAccounts[0]);
+    ({ privateKey: user2Key, publicKey: user2Address } = Local.testAccounts[1]);
     usersPostsCountersMap = new MerkleMap();
     postsMap = new MerkleMap();
-    const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
-    const config = configJson.deployAliases['test'];
-    const zkAppKeysBase58: { privateKey: string; publicKey: string } = JSON.parse(
-      await fs.readFile(config.keyPath, 'utf8')
+    const postsConfigJson: Config = JSON.parse(
+      await fs.readFile('config.json', 'utf8')
     );
-    zkAppPrivateKey = PrivateKey.fromBase58(zkAppKeysBase58.privateKey);
-    zkAppAddress = zkAppPrivateKey.toPublicKey();
-    zkApp = new PostsContract(zkAppAddress);
+    const postsConfig = postsConfigJson.deployAliases['posts'];
+    const postsContractKeysBase58: { privateKey: string; publicKey: string } =
+      JSON.parse(await fs.readFile(postsConfig.keyPath, 'utf8'));
+    postsContractKey = PrivateKey.fromBase58(
+      postsContractKeysBase58.privateKey
+    );
+    postsContractAddress = postsContractKey.toPublicKey();
+    postsContract = new PostsContract(postsContractAddress);
   });
 
-  async function localDeploy() {
-    const txn = await Mina.transaction(deployerAccount, () => {
-      AccountUpdate.fundNewAccount(deployerAccount);
-      zkApp.deploy();
+  async function deployPostsContract() {
+    const txn = await Mina.transaction(user1Address, () => {
+      AccountUpdate.fundNewAccount(user1Address);
+      postsContract.deploy();
     });
     await txn.prove();
-    await txn.sign([deployerKey, zkAppPrivateKey]).send();
+    await txn.sign([user1Key, postsContractKey]).send();
   }
 
   function createPostPublishingTransitionValidInputs(
@@ -216,22 +217,24 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     };
   }
 
-  test(`PostsContract and Posts zkProgram functionality.`, async () => {
+  test(`PostsContract and Posts ZkProgram functionality.`, async () => {
     // ==============================================================================
     // 1. Deploys PostsContract.
     // ==============================================================================
 
-    await localDeploy();
+    await deployPostsContract();
 
     // Validate expected state
-    const allPostsCounterState = zkApp.allPostsCounter.get();
-    const usersPostsCountersState = zkApp.usersPostsCounters.get();
-    const postsState = zkApp.posts.get();
+    const allPostsCounterState = postsContract.allPostsCounter.get();
+    const usersPostsCountersState = postsContract.usersPostsCounters.get();
+    const postsState = postsContract.posts.get();
     const usersPostsCountersRoot = usersPostsCountersMap.getRoot();
     const postsRoot = postsMap.getRoot();
     expect(allPostsCounterState).toEqual(Field(0));
     expect(usersPostsCountersState).toEqual(usersPostsCountersRoot);
     expect(postsState).toEqual(postsRoot);
+
+    console.log('PostsContract deployed');
 
     // ==============================================================================
     // 2. Publishes on-chain proof for publication of 1st post.
@@ -239,8 +242,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid1 = createPostPublishingTransitionValidInputs(
-      deployerAccount,
-      deployerKey,
+      user1Address,
+      user1Key,
       CircuitString.fromString(
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
@@ -279,17 +282,17 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn1 = await Mina.transaction(deployerAccount, () => {
-      zkApp.update(proof1);
+    const txn1 = await Mina.transaction(user1Address, () => {
+      postsContract.update(proof1);
     });
     await txn1.prove();
-    await txn1.sign([deployerKey]).send();
+    await txn1.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(1));
 
     // Validate expected state
-    const allPostsCounterState1 = zkApp.allPostsCounter.get();
-    const usersPostsCountersState1 = zkApp.usersPostsCounters.get();
-    const postsState1 = zkApp.posts.get();
+    const allPostsCounterState1 = postsContract.allPostsCounter.get();
+    const usersPostsCountersState1 = postsContract.usersPostsCounters.get();
+    const postsState1 = postsContract.posts.get();
     const usersPostsCountersRoot1 = usersPostsCountersMap.getRoot();
     const postsRoot1 = postsMap.getRoot();
     expect(allPostsCounterState1).toEqual(Field(1));
@@ -307,7 +310,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid2 = createPostDeletionTransitionValidInputs(
-      deployerKey,
+      user1Key,
       Field(1),
       valid1.postState,
       Field(1)
@@ -339,17 +342,17 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn2 = await Mina.transaction(deployerAccount, () => {
-      zkApp.update(proof2);
+    const txn2 = await Mina.transaction(user1Address, () => {
+      postsContract.update(proof2);
     });
     await txn2.prove();
-    await txn2.sign([deployerKey]).send();
+    await txn2.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(2));
 
     // Validate expected state
-    const allPostsCounterState2 = zkApp.allPostsCounter.get();
-    const usersPostsCountersState2 = zkApp.usersPostsCounters.get();
-    const postsState2 = zkApp.posts.get();
+    const allPostsCounterState2 = postsContract.allPostsCounter.get();
+    const usersPostsCountersState2 = postsContract.usersPostsCounters.get();
+    const postsState2 = postsContract.posts.get();
     const usersPostsCountersRoot2 = usersPostsCountersMap.getRoot();
     const postsRoot2 = postsMap.getRoot();
     expect(allPostsCounterState2).toEqual(allPostsCounterState1);
@@ -366,7 +369,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid3 = createPostRestorationTransitionValidInputs(
-      deployerKey,
+      user1Key,
       Field(1),
       valid2.latestPostState,
       Field(2)
@@ -398,17 +401,17 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn3 = await Mina.transaction(deployerAccount, () => {
-      zkApp.update(proof3);
+    const txn3 = await Mina.transaction(user1Address, () => {
+      postsContract.update(proof3);
     });
     await txn3.prove();
-    await txn3.sign([deployerKey]).send();
+    await txn3.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(3));
 
     // Validate expected state
-    const allPostsCounterState3 = zkApp.allPostsCounter.get();
-    const usersPostsCountersState3 = zkApp.usersPostsCounters.get();
-    const postsState3 = zkApp.posts.get();
+    const allPostsCounterState3 = postsContract.allPostsCounter.get();
+    const usersPostsCountersState3 = postsContract.usersPostsCounters.get();
+    const postsState3 = postsContract.posts.get();
     const usersPostsCountersRoot3 = usersPostsCountersMap.getRoot();
     const postsRoot3 = postsMap.getRoot();
     expect(allPostsCounterState3).toEqual(allPostsCounterState2);
@@ -426,8 +429,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid4 = createPostPublishingTransitionValidInputs(
-      deployerAccount,
-      deployerKey,
+      user1Address,
+      user1Key,
       CircuitString.fromString(
         'b3333333333333333333333333333333333333333333333333333333333'
       ),
@@ -467,8 +470,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid5 = createPostPublishingTransitionValidInputs(
-      senderAccount,
-      senderKey,
+      user2Address,
+      user2Key,
       CircuitString.fromString(
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
@@ -520,17 +523,17 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn4 = await Mina.transaction(deployerAccount, () => {
-      zkApp.update(mergedTransitionProofs1);
+    const txn4 = await Mina.transaction(user1Address, () => {
+      postsContract.update(mergedTransitionProofs1);
     });
     await txn4.prove();
-    await txn4.sign([deployerKey]).send();
+    await txn4.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(4));
 
     // Validate expected state
-    const allPostsCounterState4 = zkApp.allPostsCounter.get();
-    const usersPostsCountersState4 = zkApp.usersPostsCounters.get();
-    const postsState4 = zkApp.posts.get();
+    const allPostsCounterState4 = postsContract.allPostsCounter.get();
+    const usersPostsCountersState4 = postsContract.usersPostsCounters.get();
+    const postsState4 = postsContract.posts.get();
     const usersPostsCountersRoot4 = usersPostsCountersMap.getRoot();
     const postsRoot4 = postsMap.getRoot();
     expect(allPostsCounterState4).toEqual(Field(3));
@@ -549,7 +552,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid6 = createPostDeletionTransitionValidInputs(
-      deployerKey,
+      user1Key,
       Field(3),
       valid4.postState,
       Field(4)
@@ -582,7 +585,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid7 = createPostDeletionTransitionValidInputs(
-      senderKey,
+      user2Key,
       Field(3),
       valid5.postState,
       Field(4)
@@ -627,17 +630,17 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn5 = await Mina.transaction(deployerAccount, () => {
-      zkApp.update(mergedTransitionProofs2);
+    const txn5 = await Mina.transaction(user1Address, () => {
+      postsContract.update(mergedTransitionProofs2);
     });
     await txn5.prove();
-    await txn5.sign([deployerKey]).send();
+    await txn5.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(5));
 
     // Validate expected state
-    const allPostsCounterState5 = zkApp.allPostsCounter.get();
-    const usersPostsCountersState5 = zkApp.usersPostsCounters.get();
-    const postsState5 = zkApp.posts.get();
+    const allPostsCounterState5 = postsContract.allPostsCounter.get();
+    const usersPostsCountersState5 = postsContract.usersPostsCounters.get();
+    const postsState5 = postsContract.posts.get();
     const usersPostsCountersRoot5 = usersPostsCountersMap.getRoot();
     const postsRoot5 = postsMap.getRoot();
     expect(allPostsCounterState5).toEqual(allPostsCounterState4);
@@ -655,7 +658,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid8 = createPostRestorationTransitionValidInputs(
-      deployerKey,
+      user1Key,
       Field(3),
       valid6.latestPostState,
       Field(5)
@@ -688,7 +691,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid9 = createPostRestorationTransitionValidInputs(
-      senderKey,
+      user2Key,
       Field(3),
       valid7.latestPostState,
       Field(5)
@@ -733,17 +736,17 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn6 = await Mina.transaction(deployerAccount, () => {
-      zkApp.update(mergedTransitionProofs3);
+    const txn6 = await Mina.transaction(user1Address, () => {
+      postsContract.update(mergedTransitionProofs3);
     });
     await txn6.prove();
-    await txn6.sign([deployerKey]).send();
+    await txn6.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(6));
 
     // Validate expected state
-    const allPostsCounterState6 = zkApp.allPostsCounter.get();
-    const usersPostsCountersState6 = zkApp.usersPostsCounters.get();
-    const postsState6 = zkApp.posts.get();
+    const allPostsCounterState6 = postsContract.allPostsCounter.get();
+    const usersPostsCountersState6 = postsContract.usersPostsCounters.get();
+    const postsState6 = postsContract.posts.get();
     const usersPostsCountersRoot6 = usersPostsCountersMap.getRoot();
     const postsRoot6 = postsMap.getRoot();
     expect(allPostsCounterState6).toEqual(allPostsCounterState5);
@@ -760,7 +763,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid10 = createPostDeletionTransitionValidInputs(
-      deployerKey,
+      user1Key,
       Field(3),
       valid8.latestPostState,
       Field(6)
@@ -792,17 +795,17 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn7 = await Mina.transaction(deployerAccount, () => {
-      zkApp.update(proof10);
+    const txn7 = await Mina.transaction(user1Address, () => {
+      postsContract.update(proof10);
     });
     await txn7.prove();
-    await txn7.sign([deployerKey]).send();
+    await txn7.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(7));
 
     // Validate expected state
-    const allPostsCounterState7 = zkApp.allPostsCounter.get();
-    const usersPostsCountersState7 = zkApp.usersPostsCounters.get();
-    const postsState7 = zkApp.posts.get();
+    const allPostsCounterState7 = postsContract.allPostsCounter.get();
+    const usersPostsCountersState7 = postsContract.usersPostsCounters.get();
+    const postsState7 = postsContract.posts.get();
     const usersPostsCountersRoot7 = usersPostsCountersMap.getRoot();
     const postsRoot7 = postsMap.getRoot();
     expect(allPostsCounterState7).toEqual(allPostsCounterState6);
@@ -820,7 +823,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid11 = createPostRestorationTransitionValidInputs(
-      deployerKey,
+      user1Key,
       Field(3),
       valid10.latestPostState,
       Field(7)
@@ -853,7 +856,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid12 = createPostDeletionTransitionValidInputs(
-      senderKey,
+      user2Key,
       Field(3),
       valid9.latestPostState,
       Field(7)
@@ -898,17 +901,17 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn8 = await Mina.transaction(deployerAccount, () => {
-      zkApp.update(mergedTransitionProofs4);
+    const txn8 = await Mina.transaction(user1Address, () => {
+      postsContract.update(mergedTransitionProofs4);
     });
     await txn8.prove();
-    await txn8.sign([deployerKey]).send();
+    await txn8.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(8));
 
     // Validate expected state
-    const allPostsCounterState8 = zkApp.allPostsCounter.get();
-    const usersPostsCountersState8 = zkApp.usersPostsCounters.get();
-    const postsState8 = zkApp.posts.get();
+    const allPostsCounterState8 = postsContract.allPostsCounter.get();
+    const usersPostsCountersState8 = postsContract.usersPostsCounters.get();
+    const postsState8 = postsContract.posts.get();
     const usersPostsCountersRoot8 = usersPostsCountersMap.getRoot();
     const postsRoot8 = postsMap.getRoot();
     expect(allPostsCounterState8).toEqual(allPostsCounterState7);
@@ -926,7 +929,7 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid13 = createPostRestorationTransitionValidInputs(
-      senderKey,
+      user2Key,
       Field(3),
       valid12.latestPostState,
       Field(8)
@@ -959,8 +962,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
 
     // Prepare inputs to create a valid state transition
     const valid14 = createPostPublishingTransitionValidInputs(
-      senderAccount,
-      senderKey,
+      user2Address,
+      user2Key,
       CircuitString.fromString(
         'b4444444444444444444444444444444444444444444444444444444444'
       ),
@@ -1012,17 +1015,17 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn9 = await Mina.transaction(deployerAccount, () => {
-      zkApp.update(mergedTransitionProofs5);
+    const txn9 = await Mina.transaction(user1Address, () => {
+      postsContract.update(mergedTransitionProofs5);
     });
     await txn9.prove();
-    await txn9.sign([deployerKey]).send();
+    await txn9.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(9));
 
     // Validate expected state
-    const allPostsCounterState9 = zkApp.allPostsCounter.get();
-    const usersPostsCountersState9 = zkApp.usersPostsCounters.get();
-    const postsState9 = zkApp.posts.get();
+    const allPostsCounterState9 = postsContract.allPostsCounter.get();
+    const usersPostsCountersState9 = postsContract.usersPostsCounters.get();
+    const postsState9 = postsContract.posts.get();
     const usersPostsCountersRoot9 = usersPostsCountersMap.getRoot();
     const postsRoot9 = postsMap.getRoot();
     expect(allPostsCounterState9).toEqual(Field(4));
@@ -1039,8 +1042,8 @@ describe(`the PostsContract and the Posts zkProgram`, () => {
     // ==============================================================================
 
     const newUsersPostsCountersMap = new MerkleMap();
-    const deployerAccountAsField = Poseidon.hash(deployerAccount.toFields());
-    const senderAccountAsField = Poseidon.hash(senderAccount.toFields());
+    const deployerAccountAsField = Poseidon.hash(user1Address.toFields());
+    const senderAccountAsField = Poseidon.hash(user2Address.toFields());
     newUsersPostsCountersMap.set(deployerAccountAsField, Field(2));
     newUsersPostsCountersMap.set(senderAccountAsField, Field(2));
     expect(newUsersPostsCountersMap.getRoot()).toEqual(usersPostsCountersRoot9);

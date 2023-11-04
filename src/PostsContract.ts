@@ -6,7 +6,7 @@ import {
   method,
   UInt32,
   MerkleMap,
-  PrivateKey
+  PublicKey,
 } from 'o1js';
 import { PostsProof } from './Posts.js';
 import { Config } from './PostsDeploy';
@@ -15,13 +15,16 @@ import fs from 'fs/promises';
 const newMerkleMap = new MerkleMap();
 export const newMerkleMapRoot = newMerkleMap.getRoot();
 
-const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
-const config = configJson.deployAliases['test'];
-const zkAppKeysBase58: { privateKey: string; publicKey: string } = JSON.parse(
-  await fs.readFile(config.keyPath, 'utf8')
+const postsConfigJson: Config = JSON.parse(
+  await fs.readFile('config.json', 'utf8')
 );
-const zkAppPrivateKey = PrivateKey.fromBase58(zkAppKeysBase58.privateKey);
-export const postsContractAddress = zkAppPrivateKey.toPublicKey();
+const postsConfig = postsConfigJson.deployAliases['posts'];
+const postsContractAddressBase58: { publicKey: string } = JSON.parse(
+  await fs.readFile(postsConfig.keyPath, 'utf8')
+);
+export const postsContractAddress = PublicKey.fromBase58(
+  postsContractAddressBase58.publicKey
+);
 
 export class PostsContract extends SmartContract {
   @state(Field) allPostsCounter = State<Field>();
