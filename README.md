@@ -57,7 +57,7 @@ zk config
 
 And go through the prompted instructions:
 
-1. Set the name to: `test`.
+1. Set the name to: `posts`.
 
 2. Set the Mina GraphQL API URL to: `https://proxy.berkeley.minaexplorer.com/graphql`
 
@@ -76,8 +76,7 @@ npm run build
 ## Run tests
 
 ```sh
-npm run test
-npm run testw # watch mode
+npm run test -- -t 'PostsContract and Posts ZkProgram functionality'
 ```
 
 ## Deploy
