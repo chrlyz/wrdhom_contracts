@@ -1,4 +1,4 @@
-# Proof Of Events
+# WrdHom
 
 This repository hosts the source-code for [Mina](https://github.com/MinaProtocol/mina) smart contracts and zero-knowledge programs, written in [o1js](https://github.com/o1-labs/o1js), to power social-media where users are able to audit their feeds in an easy and inexpensive way at any time.
 
@@ -14,8 +14,8 @@ The purpose of this project is to establish a popular social-media platform that
 
 Posts are the heart of any social media platform. That’s how users get a conversation started, make announcements, share their art, experiences, memes, etc. To implement them, first we start by storing a counter for all posts; the root of a Merkle Map; and the root of another Merkle Map; in 3 of the 8 available Fields for a Mina smart contract, respectively. The counter for all posts will be a Field that will increase by one for every post. The keys for one Merkle Map will be the hashed addresses of users, and the values for the Merkle Map will be a Field that will increase by one for every post by a specific user. The keys for the second Merkle Map will be the result of hashing the address of a user and the contentID for one of its posts, while the values for this Merkle Map will be the hash of the state of the post.
 
-<img src="https://github.com/chrlyz/proof_of_events/blob/main/img/posts_diagram1.png?raw=true&sanitize=true">
-<img src="https://github.com/chrlyz/proof_of_events/blob/main/img/posts_diagram2.png?raw=true&sanitize=true">
+<img src="https://github.com/chrlyz/wrdhom_contracts/blob/main/img/posts_diagram1.png?raw=true&sanitize=true">
+<img src="https://github.com/chrlyz/wrdhom_contracts/blob/main/img/posts_diagram2.png?raw=true&sanitize=true">
 
 When a user creates a post, the user generates the contentID for the post and signs it. Then sends the content, signature, user address, and post ContentID to a mempool. After this, the server takes these from the mempool and verifies that everything matches. Then the server assigns a post index based on the counter for all posts, and a post index based on the counter for the posts of that user, ordering the posts at a global level and at a user level. The server also assigns the block length at the time the transaction that updates our on-chain state will be included (if current block length is 100, the server assigns a block length of 100 to the post, and in case the transaction isn’t included in block 101, we would need to build a new proof and transaction, where block length for our post is updated to 101, and try again. To increase the likelihood of our transaction succeeding and avoid doing this extra work and adding lagging to our application, we allow some tolerance in our smart contract, so a post with block length 100 can either be included at block 101 or block 102, although not at block length 103). This logic is executed through a ZkProgram that generates the proof to update the on-chain state. Guaranteeing that all posts are signed, ordered, and timestamped.
 
@@ -32,7 +32,7 @@ This project plans to build on these ideas to add even more features, like react
 ## Clone
 
 ```sh
-git clone git@github.com:chrlyz/proof_of_events.git
+git clone git@github.com:chrlyz/wrdhom_contracts.git
 ```
 
 ## Install
