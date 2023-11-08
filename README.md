@@ -1,4 +1,4 @@
-# WrdHom
+# WrdHom: auditable social-media
 
 This repository hosts the source-code for [Mina](https://github.com/MinaProtocol/mina) smart contracts and zero-knowledge programs, written in [o1js](https://github.com/o1-labs/o1js), to power social-media where users are able to audit their feeds in an easy and inexpensive way at any time.
 
@@ -31,13 +31,13 @@ This project plans to build on these ideas to add even more features, like react
 
 ## Clone
 
-```sh
+```console
 git clone git@github.com:chrlyz/wrdhom_contracts.git
 ```
 
 ## Install
 
-```sh
+```console
 npm install
 ```
 
@@ -45,13 +45,13 @@ npm install
 
 Before building, running tests or deploying the project, set some parameters in the `config.json` of the project, and generate keys for the `fee-payer` and the `PostsContract`. To do this start by installing the [zkApp-CLI](https://github.com/o1-labs/zkapp-cli):
 
-```sh
+```console
 npm install -g zkapp-cli
 ```
 
 Then:
 
-```sh
+```console
 zk config
 ```
 
@@ -69,13 +69,13 @@ And go through the prompted instructions:
 
 ## Build
 
-```sh
+```console
 npm run build
 ```
 
 ## Run tests
 
-```sh
+```console
 npm run test -- -t 'PostsContract and Posts ZkProgram functionality'
 ```
 
@@ -83,19 +83,19 @@ npm run test -- -t 'PostsContract and Posts ZkProgram functionality'
 
 To deploy the `PostsContract` on the Berkeley testnet:
 
-```sh
+```console
 node build/src/PostsDeploy.js
 ```
 
 Wait for the transaction to confirm. Then you can do some test transactions already available in `/src/PostInteract.ts`. To make the first transaction:
 
-```sh
+```console
 node build/src/PostsInteract.js 1
 ```
 
 Wait for the transaction to confirm, then to make the second transaction:
 
-```sh
+```console
 node build/src/PostsInteract.js 2
 ```
 
