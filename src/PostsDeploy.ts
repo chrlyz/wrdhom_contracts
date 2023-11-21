@@ -16,7 +16,7 @@ export type Config = {
   >;
 };
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
-const config = configJson.deployAliases['test'];
+const config = configJson.deployAliases['posts'];
 
 const feepayerKeysBase58: { privateKey: string; publicKey: string } =
   JSON.parse(await fs.readFile(config.feepayerKeyPath, 'utf8'));
