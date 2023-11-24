@@ -233,7 +233,8 @@ if (numberOfTransaction === 2) {
 }
 
 // ==============================================================================
-// 3. Publishes on-chain proof for publication of 2nd and 3rd posts
+// 3. Publishes on-chain proof for publication of 2nd and 3rd posts through
+//    merged proofs
 // ==============================================================================
 
 if (numberOfTransaction === 3) {
@@ -389,7 +390,7 @@ if (numberOfTransaction === 3) {
 
 // ==============================================================================
 // 4. Publishes on-chain proof for deletion of 3rd post
-//    and publication of 4th post
+//    and publication of 4th post through merged proofs
 // ==============================================================================
 
 if (numberOfTransaction === 4) {
@@ -549,6 +550,8 @@ if (numberOfTransaction === 4) {
     await fs.writeFile('./build/src/post4.json', post4JSON, 'utf-8');
   }
 }
+
+// ============================================================================
 
 function createPostPublishingTransitionValidInputs(
   posterAddress: PublicKey,
