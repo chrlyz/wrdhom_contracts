@@ -1,13 +1,12 @@
-import {
-  Field,
-  SmartContract,
-  state,
-  State,
-  method,
-  UInt32
-} from 'o1js';
+import { Field, SmartContract, state, State, method, UInt32 } from 'o1js';
 import { RepostsProof } from './Reposts.js';
-import { PostsContract, newMerkleMapRoot, postsContractAddress } from './PostsContract.js';
+import {
+  PostsContract,
+  newMerkleMapRoot,
+  postsContractAddress,
+} from './PostsContract.js';
+
+// ============================================================================
 
 export class RepostsContract extends SmartContract {
   @state(Field) allRepostsCounter = State<Field>();
@@ -33,7 +32,8 @@ export class RepostsContract extends SmartContract {
     const postsState = postsContract.posts.getAndAssertEquals();
     proof.publicInput.posts.assertEquals(postsState);
 
-    const currentAllRepostsCounter = this.allRepostsCounter.getAndAssertEquals();
+    const currentAllRepostsCounter =
+      this.allRepostsCounter.getAndAssertEquals();
     proof.publicInput.initialAllRepostsCounter.assertEquals(
       currentAllRepostsCounter
     );

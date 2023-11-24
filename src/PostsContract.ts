@@ -12,6 +12,8 @@ import { PostsProof } from './Posts.js';
 import { Config } from './PostsDeploy';
 import fs from 'fs/promises';
 
+// ============================================================================
+
 const newMerkleMap = new MerkleMap();
 export const newMerkleMapRoot = newMerkleMap.getRoot();
 
@@ -25,6 +27,8 @@ const postsContractAddressBase58: { publicKey: string } = JSON.parse(
 export const postsContractAddress = PublicKey.fromBase58(
   postsContractAddressBase58.publicKey
 );
+
+// ============================================================================
 
 export class PostsContract extends SmartContract {
   @state(Field) allPostsCounter = State<Field>();
