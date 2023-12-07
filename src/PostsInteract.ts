@@ -127,7 +127,7 @@ if (numberOfTransaction === 1) {
 
   Your smart contract state will be updated
   as soon as the transaction is included in a block:
-  https://berkeley.minaexplorer.com/transaction/${sentTxn1.hash()}
+  https://minascan.io/berkeley/tx/${sentTxn1.hash()}
 
   If the transaction fails, execute this step again. The transaction
   probably took too long to be included in a block, so the block height
@@ -218,7 +218,7 @@ if (numberOfTransaction === 2) {
   
   Your smart contract state will be updated
   as soon as the transaction is included in a block:
-  https://berkeley.minaexplorer.com/transaction/${sentTxn2.hash()}
+  https://minascan.io/berkeley/tx/${sentTxn2.hash()}
 
   If the transaction fails, execute this step again. The transaction
   probably took too long to be included in a block, so the block height
@@ -372,7 +372,7 @@ if (numberOfTransaction === 3) {
   
   Your smart contract state will be updated
   as soon as the transaction is included in a block:
-  https://berkeley.minaexplorer.com/transaction/${sentTxn3.hash()}
+  https://minascan.io/berkeley/tx/${sentTxn3.hash()}
 
   If the transaction fails, execute this step again. The transaction
   probably took too long to be included in a block, so the block height
@@ -535,7 +535,7 @@ if (numberOfTransaction === 4) {
   
   Your smart contract state will be updated
   as soon as the transaction is included in a block:
-  https://berkeley.minaexplorer.com/transaction/${sentTxn4.hash()}
+  https://minascan.io/berkeley/tx/${sentTxn4.hash()}
 
   If the transaction fails, execute this step again. The transaction
   probably took too long to be included in a block, so the block height
@@ -579,6 +579,7 @@ function createPostPublishingTransitionValidInputs(
     userPostsCounter: userPostsCounter,
     postBlockHeight: postingSlot,
     deletionBlockHeight: Field(0),
+    restorationBlockHeight: Field(0)
   });
 
   usersPostsCountersMap.set(posterAddressAsField, userPostsCounter);
@@ -630,6 +631,7 @@ function createPostDeletionTransitionValidInputs(
     userPostsCounter: initialPostState.userPostsCounter,
     postBlockHeight: initialPostState.postBlockHeight,
     deletionBlockHeight: deletionBlockHeight,
+    restorationBlockHeight: initialPostState.restorationBlockHeight
   });
 
   postsMap.set(postKey, latestPostState.hash());

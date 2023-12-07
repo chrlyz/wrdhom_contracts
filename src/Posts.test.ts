@@ -100,6 +100,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: userPostsCounter,
       postBlockHeight: postBlockHeight,
       deletionBlockHeight: Field(0),
+      restorationBlockHeight: Field(0)
     });
 
     usersPostsCountersMap.set(posterAddressAsField, userPostsCounter);
@@ -151,6 +152,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: initialPostState.userPostsCounter,
       postBlockHeight: initialPostState.postBlockHeight,
       deletionBlockHeight: deletionBlockHeight,
+      restorationBlockHeight: initialPostState.restorationBlockHeight
     });
 
     postsMap.set(postKey, latestPostState.hash());
@@ -199,6 +201,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: initialPostState.userPostsCounter,
       postBlockHeight: initialPostState.postBlockHeight,
       deletionBlockHeight: Field(0),
+      restorationBlockHeight: restorationBlockHeight
     });
 
     postsMap.set(postKey, latestPostState.hash());
@@ -1055,6 +1058,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: valid1.postState.userPostsCounter,
       postBlockHeight: valid1.postState.postBlockHeight,
       deletionBlockHeight: valid1.postState.deletionBlockHeight,
+      restorationBlockHeight: valid1.postState.restorationBlockHeight
     });
     const post2 = new PostState({
       posterAddress: valid4.postState.posterAddress,
@@ -1063,6 +1067,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: valid4.postState.userPostsCounter,
       postBlockHeight: valid4.postState.postBlockHeight,
       deletionBlockHeight: valid4.postState.deletionBlockHeight,
+      restorationBlockHeight: valid4.postState.restorationBlockHeight
     });
     const post3 = new PostState({
       posterAddress: valid5.postState.posterAddress,
@@ -1071,6 +1076,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: valid5.postState.userPostsCounter,
       postBlockHeight: valid5.postState.postBlockHeight,
       deletionBlockHeight: valid5.postState.deletionBlockHeight,
+      restorationBlockHeight: valid5.postState.restorationBlockHeight
     });
     const post4 = new PostState({
       posterAddress: valid14.postState.posterAddress,
@@ -1079,6 +1085,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: valid14.postState.userPostsCounter,
       postBlockHeight: valid14.postState.postBlockHeight,
       deletionBlockHeight: valid14.postState.deletionBlockHeight,
+      restorationBlockHeight: valid14.postState.restorationBlockHeight
     });
 
     const newPostsMap = new MerkleMap();

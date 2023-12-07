@@ -133,6 +133,7 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
       userPostsCounter: userPostsCounter,
       postBlockHeight: postBlockHeight,
       deletionBlockHeight: Field(0),
+      restorationBlockHeight: Field(0)
     });
 
     usersPostsCountersMap.set(posterAddressAsField, userPostsCounter);
