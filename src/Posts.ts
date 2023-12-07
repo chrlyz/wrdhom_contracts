@@ -24,6 +24,7 @@ export class PostState extends Struct({
   userPostsCounter: Field,
   postBlockHeight: Field,
   deletionBlockHeight: Field,
+  restorationBlockHeight: Field
 }) {
   hash(): Field {
     return Poseidon.hash(
@@ -35,6 +36,7 @@ export class PostState extends Struct({
           this.userPostsCounter,
           this.postBlockHeight,
           this.deletionBlockHeight,
+          this.restorationBlockHeight
         ])
     );
   }
@@ -65,6 +67,7 @@ export class PostsTransition extends Struct({
   ) {
     initialAllPostsCounter.assertEquals(postState.allPostsCounter.sub(1));
     postState.deletionBlockHeight.assertEquals(Field(0));
+    postState.restorationBlockHeight.assertEquals(Field(0));
 
     const isSigned = signature.verify(postState.posterAddress, [
       postState.postContentID.hash(),
@@ -178,6 +181,7 @@ export class PostsTransition extends Struct({
       userPostsCounter: initialPostState.userPostsCounter,
       postBlockHeight: initialPostState.postBlockHeight,
       deletionBlockHeight: blockHeight,
+      restorationBlockHeight: initialPostState.restorationBlockHeight
     });
 
     const postsAfter = postWitness.computeRootAndKey(latestPostState.hash())[0];
@@ -222,6 +226,7 @@ export class PostsTransition extends Struct({
       userPostsCounter: initialPostState.userPostsCounter,
       postBlockHeight: initialPostState.postBlockHeight,
       deletionBlockHeight: Field(0),
+      restorationBlockHeight: blockHeight
     });
 
     const postsAfter = postWitness.computeRootAndKey(latestPostState.hash())[0];
