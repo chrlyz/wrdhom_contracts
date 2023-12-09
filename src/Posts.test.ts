@@ -100,7 +100,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: userPostsCounter,
       postBlockHeight: postBlockHeight,
       deletionBlockHeight: Field(0),
-      restorationBlockHeight: Field(0)
+      restorationBlockHeight: Field(0),
     });
 
     usersPostsCountersMap.set(posterAddressAsField, userPostsCounter);
@@ -152,7 +152,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: initialPostState.userPostsCounter,
       postBlockHeight: initialPostState.postBlockHeight,
       deletionBlockHeight: deletionBlockHeight,
-      restorationBlockHeight: initialPostState.restorationBlockHeight
+      restorationBlockHeight: initialPostState.restorationBlockHeight,
     });
 
     postsMap.set(postKey, latestPostState.hash());
@@ -201,7 +201,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: initialPostState.userPostsCounter,
       postBlockHeight: initialPostState.postBlockHeight,
       deletionBlockHeight: Field(0),
-      restorationBlockHeight: restorationBlockHeight
+      restorationBlockHeight: restorationBlockHeight,
     });
 
     postsMap.set(postKey, latestPostState.hash());
@@ -1052,31 +1052,31 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     expect(newUsersPostsCountersMap.getRoot()).toEqual(usersPostsCountersRoot9);
 
     const post1 = new PostState({
-      posterAddress: valid1.postState.posterAddress,
-      postContentID: valid1.postState.postContentID,
-      allPostsCounter: valid1.postState.allPostsCounter,
-      userPostsCounter: valid1.postState.userPostsCounter,
-      postBlockHeight: valid1.postState.postBlockHeight,
-      deletionBlockHeight: valid1.postState.deletionBlockHeight,
-      restorationBlockHeight: valid1.postState.restorationBlockHeight
+      posterAddress: valid3.latestPostState.posterAddress,
+      postContentID: valid3.latestPostState.postContentID,
+      allPostsCounter: valid3.latestPostState.allPostsCounter,
+      userPostsCounter: valid3.latestPostState.userPostsCounter,
+      postBlockHeight: valid3.latestPostState.postBlockHeight,
+      deletionBlockHeight: valid3.latestPostState.deletionBlockHeight,
+      restorationBlockHeight: valid3.latestPostState.restorationBlockHeight,
     });
     const post2 = new PostState({
-      posterAddress: valid4.postState.posterAddress,
-      postContentID: valid4.postState.postContentID,
-      allPostsCounter: valid4.postState.allPostsCounter,
-      userPostsCounter: valid4.postState.userPostsCounter,
-      postBlockHeight: valid4.postState.postBlockHeight,
-      deletionBlockHeight: valid4.postState.deletionBlockHeight,
-      restorationBlockHeight: valid4.postState.restorationBlockHeight
+      posterAddress: valid11.latestPostState.posterAddress,
+      postContentID: valid11.latestPostState.postContentID,
+      allPostsCounter: valid11.latestPostState.allPostsCounter,
+      userPostsCounter: valid11.latestPostState.userPostsCounter,
+      postBlockHeight: valid11.latestPostState.postBlockHeight,
+      deletionBlockHeight: valid11.latestPostState.deletionBlockHeight,
+      restorationBlockHeight: valid11.latestPostState.restorationBlockHeight,
     });
     const post3 = new PostState({
-      posterAddress: valid5.postState.posterAddress,
-      postContentID: valid5.postState.postContentID,
-      allPostsCounter: valid5.postState.allPostsCounter,
-      userPostsCounter: valid5.postState.userPostsCounter,
-      postBlockHeight: valid5.postState.postBlockHeight,
-      deletionBlockHeight: valid5.postState.deletionBlockHeight,
-      restorationBlockHeight: valid5.postState.restorationBlockHeight
+      posterAddress: valid13.latestPostState.posterAddress,
+      postContentID: valid13.latestPostState.postContentID,
+      allPostsCounter: valid13.latestPostState.allPostsCounter,
+      userPostsCounter: valid13.latestPostState.userPostsCounter,
+      postBlockHeight: valid13.latestPostState.postBlockHeight,
+      deletionBlockHeight: valid13.latestPostState.deletionBlockHeight,
+      restorationBlockHeight: valid13.latestPostState.restorationBlockHeight,
     });
     const post4 = new PostState({
       posterAddress: valid14.postState.posterAddress,
@@ -1085,7 +1085,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       userPostsCounter: valid14.postState.userPostsCounter,
       postBlockHeight: valid14.postState.postBlockHeight,
       deletionBlockHeight: valid14.postState.deletionBlockHeight,
-      restorationBlockHeight: valid14.postState.restorationBlockHeight
+      restorationBlockHeight: valid14.postState.restorationBlockHeight,
     });
 
     const newPostsMap = new MerkleMap();
@@ -1105,6 +1105,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       Poseidon.hash([senderAccountAsField, post4.postContentID.hash()]),
       post4.hash()
     );
+
     expect(newPostsMap.getRoot()).toEqual(postsState9);
 
     console.log('Successful extra validation of all the state updates');
