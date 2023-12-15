@@ -8,7 +8,7 @@ import {
   MerkleMapWitness,
   ZkProgram,
 } from 'o1js';
-import { PostState } from './Posts.js';
+import { PostState } from '../posts/Posts.js';
 
 // ============================================================================
 

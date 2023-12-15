@@ -4,7 +4,7 @@ import {
   PostsContract,
   newMerkleMapRoot,
   postsContractAddress,
-} from './PostsContract.js';
+} from '../posts/PostsContract.js';
 
 // ============================================================================
 
