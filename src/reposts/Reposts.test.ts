@@ -1,9 +1,9 @@
-import { PostsContract } from './PostsContract';
+import { PostsContract } from '../posts/PostsContract';
 import {
   PostsTransition,
   PostState,
   Posts
-} from './Posts';
+} from '../posts/Posts';
 import { RepostsContract } from './RepostsContract';
 import { RepostsTransition, RepostState, Reposts } from './Reposts';
 import {
@@ -18,7 +18,7 @@ import {
   Signature,
   UInt32
 } from 'o1js';
-import { Config } from './PostsDeploy';
+import { Config } from '../posts/PostsDeploy';
 import fs from 'fs/promises';
 
 let proofsEnabled = true;

@@ -1,8 +1,8 @@
-import { PostState, PostsTransition, Posts, PostsProof } from './Posts.js';
-import { PostsContract } from './PostsContract.js';
-import { RepostState, RepostsTransition, Reposts } from './Reposts.js';
-import { RepostsContract } from './RepostsContract.js';
-import { Config } from './PostsDeploy.js';
+import { PostState, PostsTransition, Posts, PostsProof } from './posts/Posts.js';
+import { PostsContract } from './posts/PostsContract.js';
+import { RepostState, RepostsTransition, Reposts } from './reposts/Reposts.js';
+import { RepostsContract } from './reposts/RepostsContract.js';
+import { Config } from './posts/PostsDeploy.js';
 
 export {
   PostState,

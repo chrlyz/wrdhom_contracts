@@ -1,6 +1,6 @@
 {
   "name": "wrdhom",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "",
   "author": "",
   "license": "MIT",
@@ -12,6 +12,7 @@
   ],
   "type": "module",
   "main": "build/src/index.js",
+  "browser": "build/src/index.client.js",
   "types": "build/src/index.d.ts",
   "scripts": {
     "build": "tsc",
