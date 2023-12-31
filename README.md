@@ -59,7 +59,7 @@ And go through the prompted instructions:
 
 1. Set the name to: `posts`.
 
-2. Set the Mina GraphQL API URL to: `https://berkeley.minascan.io/graphql`
+2. Set the Mina GraphQL API URL to: `https://proxy.berkeley.minaexplorer.com/graphql`
 
 3. Set transaction fee to: `0.1`
 
