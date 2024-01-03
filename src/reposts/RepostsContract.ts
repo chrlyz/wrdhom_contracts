@@ -23,28 +23,28 @@ export class RepostsContract extends SmartContract {
   @method update(proof: RepostsProof) {
     proof.verify();
 
-    this.network.blockchainLength.assertBetween(
+    this.network.blockchainLength.requireBetween(
       UInt32.from(proof.publicInput.blockHeight),
       UInt32.from(proof.publicInput.blockHeight).add(1)
     );
 
     const postsContract = new PostsContract(postsContractAddress);
-    const postsState = postsContract.posts.getAndAssertEquals();
+    const postsState = postsContract.posts.getAndRequireEquals();
     proof.publicInput.posts.assertEquals(postsState);
 
     const currentAllRepostsCounter =
-      this.allRepostsCounter.getAndAssertEquals();
+      this.allRepostsCounter.getAndRequireEquals();
     proof.publicInput.initialAllRepostsCounter.assertEquals(
       currentAllRepostsCounter
     );
 
     const currentUsersRepostsCounters =
-      this.usersRepostsCounters.getAndAssertEquals();
+      this.usersRepostsCounters.getAndRequireEquals();
     proof.publicInput.initialUsersRepostsCounters.assertEquals(
       currentUsersRepostsCounters
     );
 
-    const currentState = this.reposts.getAndAssertEquals();
+    const currentState = this.reposts.getAndRequireEquals();
     proof.publicInput.initialReposts.assertEquals(currentState);
 
     this.reposts.set(proof.publicInput.latestReposts);

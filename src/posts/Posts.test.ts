@@ -65,62 +65,6 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     postsContract = new PostsContract(postsContractAddress);
   });
 
-  async function deployPostsContract() {
-    const txn = await Mina.transaction(user1Address, () => {
-      AccountUpdate.fundNewAccount(user1Address);
-      postsContract.deploy();
-    });
-    await txn.prove();
-    await txn.sign([user1Key, postsContractKey]).send();
-  }
-
-  function createPostPublishingTransitionValidInputs(
-    posterAddress: PublicKey,
-    posterKey: PrivateKey,
-    postContentID: CircuitString,
-    allPostsCounter: Field,
-    userPostsCounter: Field,
-    postBlockHeight: Field
-  ) {
-    const signature = Signature.create(posterKey, [postContentID.hash()]);
-
-    const initialUsersPostsCounters = usersPostsCountersMap.getRoot();
-    const posterAddressAsField = Poseidon.hash(posterAddress.toFields());
-    const userPostsCounterWitness =
-      usersPostsCountersMap.getWitness(posterAddressAsField);
-
-    const initialPosts = postsMap.getRoot();
-    const postKey = Poseidon.hash([posterAddressAsField, postContentID.hash()]);
-    const postWitness = postsMap.getWitness(postKey);
-
-    const postState = new PostState({
-      posterAddress: posterAddress,
-      postContentID: postContentID,
-      allPostsCounter: allPostsCounter,
-      userPostsCounter: userPostsCounter,
-      postBlockHeight: postBlockHeight,
-      deletionBlockHeight: Field(0),
-      restorationBlockHeight: Field(0),
-    });
-
-    usersPostsCountersMap.set(posterAddressAsField, userPostsCounter);
-    const latestUsersPostsCounters = usersPostsCountersMap.getRoot();
-
-    postsMap.set(postKey, postState.hash());
-    const latestPosts = postsMap.getRoot();
-
-    return {
-      signature: signature,
-      initialUsersPostsCounters: initialUsersPostsCounters,
-      latestUsersPostsCounters: latestUsersPostsCounters,
-      userPostsCounterWitness: userPostsCounterWitness,
-      initialPosts: initialPosts,
-      latestPosts: latestPosts,
-      postState: postState,
-      postWitness: postWitness,
-    };
-  }
-
   function createPostDeletionTransitionValidInputs(
     posterKey: PrivateKey,
     allPostsCounter: Field,
@@ -225,7 +169,12 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     // 1. Deploys PostsContract.
     // ==============================================================================
 
-    await deployPostsContract();
+    await deployPostsContract(
+      user1Address,
+      user1Key,
+      postsContract,
+      postsContractKey
+    );
 
     // Validate expected state
     const allPostsCounterState = postsContract.allPostsCounter.get();
@@ -252,7 +201,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       ),
       Field(1),
       Field(1),
-      Field(0)
+      Field(0),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -439,7 +390,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       ),
       Field(2),
       Field(2),
-      Field(3)
+      Field(3),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -480,7 +433,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       ),
       Field(3),
       Field(1),
-      Field(3)
+      Field(3),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -972,7 +927,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       ),
       Field(4),
       Field(2),
-      Field(8)
+      Field(8),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -1111,3 +1068,66 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     console.log('Successful extra validation of all the state updates');
   });
 });
+
+export async function deployPostsContract(
+  deployerAddress: PublicKey,
+  deployerKey: PrivateKey,
+  postsContract: PostsContract,
+  postsContractKey: PrivateKey
+) {
+  const txn = await Mina.transaction(deployerAddress, () => {
+    AccountUpdate.fundNewAccount(deployerAddress);
+    postsContract.deploy();
+  });
+  await txn.prove();
+  await txn.sign([deployerKey, postsContractKey]).send();
+}
+
+export function createPostPublishingTransitionValidInputs(
+  posterAddress: PublicKey,
+  posterKey: PrivateKey,
+  postContentID: CircuitString,
+  allPostsCounter: Field,
+  userPostsCounter: Field,
+  postBlockHeight: Field,
+  usersPostsCountersMap: MerkleMap,
+  postsMap: MerkleMap
+) {
+  const signature = Signature.create(posterKey, [postContentID.hash()]);
+
+  const initialUsersPostsCounters = usersPostsCountersMap.getRoot();
+  const posterAddressAsField = Poseidon.hash(posterAddress.toFields());
+  const userPostsCounterWitness =
+    usersPostsCountersMap.getWitness(posterAddressAsField);
+
+  const initialPosts = postsMap.getRoot();
+  const postKey = Poseidon.hash([posterAddressAsField, postContentID.hash()]);
+  const postWitness = postsMap.getWitness(postKey);
+
+  const postState = new PostState({
+    posterAddress: posterAddress,
+    postContentID: postContentID,
+    allPostsCounter: allPostsCounter,
+    userPostsCounter: userPostsCounter,
+    postBlockHeight: postBlockHeight,
+    deletionBlockHeight: Field(0),
+    restorationBlockHeight: Field(0),
+  });
+
+  usersPostsCountersMap.set(posterAddressAsField, userPostsCounter);
+  const latestUsersPostsCounters = usersPostsCountersMap.getRoot();
+
+  postsMap.set(postKey, postState.hash());
+  const latestPosts = postsMap.getRoot();
+
+  return {
+    signature: signature,
+    initialUsersPostsCounters: initialUsersPostsCounters,
+    latestUsersPostsCounters: latestUsersPostsCounters,
+    userPostsCounterWitness: userPostsCounterWitness,
+    initialPosts: initialPosts,
+    latestPosts: latestPosts,
+    postState: postState,
+    postWitness: postWitness,
+  };
+}

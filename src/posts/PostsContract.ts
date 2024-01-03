@@ -45,27 +45,27 @@ export class PostsContract extends SmartContract {
   @method update(proof: PostsProof) {
     proof.verify();
 
-    this.network.blockchainLength.assertBetween(
+    this.network.blockchainLength.requireBetween(
       UInt32.from(proof.publicInput.blockHeight),
       UInt32.from(proof.publicInput.blockHeight).add(1)
     );
 
-    const currentAllPostsCounter = this.allPostsCounter.getAndAssertEquals();
+    const currentAllPostsCounter = this.allPostsCounter.getAndRequireEquals();
     proof.publicInput.initialAllPostsCounter.assertEquals(
       currentAllPostsCounter
     );
 
     const currentUsersPostsCounters =
-      this.usersPostsCounters.getAndAssertEquals();
+      this.usersPostsCounters.getAndRequireEquals();
     proof.publicInput.initialUsersPostsCounters.assertEquals(
       currentUsersPostsCounters
     );
 
-    const currentState = this.posts.getAndAssertEquals();
+    const currentState = this.posts.getAndRequireEquals();
     proof.publicInput.initialPosts.assertEquals(currentState);
 
-    this.posts.set(proof.publicInput.latestPosts);
     this.allPostsCounter.set(proof.publicInput.latestAllPostsCounter);
     this.usersPostsCounters.set(proof.publicInput.latestUsersPostsCounters);
+    this.posts.set(proof.publicInput.latestPosts);
   }
 }

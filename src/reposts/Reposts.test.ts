@@ -1,9 +1,5 @@
 import { PostsContract } from '../posts/PostsContract';
-import {
-  PostsTransition,
-  PostState,
-  Posts
-} from '../posts/Posts';
+import { PostsTransition, PostState, Posts } from '../posts/Posts';
 import { RepostsContract } from './RepostsContract';
 import { RepostsTransition, RepostState, Reposts } from './Reposts';
 import {
@@ -16,10 +12,14 @@ import {
   CircuitString,
   Poseidon,
   Signature,
-  UInt32
+  UInt32,
 } from 'o1js';
 import { Config } from '../posts/PostsDeploy';
 import fs from 'fs/promises';
+import {
+  deployPostsContract,
+  createPostPublishingTransitionValidInputs,
+} from '../posts/Posts.test';
 
 let proofsEnabled = true;
 
@@ -89,15 +89,6 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     repostsMap = new MerkleMap();
   });
 
-  async function deployPostsContract() {
-    const txn = await Mina.transaction(user1Address, () => {
-      AccountUpdate.fundNewAccount(user1Address);
-      postsContract.deploy();
-    });
-    await txn.prove();
-    await txn.sign([user1Key, postsContractKey]).send();
-  }
-
   async function deployRepostsContract() {
     const txn = await Mina.transaction(user1Address, () => {
       AccountUpdate.fundNewAccount(user1Address);
@@ -105,53 +96,6 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     });
     await txn.prove();
     await txn.sign([user1Key, repostsContractKey]).send();
-  }
-
-  function createPostPublishingTransitionValidInputs(
-    posterAddress: PublicKey,
-    posterKey: PrivateKey,
-    postContentID: CircuitString,
-    allPostsCounter: Field,
-    userPostsCounter: Field,
-    postBlockHeight: Field
-  ) {
-    const signature = Signature.create(posterKey, [postContentID.hash()]);
-
-    const initialUsersPostsCounters = usersPostsCountersMap.getRoot();
-    const posterAddressAsField = Poseidon.hash(posterAddress.toFields());
-    const userPostsCounterWitness =
-      usersPostsCountersMap.getWitness(posterAddressAsField);
-
-    const initialPosts = postsMap.getRoot();
-    const postKey = Poseidon.hash([posterAddressAsField, postContentID.hash()]);
-    const postWitness = postsMap.getWitness(postKey);
-
-    const postState = new PostState({
-      posterAddress: posterAddress,
-      postContentID: postContentID,
-      allPostsCounter: allPostsCounter,
-      userPostsCounter: userPostsCounter,
-      postBlockHeight: postBlockHeight,
-      deletionBlockHeight: Field(0),
-      restorationBlockHeight: Field(0)
-    });
-
-    usersPostsCountersMap.set(posterAddressAsField, userPostsCounter);
-    const latestUsersPostsCounters = usersPostsCountersMap.getRoot();
-
-    postsMap.set(postKey, postState.hash());
-    const latestPosts = postsMap.getRoot();
-
-    return {
-      signature: signature,
-      initialUsersPostsCounters: initialUsersPostsCounters,
-      latestUsersPostsCounters: latestUsersPostsCounters,
-      userPostsCounterWitness: userPostsCounterWitness,
-      initialPosts: initialPosts,
-      latestPosts: latestPosts,
-      postState: postState,
-      postWitness: postWitness,
-    };
   }
 
   function createRepostTransitionValidInputs(
@@ -224,7 +168,12 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     // 1. Deploys PostsContract and RepostsContract.
     // ==============================================================================
 
-    await deployPostsContract();
+    await deployPostsContract(
+      user1Address,
+      user1Key,
+      postsContract,
+      postsContractKey
+    );
 
     // Validate expected state
     const allPostsCounterState = postsContract.allPostsCounter.get();
@@ -265,7 +214,9 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
       ),
       Field(1),
       Field(1),
-      Field(0)
+      Field(0),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
