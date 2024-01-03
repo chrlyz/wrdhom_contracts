@@ -19,7 +19,7 @@ import fs from 'fs/promises';
 import {
   deployPostsContract,
   createPostPublishingTransitionValidInputs,
-} from '../posts/Posts.test';
+} from '../posts/PostsUtils';
 
 let proofsEnabled = true;
 
