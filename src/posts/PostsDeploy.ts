@@ -15,23 +15,25 @@ export type Config = {
     }
   >;
 };
+
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
-const config = configJson.deployAliases['posts'];
+const postsConfig = configJson.deployAliases['posts'];
 
-const feepayerKeysBase58: { privateKey: string; publicKey: string } =
-  JSON.parse(await fs.readFile(config.feepayerKeyPath, 'utf8'));
-const zkAppKeysBase58: { privateKey: string; publicKey: string } = JSON.parse(
-  await fs.readFile(config.keyPath, 'utf8')
+const feePayerKeysBase58: { privateKey: string; publicKey: string } =
+  JSON.parse(await fs.readFile(postsConfig.feepayerKeyPath, 'utf8'));
+const postsContractKeysBase58: { privateKey: string; publicKey: string } =
+  JSON.parse(await fs.readFile(postsConfig.keyPath, 'utf8'));
+const feePayerKey = PrivateKey.fromBase58(feePayerKeysBase58.privateKey);
+const postsContractKey = PrivateKey.fromBase58(
+  postsContractKeysBase58.privateKey
 );
-const feepayerKey = PrivateKey.fromBase58(feepayerKeysBase58.privateKey);
-const zkAppKey = PrivateKey.fromBase58(zkAppKeysBase58.privateKey);
 
-const Network = Mina.Network(config.url);
-const fee = Number(config.fee) * 1e9; // in nanomina (1 billion = 1.0 mina)
+const Network = Mina.Network(postsConfig.url);
+const fee = Number(postsConfig.fee) * 1e9; // in nanomina (1 billion = 1.0 mina)
 Mina.setActiveInstance(Network);
-const feepayerAddress = feepayerKey.toPublicKey();
-const zkAppAddress = zkAppKey.toPublicKey();
-const zkApp = new PostsContract(zkAppAddress);
+const feePayerAddress = feePayerKey.toPublicKey();
+const postsContractAddress = postsContractKey.toPublicKey();
+const postsContract = new PostsContract(postsContractAddress);
 
 console.log('Compiling Posts zkProgram...');
 await Posts.compile();
@@ -42,14 +44,14 @@ console.log('Compiled');
 let sentTx;
 try {
   const txn = await Mina.transaction(
-    { sender: feepayerAddress, fee: fee },
+    { sender: feePayerAddress, fee: fee },
     () => {
-      AccountUpdate.fundNewAccount(feepayerAddress);
-      zkApp.deploy();
+      AccountUpdate.fundNewAccount(feePayerAddress);
+      postsContract.deploy();
     }
   );
   await txn.prove();
-  sentTx = await txn.sign([feepayerKey, zkAppKey]).send();
+  sentTx = await txn.sign([feePayerKey, postsContractKey]).send();
 } catch (err) {
   console.log(err);
 }

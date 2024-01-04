@@ -28,25 +28,28 @@ node build/src/PostsInteract.js <numberOfTransaction>
 `);
 
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
-const config = configJson.deployAliases['posts'];
-const feepayerKeysBase58: { privateKey: string; publicKey: string } =
-  JSON.parse(await fs.readFile(config.feepayerKeyPath, 'utf8'));
+const postsConfig = configJson.deployAliases['posts'];
+const feePayerKeysBase58: { privateKey: string; publicKey: string } =
+  JSON.parse(await fs.readFile(postsConfig.feepayerKeyPath, 'utf8'));
 
-const zkAppKeysBase58: { privateKey: string; publicKey: string } = JSON.parse(
-  await fs.readFile(config.keyPath, 'utf8')
+const postsContractKeysBase58: { privateKey: string; publicKey: string } =
+  JSON.parse(await fs.readFile(postsConfig.keyPath, 'utf8'));
+
+const feePayerKey = PrivateKey.fromBase58(feePayerKeysBase58.privateKey);
+const postsContractKey = PrivateKey.fromBase58(
+  postsContractKeysBase58.privateKey
 );
 
-const feepayerKey = PrivateKey.fromBase58(feepayerKeysBase58.privateKey);
-const zkAppKey = PrivateKey.fromBase58(zkAppKeysBase58.privateKey);
-
-const Network = Mina.Network(config.url);
-const fee = Number(config.fee) * 1e9; // in nanomina (1 billion = 1.0 mina)
+const Network = Mina.Network(postsConfig.url);
+const fee = Number(postsConfig.fee) * 1e9; // in nanomina (1 billion = 1.0 mina)
 Mina.setActiveInstance(Network);
-const feepayerAddress = feepayerKey.toPublicKey();
-const feepayerAddressAsField = Poseidon.hash(feepayerAddress.toFields());
-const zkAppAddress = zkAppKey.toPublicKey();
-const zkApp = new PostsContract(zkAppAddress);
-const zkAppAddressAsField = Poseidon.hash(zkAppAddress.toFields());
+const feePayerAddress = feePayerKey.toPublicKey();
+const feePayerAddressAsField = Poseidon.hash(feePayerAddress.toFields());
+const postsContractAddress = postsContractKey.toPublicKey();
+const postsContract = new PostsContract(postsContractAddress);
+const postsContractAddressAsField = Poseidon.hash(
+  postsContractAddress.toFields()
+);
 
 console.log('Compiling Posts zkProgram...');
 await Posts.compile();
@@ -63,12 +66,12 @@ const postsMap = new MerkleMap();
 
 if (numberOfTransaction === 1) {
   // Get last block to target next block to timestamp our post state
-  const lastBlock1 = await fetchLastBlock(config.url);
+  const lastBlock1 = await fetchLastBlock(postsConfig.url);
 
   // Prepare inputs to create a valid state transition
   const valid1 = createPostPublishingTransitionValidInputs(
-    feepayerAddress,
-    feepayerKey,
+    feePayerAddress,
+    feePayerKey,
     CircuitString.fromString(
       'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
     ),
@@ -110,13 +113,13 @@ if (numberOfTransaction === 1) {
   let sentTxn1;
   try {
     const txn1 = await Mina.transaction(
-      { sender: feepayerAddress, fee: fee },
+      { sender: feePayerAddress, fee: fee },
       () => {
-        zkApp.update(proof1);
+        postsContract.update(proof1);
       }
     );
     await txn1.prove();
-    sentTxn1 = await txn1.sign([feepayerKey]).send();
+    sentTxn1 = await txn1.sign([feePayerKey]).send();
   } catch (err) {
     console.log(err);
   }
@@ -153,20 +156,20 @@ if (numberOfTransaction === 2) {
 
   // Restore MerkleMap produced in transaction 1
   usersPostsCountersMap.set(
-    feepayerAddressAsField,
+    feePayerAddressAsField,
     Field(post1.userPostsCounter)
   );
   postsMap.set(
-    Poseidon.hash([feepayerAddressAsField, post1.postContentID.hash()]),
+    Poseidon.hash([feePayerAddressAsField, post1.postContentID.hash()]),
     post1.hash()
   );
 
   // Get last block to target next block to timestamp our post state
-  const lastBlock2 = await fetchLastBlock(config.url);
+  const lastBlock2 = await fetchLastBlock(postsConfig.url);
 
   // Prepare inputs to create a valid state transition
   const valid2 = createPostDeletionTransitionValidInputs(
-    feepayerKey,
+    feePayerKey,
     Field(1),
     post1,
     Field(lastBlock2.blockchainLength.toBigint())
@@ -201,13 +204,13 @@ if (numberOfTransaction === 2) {
   let sentTxn2;
   try {
     const txn2 = await Mina.transaction(
-      { sender: feepayerAddress, fee: fee },
+      { sender: feePayerAddress, fee: fee },
       () => {
-        zkApp.update(proof2);
+        postsContract.update(proof2);
       }
     );
     await txn2.prove();
-    sentTxn2 = await txn2.sign([feepayerKey]).send();
+    sentTxn2 = await txn2.sign([feePayerKey]).send();
   } catch (err) {
     console.log(err);
   }
@@ -245,21 +248,21 @@ if (numberOfTransaction === 3) {
 
   // Restore MerkleMap produced in transaction 2
   usersPostsCountersMap.set(
-    feepayerAddressAsField,
+    feePayerAddressAsField,
     Field(post1.userPostsCounter)
   );
   postsMap.set(
-    Poseidon.hash([feepayerAddressAsField, post1.postContentID.hash()]),
+    Poseidon.hash([feePayerAddressAsField, post1.postContentID.hash()]),
     post1.hash()
   );
 
   // Get last block to target next block to timestamp our post states
-  const lastBlock3 = await fetchLastBlock(config.url);
+  const lastBlock3 = await fetchLastBlock(postsConfig.url);
 
   // Prepare inputs to create a valid state transition
   const valid3 = createPostPublishingTransitionValidInputs(
-    feepayerAddress,
-    feepayerKey,
+    feePayerAddress,
+    feePayerKey,
     CircuitString.fromString(
       'b3333333333333333333333333333333333333333333333333333333333'
     ),
@@ -299,8 +302,8 @@ if (numberOfTransaction === 3) {
 
   // Prepare inputs to create a valid state transition
   const valid4 = createPostPublishingTransitionValidInputs(
-    zkAppAddress,
-    zkAppKey,
+    postsContractAddress,
+    postsContractKey,
     CircuitString.fromString(
       'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
     ),
@@ -355,13 +358,13 @@ if (numberOfTransaction === 3) {
   let sentTxn3;
   try {
     const txn3 = await Mina.transaction(
-      { sender: feepayerAddress, fee: fee },
+      { sender: feePayerAddress, fee: fee },
       () => {
-        zkApp.update(mergedTransitionProofs1);
+        postsContract.update(mergedTransitionProofs1);
       }
     );
     await txn3.prove();
-    sentTxn3 = await txn3.sign([feepayerKey]).send();
+    sentTxn3 = await txn3.sign([feePayerKey]).send();
   } catch (err) {
     console.log(err);
   }
@@ -407,29 +410,32 @@ if (numberOfTransaction === 4) {
 
   // Restore MerkleMap produced in previous transactions
   postsMap.set(
-    Poseidon.hash([feepayerAddressAsField, post1.postContentID.hash()]),
+    Poseidon.hash([feePayerAddressAsField, post1.postContentID.hash()]),
     post1.hash()
   );
   usersPostsCountersMap.set(
-    feepayerAddressAsField,
+    feePayerAddressAsField,
     Field(post2.userPostsCounter)
   );
   postsMap.set(
-    Poseidon.hash([feepayerAddressAsField, post2.postContentID.hash()]),
+    Poseidon.hash([feePayerAddressAsField, post2.postContentID.hash()]),
     post2.hash()
   );
-  usersPostsCountersMap.set(zkAppAddressAsField, Field(post3.userPostsCounter));
+  usersPostsCountersMap.set(
+    postsContractAddressAsField,
+    Field(post3.userPostsCounter)
+  );
   postsMap.set(
-    Poseidon.hash([zkAppAddressAsField, post3.postContentID.hash()]),
+    Poseidon.hash([postsContractAddressAsField, post3.postContentID.hash()]),
     post3.hash()
   );
 
   // Get last block to target next block to timestamp our post states
-  const lastBlock4 = await fetchLastBlock(config.url);
+  const lastBlock4 = await fetchLastBlock(postsConfig.url);
 
   // Prepare inputs to create a valid state transition
   const valid5 = createPostDeletionTransitionValidInputs(
-    zkAppKey,
+    postsContractKey,
     Field(3),
     post3,
     Field(lastBlock4.blockchainLength.toBigint())
@@ -462,8 +468,8 @@ if (numberOfTransaction === 4) {
 
   // Prepare inputs to create a valid state transition
   const valid6 = createPostPublishingTransitionValidInputs(
-    zkAppAddress,
-    zkAppKey,
+    postsContractAddress,
+    postsContractKey,
     CircuitString.fromString(
       'b4444444444444444444444444444444444444444444444444444444444'
     ),
@@ -518,13 +524,13 @@ if (numberOfTransaction === 4) {
   let sentTxn4;
   try {
     const txn4 = await Mina.transaction(
-      { sender: feepayerAddress, fee: fee },
+      { sender: feePayerAddress, fee: fee },
       () => {
-        zkApp.update(mergedTransitionProofs2);
+        postsContract.update(mergedTransitionProofs2);
       }
     );
     await txn4.prove();
-    sentTxn4 = await txn4.sign([feepayerKey]).send();
+    sentTxn4 = await txn4.sign([feePayerKey]).send();
   } catch (err) {
     console.log(err);
   }
@@ -579,7 +585,7 @@ function createPostPublishingTransitionValidInputs(
     userPostsCounter: userPostsCounter,
     postBlockHeight: postingSlot,
     deletionBlockHeight: Field(0),
-    restorationBlockHeight: Field(0)
+    restorationBlockHeight: Field(0),
   });
 
   usersPostsCountersMap.set(posterAddressAsField, userPostsCounter);
@@ -631,7 +637,7 @@ function createPostDeletionTransitionValidInputs(
     userPostsCounter: initialPostState.userPostsCounter,
     postBlockHeight: initialPostState.postBlockHeight,
     deletionBlockHeight: deletionBlockHeight,
-    restorationBlockHeight: initialPostState.restorationBlockHeight
+    restorationBlockHeight: initialPostState.restorationBlockHeight,
   });
 
   postsMap.set(postKey, latestPostState.hash());
