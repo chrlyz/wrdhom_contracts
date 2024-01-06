@@ -128,7 +128,7 @@ export class ReactionsTransition extends Struct({
     );
     const targetsReactionsCountersAfter =
       targetReactionsCounterWitness.computeRootAndKey(
-        reactionState.userReactionsCounter
+        reactionState.targetReactionsCounter
       )[0];
     targetsReactionsCountersAfter.assertEquals(latestTargetsReactionsCounters);
 
