@@ -16,6 +16,7 @@ import {
   ReactionState,
   ReactionsTransition,
   Reactions,
+  ReactionsProof,
 } from './reactions/Reactions.js';
 import { ReactionsContract } from './reactions/ReactionsContract.js';
 import { Config } from './posts/PostsDeploy.js';
@@ -34,6 +35,7 @@ export {
   ReactionState,
   ReactionsTransition,
   Reactions,
+  ReactionsProof,
   ReactionsContract,
   Config,
 };
