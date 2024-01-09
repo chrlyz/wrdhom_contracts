@@ -6,19 +6,19 @@ import {
 } from './posts/Posts.js';
 import { PostsContract } from './posts/PostsContract.js';
 import {
-  RepostState,
-  RepostsTransition,
-  Reposts,
-  RepostsProof,
-} from './reposts/Reposts.js';
-import { RepostsContract } from './reposts/RepostsContract.js';
-import {
   ReactionState,
   ReactionsTransition,
   Reactions,
   ReactionsProof,
 } from './reactions/Reactions.js';
 import { ReactionsContract } from './reactions/ReactionsContract.js';
+import {
+  CommentState,
+  CommentsTransition,
+  Comments,
+  CommentsProof,
+} from './comments/Comments.js';
+import { CommentsContract } from './comments/CommentsContract.js';
 import { Config } from './posts/PostsDeploy.js';
 
 export {
@@ -27,15 +27,15 @@ export {
   Posts,
   PostsProof,
   PostsContract,
-  RepostState,
-  RepostsTransition,
-  Reposts,
-  RepostsProof,
-  RepostsContract,
   ReactionState,
   ReactionsTransition,
   Reactions,
   ReactionsProof,
   ReactionsContract,
+  CommentState,
+  CommentsTransition,
+  Comments,
+  CommentsProof,
+  CommentsContract,
   Config,
 };
