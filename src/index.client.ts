@@ -1,5 +1,5 @@
 import { PostState } from './posts/Posts.js';
-import { RepostState } from './reposts/Reposts.js';
 import { ReactionState } from './reactions/Reactions.js';
+import { CommentState } from './comments/Comments.js';
 
-export { PostState, RepostState, ReactionState };
+export { PostState, ReactionState, CommentState };
