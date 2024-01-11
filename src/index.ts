@@ -3,6 +3,8 @@ import {
   PostsTransition,
   Posts,
   PostsProof,
+  fieldToFlagPostsAsDeleted,
+  fieldToFlagPostsAsRestored
 } from './posts/Posts.js';
 import { PostsContract } from './posts/PostsContract.js';
 import {
@@ -19,6 +21,14 @@ import {
   CommentsProof,
 } from './comments/Comments.js';
 import { CommentsContract } from './comments/CommentsContract.js';
+import   {
+  RepostState,
+  RepostsTransition,
+  Reposts,
+  RepostsProof,
+  fieldToFlagTargetAsReposted
+} from './reposts/Reposts.js';
+import { RepostsContract } from './reposts/RepostsContract.js';
 import { Config } from './posts/PostsDeploy.js';
 
 export {
@@ -26,6 +36,8 @@ export {
   PostsTransition,
   Posts,
   PostsProof,
+  fieldToFlagPostsAsDeleted,
+  fieldToFlagPostsAsRestored,
   PostsContract,
   ReactionState,
   ReactionsTransition,
@@ -37,5 +49,11 @@ export {
   Comments,
   CommentsProof,
   CommentsContract,
+  RepostState,
+  RepostsTransition,
+  Reposts,
+  RepostsProof,
+  fieldToFlagTargetAsReposted,
+  RepostsContract,
   Config,
 };
