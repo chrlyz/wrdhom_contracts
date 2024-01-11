@@ -25,7 +25,7 @@ const reactionsContract = new ReactionsContract(reactionsContractAddress);
 
 console.log('Compiling Reactions zkProgram...');
 await Reactions.compile();
-console.log('Compiling reactionsContract...');
+console.log('Compiling ReactionsContract...');
 await ReactionsContract.compile();
 console.log('Compiled');
 

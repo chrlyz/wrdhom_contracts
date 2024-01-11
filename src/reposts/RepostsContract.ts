@@ -11,12 +11,14 @@ import {
 export class RepostsContract extends SmartContract {
   @state(Field) allRepostsCounter = State<Field>();
   @state(Field) usersRepostsCounters = State<Field>();
+  @state(Field) targetsRepostsCounters = State<Field>();
   @state(Field) reposts = State<Field>();
 
   init() {
     super.init();
     this.allRepostsCounter.set(Field(0));
     this.usersRepostsCounters.set(newMerkleMapRoot);
+    this.targetsRepostsCounters.set(newMerkleMapRoot);
     this.reposts.set(newMerkleMapRoot);
   }
 
@@ -29,8 +31,8 @@ export class RepostsContract extends SmartContract {
     );
 
     const postsContract = new PostsContract(postsContractAddress);
-    const postsState = postsContract.posts.getAndRequireEquals();
-    proof.publicInput.posts.assertEquals(postsState);
+    const currentPosts = postsContract.posts.getAndRequireEquals();
+    proof.publicInput.targets.assertEquals(currentPosts);
 
     const currentAllRepostsCounter =
       this.allRepostsCounter.getAndRequireEquals();
@@ -44,11 +46,22 @@ export class RepostsContract extends SmartContract {
       currentUsersRepostsCounters
     );
 
-    const currentState = this.reposts.getAndRequireEquals();
-    proof.publicInput.initialReposts.assertEquals(currentState);
+    const currentTargetsRepostsCounters =
+      this.targetsRepostsCounters.getAndRequireEquals();
+    proof.publicInput.initialTargetsRepostsCounters.assertEquals(
+      currentTargetsRepostsCounters
+    );
 
-    this.reposts.set(proof.publicInput.latestReposts);
+    const currentReposts = this.reposts.getAndRequireEquals();
+    proof.publicInput.initialReposts.assertEquals(currentReposts);
+
     this.allRepostsCounter.set(proof.publicInput.latestAllRepostsCounter);
-    this.usersRepostsCounters.set(proof.publicInput.latestUsersRepostsCounters);
+    this.usersRepostsCounters.set(
+      proof.publicInput.latestUsersRepostsCounters
+    );
+    this.targetsRepostsCounters.set(
+      proof.publicInput.latestTargetsRepostsCounters
+    );
+    this.reposts.set(proof.publicInput.latestReposts);
   }
 }

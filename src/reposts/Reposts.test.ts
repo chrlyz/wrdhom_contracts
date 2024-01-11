@@ -1,7 +1,7 @@
 import { PostsContract } from '../posts/PostsContract';
-import { PostsTransition, PostState, Posts } from '../posts/Posts';
+import { PostsTransition, Posts } from '../posts/Posts';
 import { RepostsContract } from './RepostsContract';
-import { RepostsTransition, RepostState, Reposts } from './Reposts';
+import { RepostsTransition, Reposts } from './Reposts';
 import {
   Field,
   Mina,
@@ -10,8 +10,6 @@ import {
   AccountUpdate,
   MerkleMap,
   CircuitString,
-  Poseidon,
-  Signature,
   UInt32,
 } from 'o1js';
 import { Config } from '../posts/PostsDeploy';
@@ -20,6 +18,7 @@ import {
   deployPostsContract,
   createPostPublishingTransitionValidInputs,
 } from '../posts/PostsUtils';
+import { createRepostTransitionValidInputs } from './RepostsUtils';
 
 let proofsEnabled = true;
 
@@ -38,6 +37,7 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     repostsContractKey: PrivateKey,
     repostsContract: RepostsContract,
     usersRepostsCountersMap: MerkleMap,
+    targetsRepostsCountersMap: MerkleMap,
     repostsMap: MerkleMap;
 
   beforeAll(async () => {
@@ -60,10 +60,10 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     ({ privateKey: user1Key, publicKey: user1Address } = Local.testAccounts[0]);
     ({ privateKey: user2Key, publicKey: user2Address } = Local.testAccounts[1]);
 
-    const postsConfigJson: Config = JSON.parse(
+    const configJson: Config = JSON.parse(
       await fs.readFile('config.json', 'utf8')
     );
-    const postsConfig = postsConfigJson.deployAliases['posts'];
+    const postsConfig = configJson.deployAliases['posts'];
     const postsContractKeyBase58: { privateKey: string } = JSON.parse(
       await fs.readFile(postsConfig.keyPath, 'utf8')
     );
@@ -73,10 +73,7 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     usersPostsCountersMap = new MerkleMap();
     postsMap = new MerkleMap();
 
-    const repostsConfigJson: Config = JSON.parse(
-      await fs.readFile('config.json', 'utf8')
-    );
-    const repostsConfig = repostsConfigJson.deployAliases['reposts'];
+    const repostsConfig = configJson.deployAliases['reposts'];
     const repostsContractKeyBase58: { privateKey: string } = JSON.parse(
       await fs.readFile(repostsConfig.keyPath, 'utf8')
     );
@@ -86,6 +83,7 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     repostsContractAddress = repostsContractKey.toPublicKey();
     repostsContract = new RepostsContract(repostsContractAddress);
     usersRepostsCountersMap = new MerkleMap();
+    targetsRepostsCountersMap = new MerkleMap();
     repostsMap = new MerkleMap();
   });
 
@@ -96,71 +94,6 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     });
     await txn.prove();
     await txn.sign([user1Key, repostsContractKey]).send();
-  }
-
-  function createRepostTransitionValidInputs(
-    postState: PostState,
-    reposterAddress: PublicKey,
-    reposterKey: PrivateKey,
-    allRepostsCounter: Field,
-    userRepostsCounter: Field,
-    repostBlockHeight: Field
-  ) {
-    const posterAddressAsField = Poseidon.hash(
-      postState.posterAddress.toFields()
-    );
-    const postContentIDHash = postState.postContentID.hash();
-    const signature = Signature.create(reposterKey, [
-      posterAddressAsField,
-      postContentIDHash,
-      userRepostsCounter,
-    ]);
-
-    const initialUsersRepostsCounters = usersRepostsCountersMap.getRoot();
-    const reposterAddressAsField = Poseidon.hash(reposterAddress.toFields());
-    usersRepostsCountersMap.set(reposterAddressAsField, userRepostsCounter);
-    const latestUsersRepostsCounters = usersRepostsCountersMap.getRoot();
-    const userRepostsCounterWitness = usersRepostsCountersMap.getWitness(
-      reposterAddressAsField
-    );
-
-    const postWitness = postsMap.getWitness(
-      Poseidon.hash([posterAddressAsField, postContentIDHash])
-    );
-
-    const repostState = new RepostState({
-      posterAddress: postState.posterAddress,
-      postContentID: postState.postContentID,
-      reposterAddress: reposterAddress,
-      allRepostsCounter: allRepostsCounter,
-      userRepostsCounter: userRepostsCounter,
-      repostBlockHeight: repostBlockHeight,
-      deletionBlockHeight: Field(0),
-    });
-
-    const initialReposts = repostsMap.getRoot();
-    const repostKey = Poseidon.hash([
-      reposterAddressAsField,
-      posterAddressAsField,
-      postContentIDHash,
-      userRepostsCounter,
-    ]);
-    repostsMap.set(repostKey, repostState.hash());
-    const latestReposts = repostsMap.getRoot();
-    const repostWitness = repostsMap.getWitness(repostKey);
-
-    return {
-      signature: signature,
-      initialUsersRepostsCounters: initialUsersRepostsCounters,
-      latestUsersRepostsCounters: latestUsersRepostsCounters,
-      userRepostsCounterWitness: userRepostsCounterWitness,
-      postState: postState,
-      postWitness: postWitness,
-      initialReposts: initialReposts,
-      latestReposts: latestReposts,
-      repostState: repostState,
-      repostWitness: repostWitness,
-    };
   }
 
   test(`RepostsContract and Reposts zkProgram functionality`, async () => {
@@ -190,13 +123,19 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     await deployRepostsContract();
 
     // Validate expected state
-    const allRepostsCounterState = repostsContract.allRepostsCounter.get();
-    const userRepostsCountersState = repostsContract.usersRepostsCounters.get();
+    const allRepostsCounterState =
+      repostsContract.allRepostsCounter.get();
+    const usersRepostsCountersState =
+      repostsContract.usersRepostsCounters.get();
+    const targetsRepostsCountersState =
+      repostsContract.targetsRepostsCounters.get();
     const repostsState = repostsContract.reposts.get();
     const usersRepostsCountersRoot = usersRepostsCountersMap.getRoot();
+    const targetsRepostsCountersRoot = targetsRepostsCountersMap.getRoot();
     const repostsRoot = repostsMap.getRoot();
     expect(allRepostsCounterState).toEqual(Field(0));
-    expect(userRepostsCountersState).toEqual(usersRepostsCountersRoot);
+    expect(usersRepostsCountersState).toEqual(usersRepostsCountersRoot);
+    expect(targetsRepostsCountersState).toEqual(targetsRepostsCountersRoot);
     expect(repostsState).toEqual(repostsRoot);
 
     console.log('RepostsContract deployed');
@@ -272,7 +211,7 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     console.log('1st post published');
 
     // ==============================================================================
-    // 3. Publishes on-chain proof for reposting of 1st post.
+    // 3. Publishes on-chain proof for reposting the 1st post.
     // ==============================================================================
 
     // Prepare inputs to create a valid state transition
@@ -282,42 +221,55 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
       user2Key,
       Field(1),
       Field(1),
-      Field(1)
+      Field(1),
+      Field(1),
+      postsMap,
+      usersRepostsCountersMap,
+      targetsRepostsCountersMap,
+      repostsMap
     );
 
     // Create a valid state transition
-    const transition2 = RepostsTransition.createRepostTransition(
+    const transition2 = RepostsTransition.createRepostPublishingTransition(
       valid2.signature,
+      postsMap.getRoot(),
+      valid2.targetState,
+      valid2.targetWitness,
       valid2.repostState.allRepostsCounter.sub(1),
-      valid2.repostState.userRepostsCounter.sub(1),
       valid2.initialUsersRepostsCounters,
       valid2.latestUsersRepostsCounters,
+      valid2.repostState.userRepostsCounter.sub(1),
       valid2.userRepostsCounterWitness,
-      postsContract.posts.get(),
-      valid2.postState,
-      valid2.postWitness,
+      valid2.initialTargetsRepostsCounters,
+      valid2.latestTargetsRepostsCounters,
+      valid2.repostState.targetRepostsCounter.sub(1),
+      valid2.targetRepostsCounterWitness,
       valid2.initialReposts,
       valid2.latestReposts,
-      valid2.repostState,
-      valid2.repostWitness
+      valid2.repostWitness,
+      valid2.repostState
     );
 
     // Create valid proof for our state transition
-    const proof2 = await Reposts.proveRepostTransition(
+    const proof2 = await Reposts.proveRepostPublishingTransition(
       transition2,
       valid2.signature,
+      postsMap.getRoot(),
+      valid2.targetState,
+      valid2.targetWitness,
       valid2.repostState.allRepostsCounter.sub(1),
-      valid2.repostState.userRepostsCounter.sub(1),
       valid2.initialUsersRepostsCounters,
       valid2.latestUsersRepostsCounters,
+      valid2.repostState.userRepostsCounter.sub(1),
       valid2.userRepostsCounterWitness,
-      postsContract.posts.get(),
-      valid2.postState,
-      valid2.postWitness,
+      valid2.initialTargetsRepostsCounters,
+      valid2.latestTargetsRepostsCounters,
+      valid2.repostState.targetRepostsCounter.sub(1),
+      valid2.targetRepostsCounterWitness,
       valid2.initialReposts,
       valid2.latestReposts,
-      valid2.repostState,
-      valid2.repostWitness
+      valid2.repostWitness,
+      valid2.repostState
     );
 
     // Send valid proof to update our on-chain state
@@ -328,19 +280,30 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     await txn2.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(2));
 
-    const allRepostsCounterState1 = repostsContract.allRepostsCounter.get();
-    const userRepostsCountersState1 =
+    const allRepostsCounterState1 =
+      repostsContract.allRepostsCounter.get();
+    const usersRepostsCountersState1 =
       repostsContract.usersRepostsCounters.get();
+    const targetsRepostsCountersState1 =
+      repostsContract.targetsRepostsCounters.get();
     const repostsState1 = repostsContract.reposts.get();
     const usersRepostsCountersRoot1 = usersRepostsCountersMap.getRoot();
+    const targetsRepostsCountersRoot1 = targetsRepostsCountersMap.getRoot();
     const repostsRoot1 = repostsMap.getRoot();
     expect(allRepostsCounterState1).toEqual(Field(1));
-    expect(allRepostsCounterState1).not.toEqual(allRepostsCounterState);
-    expect(userRepostsCountersState1).toEqual(usersRepostsCountersRoot1);
-    expect(userRepostsCountersState1).not.toEqual(userRepostsCountersState);
+    expect(usersRepostsCountersState1).toEqual(usersRepostsCountersRoot1);
+    expect(usersRepostsCountersState1).not.toEqual(
+      usersRepostsCountersRoot
+    );
+    expect(targetsRepostsCountersState1).toEqual(
+      targetsRepostsCountersRoot1
+    );
+    expect(targetsRepostsCountersState1).not.toEqual(
+      targetsRepostsCountersRoot
+    );
     expect(repostsState1).toEqual(repostsRoot1);
-    expect(repostsState1).not.toEqual(repostsState);
+    expect(repostsState1).not.toEqual(repostsRoot);
 
-    console.log('1st post reposted');
+    console.log('Reposted 1st post');
   });
 });
