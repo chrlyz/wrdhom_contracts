@@ -12,7 +12,7 @@ import { PostState } from '../posts/Posts.js';
 
 // ============================================================================
 
-export const fieldToFlagTargetAsReposted = Field(93137);
+export const fieldToFlagTargetAsReposted = Field(2222);
 
 // ============================================================================
 
@@ -81,9 +81,7 @@ export class RepostsTransition extends Struct({
     repostWitness: MerkleMapWitness,
     repostState: RepostState
   ) {
-    initialAllRepostsCounter.assertEquals(
-      repostState.allRepostsCounter.sub(1)
-    );
+    initialAllRepostsCounter.assertEquals(repostState.allRepostsCounter.sub(1));
     repostState.deletionBlockHeight.assertEquals(Field(0));
     repostState.restorationBlockHeight.assertEquals(Field(0));
 
@@ -95,14 +93,12 @@ export class RepostsTransition extends Struct({
 
     const isSigned = signature.verify(repostState.reposterAddress, [
       targetKey,
-      fieldToFlagTargetAsReposted
+      fieldToFlagTargetAsReposted,
     ]);
     isSigned.assertTrue();
 
     const [usersRepostsCountersBefore, userRepostsCounterKey] =
-      userRepostsCounterWitness.computeRootAndKey(
-        initialUserRepostsCounter
-    );
+      userRepostsCounterWitness.computeRootAndKey(initialUserRepostsCounter);
     usersRepostsCountersBefore.assertEquals(initialUsersRepostsCounters);
     const reposterAddressAsField = Poseidon.hash(
       repostState.reposterAddress.toFields()
@@ -121,9 +117,7 @@ export class RepostsTransition extends Struct({
       targetRepostsCounterWitness.computeRootAndKey(
         initialTargetRepostsCounter
       );
-    targetsRepostsCountersBefore.assertEquals(
-      initialTargetsRepostsCounters
-    );
+    targetsRepostsCountersBefore.assertEquals(initialTargetsRepostsCounters);
     targetRepostsCounterKey.assertEquals(targetKey);
     initialTargetRepostsCounter.assertEquals(
       repostState.targetRepostsCounter.sub(1)
@@ -138,15 +132,8 @@ export class RepostsTransition extends Struct({
       Field(0)
     );
     repostsBefore.assertEquals(initialReposts);
-    repostKey.assertEquals(
-      Poseidon.hash([
-        targetKey,
-        reposterAddressAsField
-      ])
-    );
-    const repostsAfter = repostWitness.computeRootAndKey(
-      repostState.hash()
-    )[0];
+    repostKey.assertEquals(Poseidon.hash([targetKey, reposterAddressAsField]));
+    const repostsAfter = repostWitness.computeRootAndKey(repostState.hash())[0];
     repostsAfter.assertEquals(latestReposts);
 
     return new RepostsTransition({
