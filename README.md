@@ -40,6 +40,8 @@ Mina also makes it possible to implement native zkApp-specific rollups, so we do
 
 So far four zkPrograms and four smart-contracts have been implemented to handle the root state of posts, Reactions, Comments, and Reposts; as well as the [server](https://github.com/chrlyz/wrdhom_server) that serves the auditable content and creates the proofs based on the actions of users; and the [client](https://github.com/chrlyz/wrdhom_client) that automatically audits these responses and provides a graphic user interface for users to interact with the platform.
 
+[Here](https://www.youtube.com/playlist?list=PL5iembFEMoKwUhykeWE_E-cvxilO1wOUV) is a video with a demo of the platform.
+
 # Testing and Deploying smart-contracts and zkPrograms
 
 ## Clone
