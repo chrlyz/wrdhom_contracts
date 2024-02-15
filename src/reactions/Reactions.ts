@@ -12,6 +12,11 @@ import { PostState } from '../posts/Posts.js';
 
 // ============================================================================
 
+export const fieldToFlagReactionsAsDeleted = Field(93137);
+export const fieldToFlagReactionsAsRestored = Field(1010);
+
+// ============================================================================
+
 export class ReactionState extends Struct({
   isTargetPost: Bool,
   targetKey: Field,
@@ -187,6 +192,138 @@ export class ReactionsTransition extends Struct({
     transition1.initialReactions.assertEquals(transition2.initialReactions);
     transition1.latestReactions.assertEquals(transition2.latestReactions);
     transition1.blockHeight.assertEquals(transition2.blockHeight);
+  }
+
+  static createReactionDeletionTransition(
+    signature: Signature,
+    targets: Field,
+    targetState: PostState,
+    targetWitness: MerkleMapWitness,
+    allReactionsCounter: Field,
+    usersReactionsCounters: Field,
+    targetReactionsCounter: Field,
+    initialReactions: Field,
+    latestReactions: Field,
+    initialReactionState: ReactionState,
+    reactionWitness: MerkleMapWitness,
+    blockHeight: Field
+  ) {
+    initialReactionState.deletionBlockHeight.assertEquals(Field(0));
+
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+      targetState.hash()
+    );
+    targetsRoot.assertEquals(targets);
+    targetKey.assertEquals(initialReactionState.targetKey);
+
+    const initialReactionStateHash = initialReactionState.hash();
+    const isSigned = signature.verify(initialReactionState.reactorAddress, [
+      initialReactionStateHash,
+      fieldToFlagReactionsAsDeleted,
+    ]);
+    isSigned.assertTrue();
+
+    const reactionsBefore = reactionWitness.computeRootAndKey(
+      initialReactionStateHash
+    )[0];
+    reactionsBefore.assertEquals(initialReactions);
+
+    const latestReactionState = new ReactionState({
+      isTargetPost: initialReactionState.isTargetPost,
+      targetKey: initialReactionState.targetKey,
+      reactorAddress: initialReactionState.reactorAddress,
+      reactionCodePoint: initialReactionState.reactionCodePoint,
+      allReactionsCounter: initialReactionState.allReactionsCounter,
+      userReactionsCounter: initialReactionState.userReactionsCounter,
+      targetReactionsCounter: initialReactionState.targetReactionsCounter,
+      reactionBlockHeight: initialReactionState.reactionBlockHeight,
+      deletionBlockHeight: blockHeight,
+      restorationBlockHeight: initialReactionState.restorationBlockHeight,
+    });
+
+    const reactionsAfter = reactionWitness.computeRootAndKey(
+      latestReactionState.hash()
+    )[0];
+    reactionsAfter.assertEquals(latestReactions);
+
+    return new ReactionsTransition({
+      targets: targetsRoot,
+      initialAllReactionsCounter: allReactionsCounter,
+      latestAllReactionsCounter: allReactionsCounter,
+      initialUsersReactionsCounters: usersReactionsCounters,
+      latestUsersReactionsCounters: usersReactionsCounters,
+      initialTargetsReactionsCounters: targetReactionsCounter,
+      latestTargetsReactionsCounters: targetReactionsCounter,
+      initialReactions: initialReactions,
+      latestReactions: reactionsAfter,
+      blockHeight: blockHeight,
+    });
+  }
+
+  static createReactionRestorationTransition(
+    signature: Signature,
+    targets: Field,
+    targetState: PostState,
+    targetWitness: MerkleMapWitness,
+    allReactionsCounter: Field,
+    usersReactionsCounters: Field,
+    targetReactionsCounter: Field,
+    initialReactions: Field,
+    latestReactions: Field,
+    initialReactionState: ReactionState,
+    reactionWitness: MerkleMapWitness,
+    blockHeight: Field
+  ) {
+    initialReactionState.deletionBlockHeight.assertNotEquals(0);
+
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+      targetState.hash()
+    );
+    targetsRoot.assertEquals(targets);
+    targetKey.assertEquals(initialReactionState.targetKey);
+
+    const initialReactionStateHash = initialReactionState.hash();
+    const isSigned = signature.verify(initialReactionState.reactorAddress, [
+      initialReactionStateHash,
+      fieldToFlagReactionsAsRestored,
+    ]);
+    isSigned.assertTrue();
+
+    const reactionsBefore = reactionWitness.computeRootAndKey(
+      initialReactionStateHash
+    )[0];
+    reactionsBefore.assertEquals(initialReactions);
+
+    const latestReactionState = new ReactionState({
+      isTargetPost: initialReactionState.isTargetPost,
+      targetKey: initialReactionState.targetKey,
+      reactorAddress: initialReactionState.reactorAddress,
+      reactionCodePoint: initialReactionState.reactionCodePoint,
+      allReactionsCounter: initialReactionState.allReactionsCounter,
+      userReactionsCounter: initialReactionState.userReactionsCounter,
+      targetReactionsCounter: initialReactionState.targetReactionsCounter,
+      reactionBlockHeight: initialReactionState.reactionBlockHeight,
+      deletionBlockHeight: Field(0),
+      restorationBlockHeight: blockHeight,
+    });
+
+    const reactionsAfter = reactionWitness.computeRootAndKey(
+      latestReactionState.hash()
+    )[0];
+    reactionsAfter.assertEquals(latestReactions);
+
+    return new ReactionsTransition({
+      targets: targetsRoot,
+      initialAllReactionsCounter: allReactionsCounter,
+      latestAllReactionsCounter: allReactionsCounter,
+      initialUsersReactionsCounters: usersReactionsCounters,
+      latestUsersReactionsCounters: usersReactionsCounters,
+      initialTargetsReactionsCounters: targetReactionsCounter,
+      latestTargetsReactionsCounters: targetReactionsCounter,
+      initialReactions: initialReactions,
+      latestReactions: reactionsAfter,
+      blockHeight: blockHeight,
+    });
   }
 }
 
