@@ -18,7 +18,10 @@ import {
   deployPostsContract,
   createPostPublishingTransitionValidInputs,
 } from '../posts/PostsUtils';
-import { createReactionTransitionValidInputs } from './ReactionsUtils';
+import {
+  createReactionTransitionValidInputs,
+  createReactionDeletionTransitionValidInputs,
+} from './ReactionsUtils';
 
 let proofsEnabled = true;
 
@@ -306,5 +309,87 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     expect(reactionsState1).not.toEqual(reactionsRoot);
 
     console.log('Reacted to 1st post');
+
+    // ==============================================================================
+    // 4. Publishes on-chain proof for deleting the reaction to the 1st post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid3 = createReactionDeletionTransitionValidInputs(
+      valid2.targetState,
+      user2Key,
+      Field(1),
+      valid2.reactionState,
+      Field(2),
+      postsMap,
+      usersReactionsCountersMap,
+      targetsReactionsCountersMap,
+      reactionsMap
+    );
+
+    // Create a valid state transition
+    const transition3 = ReactionsTransition.createReactionDeletionTransition(
+      valid3.signature,
+      valid3.targets,
+      valid3.targetState,
+      valid3.targetWitness,
+      valid3.allReactionsCounter,
+      valid3.usersReactionsCounters,
+      valid3.targetsReactionsCounters,
+      valid3.initialReactions,
+      valid3.latestReactions,
+      valid3.initialReactionState,
+      valid3.reactionWitness,
+      valid3.latestReactionState.deletionBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof3 = await Reactions.proveReactionDeletionTransition(
+      transition3,
+      valid3.signature,
+      valid3.targets,
+      valid3.targetState,
+      valid3.targetWitness,
+      valid3.allReactionsCounter,
+      valid3.usersReactionsCounters,
+      valid3.targetsReactionsCounters,
+      valid3.initialReactions,
+      valid3.latestReactions,
+      valid3.initialReactionState,
+      valid3.reactionWitness,
+      valid3.latestReactionState.deletionBlockHeight
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn3 = await Mina.transaction(user1Address, () => {
+      reactionsContract.update(proof3);
+    });
+    await txn3.prove();
+    await txn3.sign([user1Key]).send();
+    Local.setBlockchainLength(UInt32.from(3));
+
+    const allReactionsCounterState2 =
+      reactionsContract.allReactionsCounter.get();
+    const usersReactionsCountersState2 =
+      reactionsContract.usersReactionsCounters.get();
+    const targetsReactionsCountersState2 =
+      reactionsContract.targetsReactionsCounters.get();
+    const reactionsState2 = reactionsContract.reactions.get();
+    const usersReactionsCountersRoot2 = usersReactionsCountersMap.getRoot();
+    const targetsReactionsCountersRoot2 = targetsReactionsCountersMap.getRoot();
+    const reactionsRoot2 = reactionsMap.getRoot();
+    expect(allReactionsCounterState2).toEqual(Field(1));
+    expect(usersReactionsCountersState2).toEqual(usersReactionsCountersRoot2);
+    expect(usersReactionsCountersState2).toEqual(usersReactionsCountersRoot1);
+    expect(targetsReactionsCountersState2).toEqual(
+      targetsReactionsCountersRoot2
+    );
+    expect(targetsReactionsCountersState2).toEqual(
+      targetsReactionsCountersRoot1
+    );
+    expect(reactionsState2).toEqual(reactionsRoot2);
+    expect(reactionsState2).not.toEqual(reactionsRoot1);
+
+    console.log('Reaction to 1st post deleted');
   });
 });

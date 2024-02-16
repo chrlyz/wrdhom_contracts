@@ -201,7 +201,7 @@ export class ReactionsTransition extends Struct({
     targetWitness: MerkleMapWitness,
     allReactionsCounter: Field,
     usersReactionsCounters: Field,
-    targetReactionsCounter: Field,
+    targetsReactionsCounters: Field,
     initialReactions: Field,
     latestReactions: Field,
     initialReactionState: ReactionState,
@@ -252,8 +252,8 @@ export class ReactionsTransition extends Struct({
       latestAllReactionsCounter: allReactionsCounter,
       initialUsersReactionsCounters: usersReactionsCounters,
       latestUsersReactionsCounters: usersReactionsCounters,
-      initialTargetsReactionsCounters: targetReactionsCounter,
-      latestTargetsReactionsCounters: targetReactionsCounter,
+      initialTargetsReactionsCounters: targetsReactionsCounters,
+      latestTargetsReactionsCounters: targetsReactionsCounters,
       initialReactions: initialReactions,
       latestReactions: reactionsAfter,
       blockHeight: blockHeight,
@@ -394,6 +394,106 @@ export const Reactions = ZkProgram({
             latestReactions,
             reactionWitness,
             reactionState
+          );
+        ReactionsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+
+    proveReactionDeletionTransition: {
+      privateInputs: [
+        Signature,
+        Field,
+        PostState,
+        MerkleMapWitness,
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        ReactionState,
+        MerkleMapWitness,
+        Field,
+      ],
+
+      method(
+        transition: ReactionsTransition,
+        signature: Signature,
+        targets: Field,
+        targetState: PostState,
+        targetWitness: MerkleMapWitness,
+        allReactionsCounter: Field,
+        usersReactionsCounters: Field,
+        targetReactionsCounter: Field,
+        initialReactions: Field,
+        latestReactions: Field,
+        initialReactionState: ReactionState,
+        reactionWitness: MerkleMapWitness,
+        blockHeight: Field
+      ) {
+        const computedTransition =
+          ReactionsTransition.createReactionDeletionTransition(
+            signature,
+            targets,
+            targetState,
+            targetWitness,
+            allReactionsCounter,
+            usersReactionsCounters,
+            targetReactionsCounter,
+            initialReactions,
+            latestReactions,
+            initialReactionState,
+            reactionWitness,
+            blockHeight
+          );
+        ReactionsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+
+    proveReactionRestorationTransition: {
+      privateInputs: [
+        Signature,
+        Field,
+        PostState,
+        MerkleMapWitness,
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        ReactionState,
+        MerkleMapWitness,
+        Field,
+      ],
+
+      method(
+        transition: ReactionsTransition,
+        signature: Signature,
+        targets: Field,
+        targetState: PostState,
+        targetWitness: MerkleMapWitness,
+        allReactionsCounter: Field,
+        usersReactionsCounters: Field,
+        targetReactionsCounter: Field,
+        initialReactions: Field,
+        latestReactions: Field,
+        initialReactionState: ReactionState,
+        reactionWitness: MerkleMapWitness,
+        blockHeight: Field
+      ) {
+        const computedTransition =
+          ReactionsTransition.createReactionRestorationTransition(
+            signature,
+            targets,
+            targetState,
+            targetWitness,
+            allReactionsCounter,
+            usersReactionsCounters,
+            targetReactionsCounter,
+            initialReactions,
+            latestReactions,
+            initialReactionState,
+            reactionWitness,
+            blockHeight
           );
         ReactionsTransition.assertEquals(computedTransition, transition);
       },
