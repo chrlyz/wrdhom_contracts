@@ -21,6 +21,7 @@ import {
 import {
   createReactionTransitionValidInputs,
   createReactionDeletionTransitionValidInputs,
+  createReactionRestorationTransitionValidInputs,
 } from './ReactionsUtils';
 
 let proofsEnabled = true;
@@ -391,5 +392,87 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     expect(reactionsState2).not.toEqual(reactionsRoot1);
 
     console.log('Reaction to 1st post deleted');
+
+    // ==============================================================================
+    // 5. Publishes on-chain proof for restoring the reaction to the 1st post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid4 = createReactionRestorationTransitionValidInputs(
+      valid3.targetState,
+      user2Key,
+      Field(1),
+      valid3.latestReactionState,
+      Field(3),
+      postsMap,
+      usersReactionsCountersMap,
+      targetsReactionsCountersMap,
+      reactionsMap
+    );
+
+    // Create a valid state transition
+    const transition4 = ReactionsTransition.createReactionRestorationTransition(
+      valid4.signature,
+      valid4.targets,
+      valid4.targetState,
+      valid4.targetWitness,
+      valid4.allReactionsCounter,
+      valid4.usersReactionsCounters,
+      valid4.targetsReactionsCounters,
+      valid4.initialReactions,
+      valid4.latestReactions,
+      valid4.initialReactionState,
+      valid4.reactionWitness,
+      valid4.latestReactionState.restorationBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof4 = await Reactions.proveReactionRestorationTransition(
+      transition4,
+      valid4.signature,
+      valid4.targets,
+      valid4.targetState,
+      valid4.targetWitness,
+      valid4.allReactionsCounter,
+      valid4.usersReactionsCounters,
+      valid4.targetsReactionsCounters,
+      valid4.initialReactions,
+      valid4.latestReactions,
+      valid4.initialReactionState,
+      valid4.reactionWitness,
+      valid4.latestReactionState.restorationBlockHeight
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn4 = await Mina.transaction(user1Address, () => {
+      reactionsContract.update(proof4);
+    });
+    await txn4.prove();
+    await txn4.sign([user1Key]).send();
+    Local.setBlockchainLength(UInt32.from(4));
+
+    const allReactionsCounterState3 =
+      reactionsContract.allReactionsCounter.get();
+    const usersReactionsCountersState3 =
+      reactionsContract.usersReactionsCounters.get();
+    const targetsReactionsCountersState3 =
+      reactionsContract.targetsReactionsCounters.get();
+    const reactionsState3 = reactionsContract.reactions.get();
+    const usersReactionsCountersRoot3 = usersReactionsCountersMap.getRoot();
+    const targetsReactionsCountersRoot3 = targetsReactionsCountersMap.getRoot();
+    const reactionsRoot3 = reactionsMap.getRoot();
+    expect(allReactionsCounterState3).toEqual(Field(1));
+    expect(usersReactionsCountersState3).toEqual(usersReactionsCountersRoot3);
+    expect(usersReactionsCountersState3).toEqual(usersReactionsCountersRoot2);
+    expect(targetsReactionsCountersState3).toEqual(
+      targetsReactionsCountersRoot3
+    );
+    expect(targetsReactionsCountersState3).toEqual(
+      targetsReactionsCountersRoot2
+    );
+    expect(reactionsState3).toEqual(reactionsRoot3);
+    expect(reactionsState3).not.toEqual(reactionsRoot2);
+
+    console.log('Reaction to 1st post restored');
   });
 });
