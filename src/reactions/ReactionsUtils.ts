@@ -170,3 +170,77 @@ export function createReactionDeletionTransitionValidInputs(
     reactionWitness: reactionWitness,
   };
 }
+
+export function createReactionRestorationTransitionValidInputs(
+  targetState: PostState,
+  reactorKey: PrivateKey,
+  allReactionsCounter: Field,
+  initialReactionState: ReactionState,
+  restorationBlockHeight: Field,
+  targetsMap: MerkleMap,
+  usersReactionsCountersMap: MerkleMap,
+  targetsReactionsCountersMap: MerkleMap,
+  reactionsMap: MerkleMap
+) {
+  const reactionStateHash = initialReactionState.hash();
+  const signature = Signature.create(reactorKey, [
+    reactionStateHash,
+    fieldToFlagReactionsAsRestored,
+  ]);
+
+  const targets = targetsMap.getRoot();
+  const usersReactionsCounters = usersReactionsCountersMap.getRoot();
+  const targetsReactionsCounters = targetsReactionsCountersMap.getRoot();
+
+  const posterAddressAsField = Poseidon.hash(
+    targetState.posterAddress.toFields()
+  );
+  const postContentIDHash = targetState.postContentID.hash();
+  const targetKey = Poseidon.hash([posterAddressAsField, postContentIDHash]);
+
+  const targetWitness = targetsMap.getWitness(targetKey);
+
+  const reactorAddressAsField = Poseidon.hash(
+    initialReactionState.reactorAddress.toFields()
+  );
+
+  const initialReactions = reactionsMap.getRoot();
+
+  const reactionKey = Poseidon.hash([
+    targetKey,
+    reactorAddressAsField,
+    initialReactionState.reactionCodePoint,
+  ]);
+  const reactionWitness = reactionsMap.getWitness(reactionKey);
+
+  const latestReactionState = new ReactionState({
+    isTargetPost: new Bool(true),
+    targetKey,
+    reactorAddress: initialReactionState.reactorAddress,
+    reactionCodePoint: initialReactionState.reactionCodePoint,
+    allReactionsCounter: initialReactionState.allReactionsCounter,
+    userReactionsCounter: initialReactionState.userReactionsCounter,
+    targetReactionsCounter: initialReactionState.targetReactionsCounter,
+    reactionBlockHeight: initialReactionState.reactionBlockHeight,
+    deletionBlockHeight: Field(0),
+    restorationBlockHeight: restorationBlockHeight,
+  });
+
+  reactionsMap.set(reactionKey, latestReactionState.hash());
+  const latestReactions = reactionsMap.getRoot();
+
+  return {
+    signature: signature,
+    targets: targets,
+    targetState: targetState,
+    targetWitness: targetWitness,
+    allReactionsCounter: allReactionsCounter,
+    usersReactionsCounters: usersReactionsCounters,
+    targetsReactionsCounters: targetsReactionsCounters,
+    initialReactions: initialReactions,
+    latestReactions: latestReactions,
+    initialReactionState: initialReactionState,
+    latestReactionState: latestReactionState,
+    reactionWitness: reactionWitness,
+  };
+}
