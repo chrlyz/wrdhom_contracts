@@ -7,6 +7,7 @@ import {
   ZkProgram,
   MerkleMapWitness,
   Bool,
+  SelfProof,
 } from 'o1js';
 import { PostState } from '../posts/Posts.js';
 
@@ -325,6 +326,39 @@ export class ReactionsTransition extends Struct({
       blockHeight: blockHeight,
     });
   }
+
+  static mergeReactionsTransitions(
+    transition1: ReactionsTransition,
+    transition2: ReactionsTransition
+  ) {
+    transition1.targets.assertEquals(transition2.targets);
+    transition1.latestAllReactionsCounter.assertEquals(
+      transition2.initialAllReactionsCounter
+    );
+    transition1.latestUsersReactionsCounters.assertEquals(
+      transition2.initialUsersReactionsCounters
+    );
+    transition1.latestTargetsReactionsCounters.assertEquals(
+      transition2.initialTargetsReactionsCounters
+    );
+    transition1.latestReactions.assertEquals(transition2.initialReactions);
+    transition1.blockHeight.assertEquals(transition2.blockHeight);
+
+    return new ReactionsTransition({
+      targets: transition1.targets,
+      initialAllReactionsCounter: transition1.initialAllReactionsCounter,
+      latestAllReactionsCounter: transition2.latestAllReactionsCounter,
+      initialUsersReactionsCounters: transition1.initialUsersReactionsCounters,
+      latestUsersReactionsCounters: transition2.latestUsersReactionsCounters,
+      initialTargetsReactionsCounters:
+        transition1.initialTargetsReactionsCounters,
+      latestTargetsReactionsCounters:
+        transition2.latestTargetsReactionsCounters,
+      initialReactions: transition1.initialReactions,
+      latestReactions: transition2.latestReactions,
+      blockHeight: transition1.blockHeight,
+    });
+  }
 }
 
 // ============================================================================
@@ -496,6 +530,29 @@ export const Reactions = ZkProgram({
             blockHeight
           );
         ReactionsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+
+    proveMergedReactionsTransitions: {
+      privateInputs: [SelfProof, SelfProof],
+
+      method(
+        mergedReactionsTransitions: ReactionsTransition,
+        reactionsTransition1Proof: SelfProof<ReactionsTransition, undefined>,
+        reactionsTransition2Proof: SelfProof<ReactionsTransition, undefined>
+      ) {
+        reactionsTransition1Proof.verify();
+        reactionsTransition2Proof.verify();
+
+        const computedTransition =
+          ReactionsTransition.mergeReactionsTransitions(
+            reactionsTransition1Proof.publicInput,
+            reactionsTransition2Proof.publicInput
+          );
+        ReactionsTransition.assertEquals(
+          computedTransition,
+          mergedReactionsTransitions
+        );
       },
     },
   },

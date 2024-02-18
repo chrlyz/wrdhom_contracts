@@ -237,7 +237,7 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     // Create a valid state transition
     const transition2 = ReactionsTransition.createReactionPublishingTransition(
       valid2.signature,
-      postsMap.getRoot(),
+      valid2.targets,
       valid2.targetState,
       valid2.targetWitness,
       valid2.reactionState.allReactionsCounter.sub(1),
@@ -259,7 +259,7 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     const proof2 = await Reactions.proveReactionPublishingTransition(
       transition2,
       valid2.signature,
-      postsMap.getRoot(),
+      valid2.targets,
       valid2.targetState,
       valid2.targetWitness,
       valid2.reactionState.allReactionsCounter.sub(1),
@@ -474,5 +474,176 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     expect(reactionsState3).not.toEqual(reactionsRoot2);
 
     console.log('Reaction to 1st post restored');
+
+    // ==============================================================================
+    // 6. Publishes on-chain proof (from merged proofs) for 2 new reactions to
+    //    the 1st post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid5 = createReactionTransitionValidInputs(
+      valid1.postState,
+      user1Address,
+      user1Key,
+      Field(128064),
+      Field(2),
+      Field(1),
+      Field(2),
+      Field(4),
+      postsMap,
+      usersReactionsCountersMap,
+      targetsReactionsCountersMap,
+      reactionsMap
+    );
+
+    // Create a valid state transition
+    const transition5 = ReactionsTransition.createReactionPublishingTransition(
+      valid5.signature,
+      valid5.targets,
+      valid5.targetState,
+      valid5.targetWitness,
+      valid5.reactionState.allReactionsCounter.sub(1),
+      valid5.initialUsersReactionsCounters,
+      valid5.latestUsersReactionsCounters,
+      valid5.reactionState.userReactionsCounter.sub(1),
+      valid5.userReactionsCounterWitness,
+      valid5.initialTargetsReactionsCounters,
+      valid5.latestTargetsReactionsCounters,
+      valid5.reactionState.targetReactionsCounter.sub(1),
+      valid5.targetReactionsCounterWitness,
+      valid5.initialReactions,
+      valid5.latestReactions,
+      valid5.reactionWitness,
+      valid5.reactionState
+    );
+
+    // Create valid proof for our state transition
+    const proof5 = await Reactions.proveReactionPublishingTransition(
+      transition5,
+      valid5.signature,
+      valid5.targets,
+      valid5.targetState,
+      valid5.targetWitness,
+      valid5.reactionState.allReactionsCounter.sub(1),
+      valid5.initialUsersReactionsCounters,
+      valid5.latestUsersReactionsCounters,
+      valid5.reactionState.userReactionsCounter.sub(1),
+      valid5.userReactionsCounterWitness,
+      valid5.initialTargetsReactionsCounters,
+      valid5.latestTargetsReactionsCounters,
+      valid5.reactionState.targetReactionsCounter.sub(1),
+      valid5.targetReactionsCounterWitness,
+      valid5.initialReactions,
+      valid5.latestReactions,
+      valid5.reactionWitness,
+      valid5.reactionState
+    );
+
+    // Prepare inputs to create a valid state transition
+    const valid6 = createReactionTransitionValidInputs(
+      valid1.postState,
+      user2Address,
+      user2Key,
+      Field(129654),
+      Field(3),
+      Field(2),
+      Field(3),
+      Field(4),
+      postsMap,
+      usersReactionsCountersMap,
+      targetsReactionsCountersMap,
+      reactionsMap
+    );
+
+    // Create a valid state transition
+    const transition6 = ReactionsTransition.createReactionPublishingTransition(
+      valid6.signature,
+      valid6.targets,
+      valid6.targetState,
+      valid6.targetWitness,
+      valid6.reactionState.allReactionsCounter.sub(1),
+      valid6.initialUsersReactionsCounters,
+      valid6.latestUsersReactionsCounters,
+      valid6.reactionState.userReactionsCounter.sub(1),
+      valid6.userReactionsCounterWitness,
+      valid6.initialTargetsReactionsCounters,
+      valid6.latestTargetsReactionsCounters,
+      valid6.reactionState.targetReactionsCounter.sub(1),
+      valid6.targetReactionsCounterWitness,
+      valid6.initialReactions,
+      valid6.latestReactions,
+      valid6.reactionWitness,
+      valid6.reactionState
+    );
+
+    // Create valid proof for our state transition
+    const proof6 = await Reactions.proveReactionPublishingTransition(
+      transition6,
+      valid6.signature,
+      valid6.targets,
+      valid6.targetState,
+      valid6.targetWitness,
+      valid6.reactionState.allReactionsCounter.sub(1),
+      valid6.initialUsersReactionsCounters,
+      valid6.latestUsersReactionsCounters,
+      valid6.reactionState.userReactionsCounter.sub(1),
+      valid6.userReactionsCounterWitness,
+      valid6.initialTargetsReactionsCounters,
+      valid6.latestTargetsReactionsCounters,
+      valid6.reactionState.targetReactionsCounter.sub(1),
+      valid6.targetReactionsCounterWitness,
+      valid6.initialReactions,
+      valid6.latestReactions,
+      valid6.reactionWitness,
+      valid6.reactionState
+    );
+
+    // Merge valid state transitions
+    const mergedTransitions1 = ReactionsTransition.mergeReactionsTransitions(
+      transition5,
+      transition6
+    );
+
+    // Create proof of valid merged state transitions
+    const mergedTransitionProofs1 =
+      await Reactions.proveMergedReactionsTransitions(
+        mergedTransitions1,
+        proof5,
+        proof6
+      );
+
+    // Send valid proof to update our on-chain state
+    const txn5 = await Mina.transaction(user1Address, () => {
+      reactionsContract.update(mergedTransitionProofs1);
+    });
+    await txn5.prove();
+    await txn5.sign([user1Key]).send();
+    Local.setBlockchainLength(UInt32.from(5));
+
+    const allReactionsCounterState4 =
+      reactionsContract.allReactionsCounter.get();
+    const usersReactionsCountersState4 =
+      reactionsContract.usersReactionsCounters.get();
+    const targetsReactionsCountersState4 =
+      reactionsContract.targetsReactionsCounters.get();
+    const reactionsState4 = reactionsContract.reactions.get();
+    const usersReactionsCountersRoot4 = usersReactionsCountersMap.getRoot();
+    const targetsReactionsCountersRoot4 = targetsReactionsCountersMap.getRoot();
+    const reactionsRoot4 = reactionsMap.getRoot();
+    expect(allReactionsCounterState4).toEqual(Field(3));
+    expect(usersReactionsCountersState4).toEqual(usersReactionsCountersRoot4);
+    expect(usersReactionsCountersState4).not.toEqual(
+      usersReactionsCountersRoot3
+    );
+    expect(targetsReactionsCountersState4).toEqual(
+      targetsReactionsCountersRoot4
+    );
+    expect(targetsReactionsCountersState4).not.toEqual(
+      targetsReactionsCountersRoot3
+    );
+    expect(reactionsState4).toEqual(reactionsRoot4);
+    expect(reactionsState4).not.toEqual(reactionsRoot3);
+
+    console.log('2nd and 3rd reactions published through merged proofs');
   });
 });

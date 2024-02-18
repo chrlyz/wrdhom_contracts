@@ -20,7 +20,7 @@
     "coverage": "node --experimental-vm-modules --experimental-wasm-threads node_modules/jest/bin/jest.js --coverage",
     "format": "prettier --write --ignore-unknown **/*",
     "prepare": "husky install",
-    "test": "node --experimental-vm-modules --experimental-wasm-threads node_modules/jest/bin/jest.js",
+    "test": "node --max-old-space-size=8888 --experimental-vm-modules --experimental-wasm-threads node_modules/jest/bin/jest.js",
     "testw": "node --experimental-vm-modules --experimental-wasm-threads node_modules/jest/bin/jest.js --watch",
     "lint": "npx eslint src/* --fix"
   },

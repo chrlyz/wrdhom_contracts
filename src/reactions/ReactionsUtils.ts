@@ -23,7 +23,7 @@ export function createReactionTransitionValidInputs(
   userReactionsCounter: Field,
   targetReactionsCounter: Field,
   reactionBlockHeight: Field,
-  postsMap: MerkleMap,
+  targetsMap: MerkleMap,
   usersReactionsCountersMap: MerkleMap,
   targetsReactionsCountersMap: MerkleMap,
   reactionsMap: MerkleMap
@@ -39,7 +39,8 @@ export function createReactionTransitionValidInputs(
     reactionCodePoint,
   ]);
 
-  const targetWitness = postsMap.getWitness(
+  const targets = targetsMap.getRoot();
+  const targetWitness = targetsMap.getWitness(
     Poseidon.hash([posterAddressAsField, postContentIDHash])
   );
 
@@ -82,6 +83,7 @@ export function createReactionTransitionValidInputs(
 
   return {
     signature: signature,
+    targets: targets,
     targetState: targetState,
     targetWitness: targetWitness,
     initialUsersReactionsCounters: initialUsersReactionsCounters,
