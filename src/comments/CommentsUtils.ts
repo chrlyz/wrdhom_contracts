@@ -9,7 +9,11 @@ import {
   CircuitString,
 } from 'o1js';
 import { PostState } from '../posts/Posts';
-import { CommentState } from './Comments.js';
+import {
+  CommentState,
+  fieldToFlagCommentsAsDeleted,
+  fieldToFlagCommentsAsRestored,
+} from './Comments.js';
 
 export function createCommentTransitionValidInputs(
   targetState: PostState,
@@ -20,7 +24,7 @@ export function createCommentTransitionValidInputs(
   userCommentsCounter: Field,
   targetCommentsCounter: Field,
   commentBlockHeight: Field,
-  postsMap: MerkleMap,
+  targetsMap: MerkleMap,
   usersCommentsCountersMap: MerkleMap,
   targetsCommentsCountersMap: MerkleMap,
   commentsMap: MerkleMap
@@ -36,7 +40,8 @@ export function createCommentTransitionValidInputs(
     commentContentID.hash(),
   ]);
 
-  const targetWitness = postsMap.getWitness(
+  const targets = targetsMap.getRoot();
+  const targetWitness = targetsMap.getWitness(
     Poseidon.hash([posterAddressAsField, postContentIDHash])
   );
 
@@ -79,6 +84,7 @@ export function createCommentTransitionValidInputs(
 
   return {
     signature: signature,
+    targets: targets,
     targetState: targetState,
     targetWitness: targetWitness,
     initialUsersCommentsCounters: initialUsersCommentsCounters,
@@ -91,5 +97,153 @@ export function createCommentTransitionValidInputs(
     latestComments: latestComments,
     commentWitness: commentWitness,
     commentState: commentState,
+  };
+}
+
+export function createCommentDeletionTransitionValidInputs(
+  targetState: PostState,
+  commenterKey: PrivateKey,
+  allCommentsCounter: Field,
+  initialCommentState: CommentState,
+  deletionBlockHeight: Field,
+  targetsMap: MerkleMap,
+  usersCommentsCountersMap: MerkleMap,
+  targetsCommentsCountersMap: MerkleMap,
+  commentsMap: MerkleMap
+) {
+  const commentStateHash = initialCommentState.hash();
+  const signature = Signature.create(commenterKey, [
+    commentStateHash,
+    fieldToFlagCommentsAsDeleted,
+  ]);
+
+  const targets = targetsMap.getRoot();
+  const usersCommentsCounters = usersCommentsCountersMap.getRoot();
+  const targetsCommentsCounters = targetsCommentsCountersMap.getRoot();
+
+  const posterAddressAsField = Poseidon.hash(
+    targetState.posterAddress.toFields()
+  );
+  const postContentIDHash = targetState.postContentID.hash();
+  const targetKey = Poseidon.hash([posterAddressAsField, postContentIDHash]);
+
+  const targetWitness = targetsMap.getWitness(targetKey);
+
+  const commenterAddressAsField = Poseidon.hash(
+    initialCommentState.commenterAddress.toFields()
+  );
+
+  const initialComments = commentsMap.getRoot();
+
+  const commentKey = Poseidon.hash([
+    targetKey,
+    commenterAddressAsField,
+    initialCommentState.commentContentID.hash(),
+  ]);
+  const commentWitness = commentsMap.getWitness(commentKey);
+
+  const latestCommentState = new CommentState({
+    isTargetPost: new Bool(true),
+    targetKey,
+    commenterAddress: initialCommentState.commenterAddress,
+    commentContentID: initialCommentState.commentContentID,
+    allCommentsCounter: initialCommentState.allCommentsCounter,
+    userCommentsCounter: initialCommentState.userCommentsCounter,
+    targetCommentsCounter: initialCommentState.targetCommentsCounter,
+    commentBlockHeight: initialCommentState.commentBlockHeight,
+    deletionBlockHeight: deletionBlockHeight,
+    restorationBlockHeight: initialCommentState.restorationBlockHeight,
+  });
+
+  commentsMap.set(commentKey, latestCommentState.hash());
+  const latestComments = commentsMap.getRoot();
+
+  return {
+    signature: signature,
+    targets: targets,
+    targetState: targetState,
+    targetWitness: targetWitness,
+    allCommentsCounter: allCommentsCounter,
+    usersCommentsCounters: usersCommentsCounters,
+    targetsCommentsCounters: targetsCommentsCounters,
+    initialComments: initialComments,
+    latestComments: latestComments,
+    initialCommentState: initialCommentState,
+    latestCommentState: latestCommentState,
+    commentWitness: commentWitness,
+  };
+}
+
+export function createCommentRestorationTransitionValidInputs(
+  targetState: PostState,
+  commenterKey: PrivateKey,
+  allCommentsCounter: Field,
+  initialCommentState: CommentState,
+  restorationBlockHeight: Field,
+  targetsMap: MerkleMap,
+  usersCommentsCountersMap: MerkleMap,
+  targetsCommentsCountersMap: MerkleMap,
+  commentsMap: MerkleMap
+) {
+  const commentStateHash = initialCommentState.hash();
+  const signature = Signature.create(commenterKey, [
+    commentStateHash,
+    fieldToFlagCommentsAsRestored,
+  ]);
+
+  const targets = targetsMap.getRoot();
+  const usersCommentsCounters = usersCommentsCountersMap.getRoot();
+  const targetsCommentsCounters = targetsCommentsCountersMap.getRoot();
+
+  const posterAddressAsField = Poseidon.hash(
+    targetState.posterAddress.toFields()
+  );
+  const postContentIDHash = targetState.postContentID.hash();
+  const targetKey = Poseidon.hash([posterAddressAsField, postContentIDHash]);
+
+  const targetWitness = targetsMap.getWitness(targetKey);
+
+  const commenterAddressAsField = Poseidon.hash(
+    initialCommentState.commenterAddress.toFields()
+  );
+
+  const initialComments = commentsMap.getRoot();
+
+  const commentKey = Poseidon.hash([
+    targetKey,
+    commenterAddressAsField,
+    initialCommentState.commentContentID.hash(),
+  ]);
+  const commentWitness = commentsMap.getWitness(commentKey);
+
+  const latestCommentState = new CommentState({
+    isTargetPost: new Bool(true),
+    targetKey,
+    commenterAddress: initialCommentState.commenterAddress,
+    commentContentID: initialCommentState.commentContentID,
+    allCommentsCounter: initialCommentState.allCommentsCounter,
+    userCommentsCounter: initialCommentState.userCommentsCounter,
+    targetCommentsCounter: initialCommentState.targetCommentsCounter,
+    commentBlockHeight: initialCommentState.commentBlockHeight,
+    deletionBlockHeight: Field(0),
+    restorationBlockHeight: restorationBlockHeight,
+  });
+
+  commentsMap.set(commentKey, latestCommentState.hash());
+  const latestComments = commentsMap.getRoot();
+
+  return {
+    signature: signature,
+    targets: targets,
+    targetState: targetState,
+    targetWitness: targetWitness,
+    allCommentsCounter: allCommentsCounter,
+    usersCommentsCounters: usersCommentsCounters,
+    targetsCommentsCounters: targetsCommentsCounters,
+    initialComments: initialComments,
+    latestComments: latestComments,
+    initialCommentState: initialCommentState,
+    latestCommentState: latestCommentState,
+    commentWitness: commentWitness,
   };
 }

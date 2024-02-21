@@ -18,7 +18,11 @@ import {
   deployPostsContract,
   createPostPublishingTransitionValidInputs,
 } from '../posts/PostsUtils';
-import { createCommentTransitionValidInputs } from './CommentsUtils';
+import {
+  createCommentTransitionValidInputs,
+  createCommentDeletionTransitionValidInputs,
+  createCommentRestorationTransitionValidInputs,
+} from './CommentsUtils';
 
 let proofsEnabled = true;
 
@@ -218,7 +222,9 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
       valid1.postState,
       user2Address,
       user2Key,
-      CircuitString.fromString('comment1ContentID'),
+      CircuitString.fromString(
+        'bafkreifedy7l6a7izydrz7zr5nnezkfttj3be5hcbydbznn2d32ai7j26u'
+      ),
       Field(1),
       Field(1),
       Field(1),
@@ -300,5 +306,329 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     expect(commentsState1).not.toEqual(commentsRoot);
 
     console.log('Commented to 1st post');
+
+    // ==============================================================================
+    // 4. Publishes on-chain proof for deleting the comment to the 1st post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid3 = createCommentDeletionTransitionValidInputs(
+      valid2.targetState,
+      user2Key,
+      Field(1),
+      valid2.commentState,
+      Field(2),
+      postsMap,
+      usersCommentsCountersMap,
+      targetsCommentsCountersMap,
+      commentsMap
+    );
+
+    // Create a valid state transition
+    const transition3 = CommentsTransition.createCommentDeletionTransition(
+      valid3.signature,
+      valid3.targets,
+      valid3.targetState,
+      valid3.targetWitness,
+      valid3.allCommentsCounter,
+      valid3.usersCommentsCounters,
+      valid3.targetsCommentsCounters,
+      valid3.initialComments,
+      valid3.latestComments,
+      valid3.initialCommentState,
+      valid3.commentWitness,
+      valid3.latestCommentState.deletionBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof3 = await Comments.proveCommentDeletionTransition(
+      transition3,
+      valid3.signature,
+      valid3.targets,
+      valid3.targetState,
+      valid3.targetWitness,
+      valid3.allCommentsCounter,
+      valid3.usersCommentsCounters,
+      valid3.targetsCommentsCounters,
+      valid3.initialComments,
+      valid3.latestComments,
+      valid3.initialCommentState,
+      valid3.commentWitness,
+      valid3.latestCommentState.deletionBlockHeight
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn3 = await Mina.transaction(user1Address, () => {
+      commentsContract.update(proof3);
+    });
+    await txn3.prove();
+    await txn3.sign([user1Key]).send();
+    Local.setBlockchainLength(UInt32.from(3));
+
+    const allCommentsCounterState2 = commentsContract.allCommentsCounter.get();
+    const usersCommentsCountersState2 =
+      commentsContract.usersCommentsCounters.get();
+    const targetsCommentsCountersState2 =
+      commentsContract.targetsCommentsCounters.get();
+    const commentsState2 = commentsContract.comments.get();
+    const usersCommentsCountersRoot2 = usersCommentsCountersMap.getRoot();
+    const targetsCommentsCountersRoot2 = targetsCommentsCountersMap.getRoot();
+    const commentsRoot2 = commentsMap.getRoot();
+    expect(allCommentsCounterState2).toEqual(Field(1));
+    expect(usersCommentsCountersState2).toEqual(usersCommentsCountersRoot2);
+    expect(usersCommentsCountersState2).toEqual(usersCommentsCountersRoot1);
+    expect(targetsCommentsCountersState2).toEqual(targetsCommentsCountersRoot2);
+    expect(targetsCommentsCountersState2).toEqual(targetsCommentsCountersRoot1);
+    expect(commentsState2).toEqual(commentsRoot2);
+    expect(commentsState2).not.toEqual(commentsRoot1);
+
+    console.log('Comment to 1st post deleted');
+
+    // ==============================================================================
+    // 5. Publishes on-chain proof for restoring the comment to the 1st post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid4 = createCommentRestorationTransitionValidInputs(
+      valid3.targetState,
+      user2Key,
+      Field(1),
+      valid3.latestCommentState,
+      Field(3),
+      postsMap,
+      usersCommentsCountersMap,
+      targetsCommentsCountersMap,
+      commentsMap
+    );
+
+    // Create a valid state transition
+    const transition4 = CommentsTransition.createCommentRestorationTransition(
+      valid4.signature,
+      valid4.targets,
+      valid4.targetState,
+      valid4.targetWitness,
+      valid4.allCommentsCounter,
+      valid4.usersCommentsCounters,
+      valid4.targetsCommentsCounters,
+      valid4.initialComments,
+      valid4.latestComments,
+      valid4.initialCommentState,
+      valid4.commentWitness,
+      valid4.latestCommentState.restorationBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof4 = await Comments.proveCommentRestorationTransition(
+      transition4,
+      valid4.signature,
+      valid4.targets,
+      valid4.targetState,
+      valid4.targetWitness,
+      valid4.allCommentsCounter,
+      valid4.usersCommentsCounters,
+      valid4.targetsCommentsCounters,
+      valid4.initialComments,
+      valid4.latestComments,
+      valid4.initialCommentState,
+      valid4.commentWitness,
+      valid4.latestCommentState.restorationBlockHeight
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn4 = await Mina.transaction(user1Address, () => {
+      commentsContract.update(proof4);
+    });
+    await txn4.prove();
+    await txn4.sign([user1Key]).send();
+    Local.setBlockchainLength(UInt32.from(4));
+
+    const allCommentsCounterState3 = commentsContract.allCommentsCounter.get();
+    const usersCommentsCountersState3 =
+      commentsContract.usersCommentsCounters.get();
+    const targetsCommentsCountersState3 =
+      commentsContract.targetsCommentsCounters.get();
+    const commentsState3 = commentsContract.comments.get();
+    const usersCommentsCountersRoot3 = usersCommentsCountersMap.getRoot();
+    const targetsCommentsCountersRoot3 = targetsCommentsCountersMap.getRoot();
+    const commentsRoot3 = commentsMap.getRoot();
+    expect(allCommentsCounterState3).toEqual(Field(1));
+    expect(usersCommentsCountersState3).toEqual(usersCommentsCountersRoot3);
+    expect(usersCommentsCountersState3).toEqual(usersCommentsCountersRoot2);
+    expect(targetsCommentsCountersState3).toEqual(targetsCommentsCountersRoot3);
+    expect(targetsCommentsCountersState3).toEqual(targetsCommentsCountersRoot2);
+    expect(commentsState3).toEqual(commentsRoot3);
+    expect(commentsState3).not.toEqual(commentsRoot2);
+
+    console.log('Comment to 1st post restored');
+
+    // ==============================================================================
+    // 6. Publishes on-chain proof (from merged proofs) for 2 new comments to
+    //    the 1st post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid5 = createCommentTransitionValidInputs(
+      valid1.postState,
+      user1Address,
+      user1Key,
+      CircuitString.fromString(
+        'bafkreiendqwlv3ghhkaficpkkdcykrrtv52b3txgi47pmnyu4pq7wvnxxy'
+      ),
+      Field(2),
+      Field(1),
+      Field(2),
+      Field(4),
+      postsMap,
+      usersCommentsCountersMap,
+      targetsCommentsCountersMap,
+      commentsMap
+    );
+
+    // Create a valid state transition
+    const transition5 = CommentsTransition.createCommentPublishingTransition(
+      valid5.signature,
+      valid5.targets,
+      valid5.targetState,
+      valid5.targetWitness,
+      valid5.commentState.allCommentsCounter.sub(1),
+      valid5.initialUsersCommentsCounters,
+      valid5.latestUsersCommentsCounters,
+      valid5.commentState.userCommentsCounter.sub(1),
+      valid5.userCommentsCounterWitness,
+      valid5.initialTargetsCommentsCounters,
+      valid5.latestTargetsCommentsCounters,
+      valid5.commentState.targetCommentsCounter.sub(1),
+      valid5.targetCommentsCounterWitness,
+      valid5.initialComments,
+      valid5.latestComments,
+      valid5.commentWitness,
+      valid5.commentState
+    );
+
+    // Create valid proof for our state transition
+    const proof5 = await Comments.proveCommentPublishingTransition(
+      transition5,
+      valid5.signature,
+      valid5.targets,
+      valid5.targetState,
+      valid5.targetWitness,
+      valid5.commentState.allCommentsCounter.sub(1),
+      valid5.initialUsersCommentsCounters,
+      valid5.latestUsersCommentsCounters,
+      valid5.commentState.userCommentsCounter.sub(1),
+      valid5.userCommentsCounterWitness,
+      valid5.initialTargetsCommentsCounters,
+      valid5.latestTargetsCommentsCounters,
+      valid5.commentState.targetCommentsCounter.sub(1),
+      valid5.targetCommentsCounterWitness,
+      valid5.initialComments,
+      valid5.latestComments,
+      valid5.commentWitness,
+      valid5.commentState
+    );
+
+    // Prepare inputs to create a valid state transition
+    const valid6 = createCommentTransitionValidInputs(
+      valid1.postState,
+      user2Address,
+      user2Key,
+      CircuitString.fromString(
+        'bafkreid66gqf3q4qfggfqqovb33mh5ophojtiwld3kezvndjyxzqamub3m'
+      ),
+      Field(3),
+      Field(2),
+      Field(3),
+      Field(4),
+      postsMap,
+      usersCommentsCountersMap,
+      targetsCommentsCountersMap,
+      commentsMap
+    );
+
+    // Create a valid state transition
+    const transition6 = CommentsTransition.createCommentPublishingTransition(
+      valid6.signature,
+      valid6.targets,
+      valid6.targetState,
+      valid6.targetWitness,
+      valid6.commentState.allCommentsCounter.sub(1),
+      valid6.initialUsersCommentsCounters,
+      valid6.latestUsersCommentsCounters,
+      valid6.commentState.userCommentsCounter.sub(1),
+      valid6.userCommentsCounterWitness,
+      valid6.initialTargetsCommentsCounters,
+      valid6.latestTargetsCommentsCounters,
+      valid6.commentState.targetCommentsCounter.sub(1),
+      valid6.targetCommentsCounterWitness,
+      valid6.initialComments,
+      valid6.latestComments,
+      valid6.commentWitness,
+      valid6.commentState
+    );
+
+    // Create valid proof for our state transition
+    const proof6 = await Comments.proveCommentPublishingTransition(
+      transition6,
+      valid6.signature,
+      valid6.targets,
+      valid6.targetState,
+      valid6.targetWitness,
+      valid6.commentState.allCommentsCounter.sub(1),
+      valid6.initialUsersCommentsCounters,
+      valid6.latestUsersCommentsCounters,
+      valid6.commentState.userCommentsCounter.sub(1),
+      valid6.userCommentsCounterWitness,
+      valid6.initialTargetsCommentsCounters,
+      valid6.latestTargetsCommentsCounters,
+      valid6.commentState.targetCommentsCounter.sub(1),
+      valid6.targetCommentsCounterWitness,
+      valid6.initialComments,
+      valid6.latestComments,
+      valid6.commentWitness,
+      valid6.commentState
+    );
+
+    // Merge valid state transitions
+    const mergedTransitions1 = CommentsTransition.mergeCommentsTransitions(
+      transition5,
+      transition6
+    );
+
+    // Create proof of valid merged state transitions
+    const mergedTransitionProofs1 =
+      await Comments.proveMergedCommentsTransitions(
+        mergedTransitions1,
+        proof5,
+        proof6
+      );
+
+    // Send valid proof to update our on-chain state
+    const txn5 = await Mina.transaction(user1Address, () => {
+      commentsContract.update(mergedTransitionProofs1);
+    });
+    await txn5.prove();
+    await txn5.sign([user1Key]).send();
+    Local.setBlockchainLength(UInt32.from(5));
+
+    const allCommentsCounterState4 = commentsContract.allCommentsCounter.get();
+    const usersCommentsCountersState4 =
+      commentsContract.usersCommentsCounters.get();
+    const targetsCommentsCountersState4 =
+      commentsContract.targetsCommentsCounters.get();
+    const commentsState4 = commentsContract.comments.get();
+    const usersCommentsCountersRoot4 = usersCommentsCountersMap.getRoot();
+    const targetsCommentsCountersRoot4 = targetsCommentsCountersMap.getRoot();
+    const commentsRoot4 = commentsMap.getRoot();
+    expect(allCommentsCounterState4).toEqual(Field(3));
+    expect(usersCommentsCountersState4).toEqual(usersCommentsCountersRoot4);
+    expect(usersCommentsCountersState4).not.toEqual(usersCommentsCountersRoot3);
+    expect(targetsCommentsCountersState4).toEqual(targetsCommentsCountersRoot4);
+    expect(targetsCommentsCountersState4).not.toEqual(
+      targetsCommentsCountersRoot3
+    );
+    expect(commentsState4).toEqual(commentsRoot4);
+    expect(commentsState4).not.toEqual(commentsRoot3);
+
+    console.log('2nd and 3rd comments published through merged proofs');
   });
 });

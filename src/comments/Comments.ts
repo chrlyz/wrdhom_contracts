@@ -8,8 +8,14 @@ import {
   MerkleMapWitness,
   Bool,
   CircuitString,
+  SelfProof,
 } from 'o1js';
 import { PostState } from '../posts/Posts.js';
+
+// ============================================================================
+
+export const fieldToFlagCommentsAsDeleted = Field(93137);
+export const fieldToFlagCommentsAsRestored = Field(1010);
 
 // ============================================================================
 
@@ -185,6 +191,170 @@ export class CommentsTransition extends Struct({
     transition1.latestComments.assertEquals(transition2.latestComments);
     transition1.blockHeight.assertEquals(transition2.blockHeight);
   }
+
+  static createCommentDeletionTransition(
+    signature: Signature,
+    targets: Field,
+    targetState: PostState,
+    targetWitness: MerkleMapWitness,
+    allCommentsCounter: Field,
+    usersCommentsCounters: Field,
+    targetsCommentsCounters: Field,
+    initialComments: Field,
+    latestComments: Field,
+    initialCommentState: CommentState,
+    commentWitness: MerkleMapWitness,
+    blockHeight: Field
+  ) {
+    initialCommentState.deletionBlockHeight.assertEquals(Field(0));
+
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+      targetState.hash()
+    );
+    targetsRoot.assertEquals(targets);
+    targetKey.assertEquals(initialCommentState.targetKey);
+
+    const initialCommentStateHash = initialCommentState.hash();
+    const isSigned = signature.verify(initialCommentState.commenterAddress, [
+      initialCommentStateHash,
+      fieldToFlagCommentsAsDeleted,
+    ]);
+    isSigned.assertTrue();
+
+    const commentsBefore = commentWitness.computeRootAndKey(
+      initialCommentStateHash
+    )[0];
+    commentsBefore.assertEquals(initialComments);
+
+    const latestCommentState = new CommentState({
+      isTargetPost: initialCommentState.isTargetPost,
+      targetKey: initialCommentState.targetKey,
+      commenterAddress: initialCommentState.commenterAddress,
+      commentContentID: initialCommentState.commentContentID,
+      allCommentsCounter: initialCommentState.allCommentsCounter,
+      userCommentsCounter: initialCommentState.userCommentsCounter,
+      targetCommentsCounter: initialCommentState.targetCommentsCounter,
+      commentBlockHeight: initialCommentState.commentBlockHeight,
+      deletionBlockHeight: blockHeight,
+      restorationBlockHeight: initialCommentState.restorationBlockHeight,
+    });
+
+    const commentsAfter = commentWitness.computeRootAndKey(
+      latestCommentState.hash()
+    )[0];
+    commentsAfter.assertEquals(latestComments);
+
+    return new CommentsTransition({
+      targets: targetsRoot,
+      initialAllCommentsCounter: allCommentsCounter,
+      latestAllCommentsCounter: allCommentsCounter,
+      initialUsersCommentsCounters: usersCommentsCounters,
+      latestUsersCommentsCounters: usersCommentsCounters,
+      initialTargetsCommentsCounters: targetsCommentsCounters,
+      latestTargetsCommentsCounters: targetsCommentsCounters,
+      initialComments: initialComments,
+      latestComments: commentsAfter,
+      blockHeight: blockHeight,
+    });
+  }
+
+  static createCommentRestorationTransition(
+    signature: Signature,
+    targets: Field,
+    targetState: PostState,
+    targetWitness: MerkleMapWitness,
+    allCommentsCounter: Field,
+    usersCommentsCounters: Field,
+    targetCommentsCounter: Field,
+    initialComments: Field,
+    latestComments: Field,
+    initialCommentState: CommentState,
+    commentWitness: MerkleMapWitness,
+    blockHeight: Field
+  ) {
+    initialCommentState.deletionBlockHeight.assertNotEquals(0);
+
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+      targetState.hash()
+    );
+    targetsRoot.assertEquals(targets);
+    targetKey.assertEquals(initialCommentState.targetKey);
+
+    const initialCommentStateHash = initialCommentState.hash();
+    const isSigned = signature.verify(initialCommentState.commenterAddress, [
+      initialCommentStateHash,
+      fieldToFlagCommentsAsRestored,
+    ]);
+    isSigned.assertTrue();
+
+    const commentsBefore = commentWitness.computeRootAndKey(
+      initialCommentStateHash
+    )[0];
+    commentsBefore.assertEquals(initialComments);
+
+    const latestCommentState = new CommentState({
+      isTargetPost: initialCommentState.isTargetPost,
+      targetKey: initialCommentState.targetKey,
+      commenterAddress: initialCommentState.commenterAddress,
+      commentContentID: initialCommentState.commentContentID,
+      allCommentsCounter: initialCommentState.allCommentsCounter,
+      userCommentsCounter: initialCommentState.userCommentsCounter,
+      targetCommentsCounter: initialCommentState.targetCommentsCounter,
+      commentBlockHeight: initialCommentState.commentBlockHeight,
+      deletionBlockHeight: Field(0),
+      restorationBlockHeight: blockHeight,
+    });
+
+    const commentsAfter = commentWitness.computeRootAndKey(
+      latestCommentState.hash()
+    )[0];
+    commentsAfter.assertEquals(latestComments);
+
+    return new CommentsTransition({
+      targets: targetsRoot,
+      initialAllCommentsCounter: allCommentsCounter,
+      latestAllCommentsCounter: allCommentsCounter,
+      initialUsersCommentsCounters: usersCommentsCounters,
+      latestUsersCommentsCounters: usersCommentsCounters,
+      initialTargetsCommentsCounters: targetCommentsCounter,
+      latestTargetsCommentsCounters: targetCommentsCounter,
+      initialComments: initialComments,
+      latestComments: commentsAfter,
+      blockHeight: blockHeight,
+    });
+  }
+
+  static mergeCommentsTransitions(
+    transition1: CommentsTransition,
+    transition2: CommentsTransition
+  ) {
+    transition1.targets.assertEquals(transition2.targets);
+    transition1.latestAllCommentsCounter.assertEquals(
+      transition2.initialAllCommentsCounter
+    );
+    transition1.latestUsersCommentsCounters.assertEquals(
+      transition2.initialUsersCommentsCounters
+    );
+    transition1.latestTargetsCommentsCounters.assertEquals(
+      transition2.initialTargetsCommentsCounters
+    );
+    transition1.latestComments.assertEquals(transition2.initialComments);
+    transition1.blockHeight.assertEquals(transition2.blockHeight);
+
+    return new CommentsTransition({
+      targets: transition1.targets,
+      initialAllCommentsCounter: transition1.initialAllCommentsCounter,
+      latestAllCommentsCounter: transition2.latestAllCommentsCounter,
+      initialUsersCommentsCounters: transition1.initialUsersCommentsCounters,
+      latestUsersCommentsCounters: transition2.latestUsersCommentsCounters,
+      initialTargetsCommentsCounters:
+        transition1.initialTargetsCommentsCounters,
+      latestTargetsCommentsCounters: transition2.latestTargetsCommentsCounters,
+      initialComments: transition1.initialComments,
+      latestComments: transition2.latestComments,
+      blockHeight: transition1.blockHeight,
+    });
+  }
 }
 
 // ============================================================================
@@ -256,6 +426,128 @@ export const Comments = ZkProgram({
             commentState
           );
         CommentsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+
+    proveCommentDeletionTransition: {
+      privateInputs: [
+        Signature,
+        Field,
+        PostState,
+        MerkleMapWitness,
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        CommentState,
+        MerkleMapWitness,
+        Field,
+      ],
+
+      method(
+        transition: CommentsTransition,
+        signature: Signature,
+        targets: Field,
+        targetState: PostState,
+        targetWitness: MerkleMapWitness,
+        allCommentsCounter: Field,
+        usersCommentsCounters: Field,
+        targetCommentsCounter: Field,
+        initialComments: Field,
+        latestComments: Field,
+        initialCommentState: CommentState,
+        reactionWitness: MerkleMapWitness,
+        blockHeight: Field
+      ) {
+        const computedTransition =
+          CommentsTransition.createCommentDeletionTransition(
+            signature,
+            targets,
+            targetState,
+            targetWitness,
+            allCommentsCounter,
+            usersCommentsCounters,
+            targetCommentsCounter,
+            initialComments,
+            latestComments,
+            initialCommentState,
+            reactionWitness,
+            blockHeight
+          );
+        CommentsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+
+    proveCommentRestorationTransition: {
+      privateInputs: [
+        Signature,
+        Field,
+        PostState,
+        MerkleMapWitness,
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        CommentState,
+        MerkleMapWitness,
+        Field,
+      ],
+
+      method(
+        transition: CommentsTransition,
+        signature: Signature,
+        targets: Field,
+        targetState: PostState,
+        targetWitness: MerkleMapWitness,
+        allCommentsCounter: Field,
+        usersCommentsCounters: Field,
+        targetCommentsCounter: Field,
+        initialComments: Field,
+        latestComments: Field,
+        initialCommentState: CommentState,
+        reactionWitness: MerkleMapWitness,
+        blockHeight: Field
+      ) {
+        const computedTransition =
+          CommentsTransition.createCommentRestorationTransition(
+            signature,
+            targets,
+            targetState,
+            targetWitness,
+            allCommentsCounter,
+            usersCommentsCounters,
+            targetCommentsCounter,
+            initialComments,
+            latestComments,
+            initialCommentState,
+            reactionWitness,
+            blockHeight
+          );
+        CommentsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+
+    proveMergedCommentsTransitions: {
+      privateInputs: [SelfProof, SelfProof],
+
+      method(
+        mergedCommentsTransitions: CommentsTransition,
+        commentsTransition1Proof: SelfProof<CommentsTransition, undefined>,
+        commentsTransition2Proof: SelfProof<CommentsTransition, undefined>
+      ) {
+        commentsTransition1Proof.verify();
+        commentsTransition2Proof.verify();
+
+        const computedTransition = CommentsTransition.mergeCommentsTransitions(
+          commentsTransition1Proof.publicInput,
+          commentsTransition2Proof.publicInput
+        );
+        CommentsTransition.assertEquals(
+          computedTransition,
+          mergedCommentsTransitions
+        );
       },
     },
   },
