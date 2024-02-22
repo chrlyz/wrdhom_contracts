@@ -18,7 +18,11 @@ import {
   deployPostsContract,
   createPostPublishingTransitionValidInputs,
 } from '../posts/PostsUtils';
-import { createRepostTransitionValidInputs } from './RepostsUtils';
+import {
+  createRepostTransitionValidInputs,
+  createRepostDeletionTransitionValidInputs,
+  createRepostRestorationTransitionValidInputs,
+} from './RepostsUtils';
 
 let proofsEnabled = true;
 
@@ -123,8 +127,7 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     await deployRepostsContract();
 
     // Validate expected state
-    const allRepostsCounterState =
-      repostsContract.allRepostsCounter.get();
+    const allRepostsCounterState = repostsContract.allRepostsCounter.get();
     const usersRepostsCountersState =
       repostsContract.usersRepostsCounters.get();
     const targetsRepostsCountersState =
@@ -280,8 +283,7 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     await txn2.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(2));
 
-    const allRepostsCounterState1 =
-      repostsContract.allRepostsCounter.get();
+    const allRepostsCounterState1 = repostsContract.allRepostsCounter.get();
     const usersRepostsCountersState1 =
       repostsContract.usersRepostsCounters.get();
     const targetsRepostsCountersState1 =
@@ -292,12 +294,8 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     const repostsRoot1 = repostsMap.getRoot();
     expect(allRepostsCounterState1).toEqual(Field(1));
     expect(usersRepostsCountersState1).toEqual(usersRepostsCountersRoot1);
-    expect(usersRepostsCountersState1).not.toEqual(
-      usersRepostsCountersRoot
-    );
-    expect(targetsRepostsCountersState1).toEqual(
-      targetsRepostsCountersRoot1
-    );
+    expect(usersRepostsCountersState1).not.toEqual(usersRepostsCountersRoot);
+    expect(targetsRepostsCountersState1).toEqual(targetsRepostsCountersRoot1);
     expect(targetsRepostsCountersState1).not.toEqual(
       targetsRepostsCountersRoot
     );
@@ -305,5 +303,392 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     expect(repostsState1).not.toEqual(repostsRoot);
 
     console.log('Reposted 1st post');
+
+    // ==============================================================================
+    // 4. Publishes on-chain proof for deleting the repost to the 1st post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid3 = createRepostDeletionTransitionValidInputs(
+      valid2.targetState,
+      user2Key,
+      Field(1),
+      valid2.repostState,
+      Field(2),
+      postsMap,
+      usersRepostsCountersMap,
+      targetsRepostsCountersMap,
+      repostsMap
+    );
+
+    // Create a valid state transition
+    const transition3 = RepostsTransition.createRepostDeletionTransition(
+      valid3.signature,
+      valid3.targets,
+      valid3.targetState,
+      valid3.targetWitness,
+      valid3.allRepostsCounter,
+      valid3.usersRepostsCounters,
+      valid3.targetsRepostsCounters,
+      valid3.initialReposts,
+      valid3.latestReposts,
+      valid3.initialRepostState,
+      valid3.repostWitness,
+      valid3.latestRepostState.deletionBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof3 = await Reposts.proveRepostDeletionTransition(
+      transition3,
+      valid3.signature,
+      valid3.targets,
+      valid3.targetState,
+      valid3.targetWitness,
+      valid3.allRepostsCounter,
+      valid3.usersRepostsCounters,
+      valid3.targetsRepostsCounters,
+      valid3.initialReposts,
+      valid3.latestReposts,
+      valid3.initialRepostState,
+      valid3.repostWitness,
+      valid3.latestRepostState.deletionBlockHeight
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn3 = await Mina.transaction(user1Address, () => {
+      repostsContract.update(proof3);
+    });
+    await txn3.prove();
+    await txn3.sign([user1Key]).send();
+    Local.setBlockchainLength(UInt32.from(3));
+
+    const allRepostsCounterState2 = repostsContract.allRepostsCounter.get();
+    const usersRepostsCountersState2 =
+      repostsContract.usersRepostsCounters.get();
+    const targetsRepostsCountersState2 =
+      repostsContract.targetsRepostsCounters.get();
+    const repostsState2 = repostsContract.reposts.get();
+    const usersRepostsCountersRoot2 = usersRepostsCountersMap.getRoot();
+    const targetsRepostsCountersRoot2 = targetsRepostsCountersMap.getRoot();
+    const repostsRoot2 = repostsMap.getRoot();
+    expect(allRepostsCounterState2).toEqual(Field(1));
+    expect(usersRepostsCountersState2).toEqual(usersRepostsCountersRoot2);
+    expect(usersRepostsCountersState2).toEqual(usersRepostsCountersRoot1);
+    expect(targetsRepostsCountersState2).toEqual(targetsRepostsCountersRoot2);
+    expect(targetsRepostsCountersState2).toEqual(targetsRepostsCountersRoot1);
+    expect(repostsState2).toEqual(repostsRoot2);
+    expect(repostsState2).not.toEqual(repostsRoot1);
+
+    console.log('Repost to 1st post deleted');
+
+    // ==============================================================================
+    // 5. Publishes on-chain proof for restoring the repost to the 1st post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid4 = createRepostRestorationTransitionValidInputs(
+      valid3.targetState,
+      user2Key,
+      Field(1),
+      valid3.latestRepostState,
+      Field(3),
+      postsMap,
+      usersRepostsCountersMap,
+      targetsRepostsCountersMap,
+      repostsMap
+    );
+
+    // Create a valid state transition
+    const transition4 = RepostsTransition.createRepostRestorationTransition(
+      valid4.signature,
+      valid4.targets,
+      valid4.targetState,
+      valid4.targetWitness,
+      valid4.allRepostsCounter,
+      valid4.usersRepostsCounters,
+      valid4.targetsRepostsCounters,
+      valid4.initialReposts,
+      valid4.latestReposts,
+      valid4.initialRepostState,
+      valid4.repostWitness,
+      valid4.latestRepostState.restorationBlockHeight
+    );
+
+    // Create valid proof for our state transition
+    const proof4 = await Reposts.proveRepostRestorationTransition(
+      transition4,
+      valid4.signature,
+      valid4.targets,
+      valid4.targetState,
+      valid4.targetWitness,
+      valid4.allRepostsCounter,
+      valid4.usersRepostsCounters,
+      valid4.targetsRepostsCounters,
+      valid4.initialReposts,
+      valid4.latestReposts,
+      valid4.initialRepostState,
+      valid4.repostWitness,
+      valid4.latestRepostState.restorationBlockHeight
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn4 = await Mina.transaction(user1Address, () => {
+      repostsContract.update(proof4);
+    });
+    await txn4.prove();
+    await txn4.sign([user1Key]).send();
+    Local.setBlockchainLength(UInt32.from(4));
+
+    const allRepostsCounterState3 = repostsContract.allRepostsCounter.get();
+    const usersRepostsCountersState3 =
+      repostsContract.usersRepostsCounters.get();
+    const targetsRepostsCountersState3 =
+      repostsContract.targetsRepostsCounters.get();
+    const repostsState3 = repostsContract.reposts.get();
+    const usersRepostsCountersRoot3 = usersRepostsCountersMap.getRoot();
+    const targetsRepostsCountersRoot3 = targetsRepostsCountersMap.getRoot();
+    const repostsRoot3 = repostsMap.getRoot();
+    expect(allRepostsCounterState3).toEqual(Field(1));
+    expect(usersRepostsCountersState3).toEqual(usersRepostsCountersRoot3);
+    expect(usersRepostsCountersState3).toEqual(usersRepostsCountersRoot2);
+    expect(targetsRepostsCountersState3).toEqual(targetsRepostsCountersRoot3);
+    expect(targetsRepostsCountersState3).toEqual(targetsRepostsCountersRoot2);
+    expect(repostsState3).toEqual(repostsRoot3);
+    expect(repostsState3).not.toEqual(repostsRoot2);
+
+    console.log('Repost to 1st post restored');
+
+    // ==============================================================================
+    // 6. Publishes on-chain proof for publication of 2nd post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid5 = createPostPublishingTransitionValidInputs(
+      user2Address,
+      user2Key,
+      CircuitString.fromString(
+        'bafkreic5uypi3rpzzddxtpbbancwmkequk2as47f5hfn25sljzng3qxx4m'
+      ),
+      Field(2),
+      Field(1),
+      Field(4),
+      usersPostsCountersMap,
+      postsMap
+    );
+
+    // Create a valid state transition
+    const transition5 = PostsTransition.createPostPublishingTransition(
+      valid5.signature,
+      valid5.postState.allPostsCounter.sub(1),
+      valid5.initialUsersPostsCounters,
+      valid5.latestUsersPostsCounters,
+      valid5.postState.userPostsCounter.sub(1),
+      valid5.userPostsCounterWitness,
+      valid5.initialPosts,
+      valid5.latestPosts,
+      valid5.postState,
+      valid5.postWitness
+    );
+
+    // Create valid proof for our state transition
+    const proof5 = await Posts.provePostPublishingTransition(
+      transition5,
+      valid5.signature,
+      valid5.postState.allPostsCounter.sub(1),
+      valid5.initialUsersPostsCounters,
+      valid5.latestUsersPostsCounters,
+      valid5.postState.userPostsCounter.sub(1),
+      valid5.userPostsCounterWitness,
+      valid5.initialPosts,
+      valid5.latestPosts,
+      valid5.postState,
+      valid5.postWitness
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn5 = await Mina.transaction(user1Address, () => {
+      postsContract.update(proof5);
+    });
+    await txn5.prove();
+    await txn5.sign([user1Key]).send();
+    Local.setBlockchainLength(UInt32.from(5));
+
+    // Validate expected state
+    const allPostsCounterState2 = postsContract.allPostsCounter.get();
+    const usersPostsCountersState2 = postsContract.usersPostsCounters.get();
+    const postsState2 = postsContract.posts.get();
+    const usersPostsCountersRoot2 = usersPostsCountersMap.getRoot();
+    const postsRoot2 = postsMap.getRoot();
+    expect(allPostsCounterState2).toEqual(Field(2));
+    expect(allPostsCounterState2).not.toEqual(allPostsCounterState1);
+    expect(usersPostsCountersState2).toEqual(usersPostsCountersRoot2);
+    expect(usersPostsCountersState2).not.toEqual(usersPostsCountersState1);
+    expect(postsState2).toEqual(postsRoot2);
+    expect(postsState2).not.toEqual(postsRoot1);
+
+    console.log('2nd post published');
+
+    // ==============================================================================
+    // 7. Publishes on-chain proof (from merged proofs) for 2 new reposts for
+    //    1st and 2nd post.
+    // ==============================================================================
+
+    // Prepare inputs to create a valid state transition
+    const valid6 = createRepostTransitionValidInputs(
+      valid5.postState,
+      user1Address,
+      user1Key,
+      Field(2),
+      Field(1),
+      Field(1),
+      Field(5),
+      postsMap,
+      usersRepostsCountersMap,
+      targetsRepostsCountersMap,
+      repostsMap
+    );
+
+    // Create a valid state transition
+    const transition6 = RepostsTransition.createRepostPublishingTransition(
+      valid6.signature,
+      valid6.targets,
+      valid6.targetState,
+      valid6.targetWitness,
+      valid6.repostState.allRepostsCounter.sub(1),
+      valid6.initialUsersRepostsCounters,
+      valid6.latestUsersRepostsCounters,
+      valid6.repostState.userRepostsCounter.sub(1),
+      valid6.userRepostsCounterWitness,
+      valid6.initialTargetsRepostsCounters,
+      valid6.latestTargetsRepostsCounters,
+      valid6.repostState.targetRepostsCounter.sub(1),
+      valid6.targetRepostsCounterWitness,
+      valid6.initialReposts,
+      valid6.latestReposts,
+      valid6.repostWitness,
+      valid6.repostState
+    );
+
+    // Create valid proof for our state transition
+    const proof6 = await Reposts.proveRepostPublishingTransition(
+      transition6,
+      valid6.signature,
+      valid6.targets,
+      valid6.targetState,
+      valid6.targetWitness,
+      valid6.repostState.allRepostsCounter.sub(1),
+      valid6.initialUsersRepostsCounters,
+      valid6.latestUsersRepostsCounters,
+      valid6.repostState.userRepostsCounter.sub(1),
+      valid6.userRepostsCounterWitness,
+      valid6.initialTargetsRepostsCounters,
+      valid6.latestTargetsRepostsCounters,
+      valid6.repostState.targetRepostsCounter.sub(1),
+      valid6.targetRepostsCounterWitness,
+      valid6.initialReposts,
+      valid6.latestReposts,
+      valid6.repostWitness,
+      valid6.repostState
+    );
+
+    // Prepare inputs to create a valid state transition
+    const valid7 = createRepostTransitionValidInputs(
+      valid5.postState,
+      user2Address,
+      user2Key,
+      Field(3),
+      Field(2),
+      Field(2),
+      Field(5),
+      postsMap,
+      usersRepostsCountersMap,
+      targetsRepostsCountersMap,
+      repostsMap
+    );
+
+    // Create a valid state transition
+    const transition7 = RepostsTransition.createRepostPublishingTransition(
+      valid7.signature,
+      valid7.targets,
+      valid7.targetState,
+      valid7.targetWitness,
+      valid7.repostState.allRepostsCounter.sub(1),
+      valid7.initialUsersRepostsCounters,
+      valid7.latestUsersRepostsCounters,
+      valid7.repostState.userRepostsCounter.sub(1),
+      valid7.userRepostsCounterWitness,
+      valid7.initialTargetsRepostsCounters,
+      valid7.latestTargetsRepostsCounters,
+      valid7.repostState.targetRepostsCounter.sub(1),
+      valid7.targetRepostsCounterWitness,
+      valid7.initialReposts,
+      valid7.latestReposts,
+      valid7.repostWitness,
+      valid7.repostState
+    );
+
+    // Create valid proof for our state transition
+    const proof7 = await Reposts.proveRepostPublishingTransition(
+      transition7,
+      valid7.signature,
+      valid7.targets,
+      valid7.targetState,
+      valid7.targetWitness,
+      valid7.repostState.allRepostsCounter.sub(1),
+      valid7.initialUsersRepostsCounters,
+      valid7.latestUsersRepostsCounters,
+      valid7.repostState.userRepostsCounter.sub(1),
+      valid7.userRepostsCounterWitness,
+      valid7.initialTargetsRepostsCounters,
+      valid7.latestTargetsRepostsCounters,
+      valid7.repostState.targetRepostsCounter.sub(1),
+      valid7.targetRepostsCounterWitness,
+      valid7.initialReposts,
+      valid7.latestReposts,
+      valid7.repostWitness,
+      valid7.repostState
+    );
+
+    // Merge valid state transitions
+    const mergedTransitions1 = RepostsTransition.mergeRepostsTransitions(
+      transition6,
+      transition7
+    );
+
+    // Create proof of valid merged state transitions
+    const mergedTransitionProofs1 = await Reposts.proveMergedRepostsTransitions(
+      mergedTransitions1,
+      proof6,
+      proof7
+    );
+
+    // Send valid proof to update our on-chain state
+    const txn6 = await Mina.transaction(user1Address, () => {
+      repostsContract.update(mergedTransitionProofs1);
+    });
+    await txn6.prove();
+    await txn6.sign([user1Key]).send();
+    Local.setBlockchainLength(UInt32.from(6));
+
+    const allRepostsCounterState4 = repostsContract.allRepostsCounter.get();
+    const usersRepostsCountersState4 =
+      repostsContract.usersRepostsCounters.get();
+    const targetsRepostsCountersState4 =
+      repostsContract.targetsRepostsCounters.get();
+    const repostsState4 = repostsContract.reposts.get();
+    const usersRepostsCountersRoot4 = usersRepostsCountersMap.getRoot();
+    const targetsRepostsCountersRoot4 = targetsRepostsCountersMap.getRoot();
+    const repostsRoot4 = repostsMap.getRoot();
+    expect(allRepostsCounterState4).toEqual(Field(3));
+    expect(usersRepostsCountersState4).toEqual(usersRepostsCountersRoot4);
+    expect(usersRepostsCountersState4).not.toEqual(usersRepostsCountersRoot3);
+    expect(targetsRepostsCountersState4).toEqual(targetsRepostsCountersRoot4);
+    expect(targetsRepostsCountersState4).not.toEqual(
+      targetsRepostsCountersRoot3
+    );
+    expect(repostsState4).toEqual(repostsRoot4);
+    expect(repostsState4).not.toEqual(repostsRoot3);
+
+    console.log('2nd and 3rd reposts published through merged proofs');
   });
 });
