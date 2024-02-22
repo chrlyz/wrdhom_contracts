@@ -7,12 +7,15 @@ import {
   ZkProgram,
   MerkleMapWitness,
   Bool,
+  SelfProof,
 } from 'o1js';
 import { PostState } from '../posts/Posts.js';
 
 // ============================================================================
 
 export const fieldToFlagTargetAsReposted = Field(2222);
+export const fieldToFlagRepostsAsDeleted = Field(93137);
+export const fieldToFlagRepostsAsRestored = Field(1010);
 
 // ============================================================================
 
@@ -176,6 +179,167 @@ export class RepostsTransition extends Struct({
     transition1.latestReposts.assertEquals(transition2.latestReposts);
     transition1.blockHeight.assertEquals(transition2.blockHeight);
   }
+
+  static createRepostDeletionTransition(
+    signature: Signature,
+    targets: Field,
+    targetState: PostState,
+    targetWitness: MerkleMapWitness,
+    allRepostsCounter: Field,
+    usersRepostsCounters: Field,
+    targetsRepostsCounters: Field,
+    initialReposts: Field,
+    latestReposts: Field,
+    initialRepostState: RepostState,
+    repostWitness: MerkleMapWitness,
+    blockHeight: Field
+  ) {
+    initialRepostState.deletionBlockHeight.assertEquals(Field(0));
+
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+      targetState.hash()
+    );
+    targetsRoot.assertEquals(targets);
+    targetKey.assertEquals(initialRepostState.targetKey);
+
+    const initialRepostStateHash = initialRepostState.hash();
+    const isSigned = signature.verify(initialRepostState.reposterAddress, [
+      initialRepostStateHash,
+      fieldToFlagRepostsAsDeleted,
+    ]);
+    isSigned.assertTrue();
+
+    const repostsBefore = repostWitness.computeRootAndKey(
+      initialRepostStateHash
+    )[0];
+    repostsBefore.assertEquals(initialReposts);
+
+    const latestRepostState = new RepostState({
+      isTargetPost: initialRepostState.isTargetPost,
+      targetKey: initialRepostState.targetKey,
+      reposterAddress: initialRepostState.reposterAddress,
+      allRepostsCounter: initialRepostState.allRepostsCounter,
+      userRepostsCounter: initialRepostState.userRepostsCounter,
+      targetRepostsCounter: initialRepostState.targetRepostsCounter,
+      repostBlockHeight: initialRepostState.repostBlockHeight,
+      deletionBlockHeight: blockHeight,
+      restorationBlockHeight: initialRepostState.restorationBlockHeight,
+    });
+
+    const repostsAfter = repostWitness.computeRootAndKey(
+      latestRepostState.hash()
+    )[0];
+    repostsAfter.assertEquals(latestReposts);
+
+    return new RepostsTransition({
+      targets: targetsRoot,
+      initialAllRepostsCounter: allRepostsCounter,
+      latestAllRepostsCounter: allRepostsCounter,
+      initialUsersRepostsCounters: usersRepostsCounters,
+      latestUsersRepostsCounters: usersRepostsCounters,
+      initialTargetsRepostsCounters: targetsRepostsCounters,
+      latestTargetsRepostsCounters: targetsRepostsCounters,
+      initialReposts: initialReposts,
+      latestReposts: repostsAfter,
+      blockHeight: blockHeight,
+    });
+  }
+
+  static createRepostRestorationTransition(
+    signature: Signature,
+    targets: Field,
+    targetState: PostState,
+    targetWitness: MerkleMapWitness,
+    allRepostsCounter: Field,
+    usersRepostsCounters: Field,
+    targetRepostsCounter: Field,
+    initialReposts: Field,
+    latestReposts: Field,
+    initialRepostState: RepostState,
+    repostWitness: MerkleMapWitness,
+    blockHeight: Field
+  ) {
+    initialRepostState.deletionBlockHeight.assertNotEquals(0);
+
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+      targetState.hash()
+    );
+    targetsRoot.assertEquals(targets);
+    targetKey.assertEquals(initialRepostState.targetKey);
+
+    const initialRepostStateHash = initialRepostState.hash();
+    const isSigned = signature.verify(initialRepostState.reposterAddress, [
+      initialRepostStateHash,
+      fieldToFlagRepostsAsRestored,
+    ]);
+    isSigned.assertTrue();
+
+    const repostsBefore = repostWitness.computeRootAndKey(
+      initialRepostStateHash
+    )[0];
+    repostsBefore.assertEquals(initialReposts);
+
+    const latestRepostState = new RepostState({
+      isTargetPost: initialRepostState.isTargetPost,
+      targetKey: initialRepostState.targetKey,
+      reposterAddress: initialRepostState.reposterAddress,
+      allRepostsCounter: initialRepostState.allRepostsCounter,
+      userRepostsCounter: initialRepostState.userRepostsCounter,
+      targetRepostsCounter: initialRepostState.targetRepostsCounter,
+      repostBlockHeight: initialRepostState.repostBlockHeight,
+      deletionBlockHeight: Field(0),
+      restorationBlockHeight: blockHeight,
+    });
+
+    const repostsAfter = repostWitness.computeRootAndKey(
+      latestRepostState.hash()
+    )[0];
+    repostsAfter.assertEquals(latestReposts);
+
+    return new RepostsTransition({
+      targets: targetsRoot,
+      initialAllRepostsCounter: allRepostsCounter,
+      latestAllRepostsCounter: allRepostsCounter,
+      initialUsersRepostsCounters: usersRepostsCounters,
+      latestUsersRepostsCounters: usersRepostsCounters,
+      initialTargetsRepostsCounters: targetRepostsCounter,
+      latestTargetsRepostsCounters: targetRepostsCounter,
+      initialReposts: initialReposts,
+      latestReposts: repostsAfter,
+      blockHeight: blockHeight,
+    });
+  }
+
+  static mergeRepostsTransitions(
+    transition1: RepostsTransition,
+    transition2: RepostsTransition
+  ) {
+    transition1.targets.assertEquals(transition2.targets);
+    transition1.latestAllRepostsCounter.assertEquals(
+      transition2.initialAllRepostsCounter
+    );
+    transition1.latestUsersRepostsCounters.assertEquals(
+      transition2.initialUsersRepostsCounters
+    );
+    transition1.latestTargetsRepostsCounters.assertEquals(
+      transition2.initialTargetsRepostsCounters
+    );
+    transition1.latestReposts.assertEquals(transition2.initialReposts);
+    transition1.blockHeight.assertEquals(transition2.blockHeight);
+
+    return new RepostsTransition({
+      targets: transition1.targets,
+      initialAllRepostsCounter: transition1.initialAllRepostsCounter,
+      latestAllRepostsCounter: transition2.latestAllRepostsCounter,
+      initialUsersRepostsCounters: transition1.initialUsersRepostsCounters,
+      latestUsersRepostsCounters: transition2.latestUsersRepostsCounters,
+      initialTargetsRepostsCounters: transition1.initialTargetsRepostsCounters,
+      latestTargetsRepostsCounters: transition2.latestTargetsRepostsCounters,
+      initialReposts: transition1.initialReposts,
+      latestReposts: transition2.latestReposts,
+      blockHeight: transition1.blockHeight,
+    });
+  }
 }
 
 // ============================================================================
@@ -247,6 +411,128 @@ export const Reposts = ZkProgram({
             repostState
           );
         RepostsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+
+    proveRepostDeletionTransition: {
+      privateInputs: [
+        Signature,
+        Field,
+        PostState,
+        MerkleMapWitness,
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        RepostState,
+        MerkleMapWitness,
+        Field,
+      ],
+
+      method(
+        transition: RepostsTransition,
+        signature: Signature,
+        targets: Field,
+        targetState: PostState,
+        targetWitness: MerkleMapWitness,
+        allRepostsCounter: Field,
+        usersRepostsCounters: Field,
+        targetRepostsCounter: Field,
+        initialReposts: Field,
+        latestReposts: Field,
+        initialRepostState: RepostState,
+        repostWitness: MerkleMapWitness,
+        blockHeight: Field
+      ) {
+        const computedTransition =
+          RepostsTransition.createRepostDeletionTransition(
+            signature,
+            targets,
+            targetState,
+            targetWitness,
+            allRepostsCounter,
+            usersRepostsCounters,
+            targetRepostsCounter,
+            initialReposts,
+            latestReposts,
+            initialRepostState,
+            repostWitness,
+            blockHeight
+          );
+        RepostsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+
+    proveRepostRestorationTransition: {
+      privateInputs: [
+        Signature,
+        Field,
+        PostState,
+        MerkleMapWitness,
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        RepostState,
+        MerkleMapWitness,
+        Field,
+      ],
+
+      method(
+        transition: RepostsTransition,
+        signature: Signature,
+        targets: Field,
+        targetState: PostState,
+        targetWitness: MerkleMapWitness,
+        allRepostsCounter: Field,
+        usersRepostsCounters: Field,
+        targetRepostsCounter: Field,
+        initialReposts: Field,
+        latestReposts: Field,
+        initialRepostState: RepostState,
+        repostWitness: MerkleMapWitness,
+        blockHeight: Field
+      ) {
+        const computedTransition =
+          RepostsTransition.createRepostRestorationTransition(
+            signature,
+            targets,
+            targetState,
+            targetWitness,
+            allRepostsCounter,
+            usersRepostsCounters,
+            targetRepostsCounter,
+            initialReposts,
+            latestReposts,
+            initialRepostState,
+            repostWitness,
+            blockHeight
+          );
+        RepostsTransition.assertEquals(computedTransition, transition);
+      },
+    },
+
+    proveMergedRepostsTransitions: {
+      privateInputs: [SelfProof, SelfProof],
+
+      method(
+        mergedRepostsTransitions: RepostsTransition,
+        repostsTransition1Proof: SelfProof<RepostsTransition, undefined>,
+        repostsTransition2Proof: SelfProof<RepostsTransition, undefined>
+      ) {
+        repostsTransition1Proof.verify();
+        repostsTransition2Proof.verify();
+
+        const computedTransition = RepostsTransition.mergeRepostsTransitions(
+          repostsTransition1Proof.publicInput,
+          repostsTransition2Proof.publicInput
+        );
+        RepostsTransition.assertEquals(
+          computedTransition,
+          mergedRepostsTransitions
+        );
       },
     },
   },
