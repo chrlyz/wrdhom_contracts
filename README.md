@@ -40,7 +40,7 @@ Mina also makes it possible to implement native zkApp-specific rollups, so we do
 
 So far four zkPrograms and four smart-contracts have been implemented to handle the root state of posts, Reactions, Comments, and Reposts; as well as the [server](https://github.com/chrlyz/wrdhom_server) that serves the auditable content and creates the proofs based on the actions of users; and the [client](https://github.com/chrlyz/wrdhom_client) that automatically audits these responses and provides a graphic user interface for users to interact with the platform.
 
-[Here](https://www.youtube.com/playlist?list=PL5iembFEMoKwUhykeWE_E-cvxilO1wOUV) is a video with a demo of the platform.
+[Here](https://www.youtube.com/playlist?list=PL5iembFEMoKwUhykeWE_E-cvxilO1wOUV) is a video of a demo of the status of the project in January.
 
 # Testing and Deploying smart-contracts and zkPrograms
 
@@ -102,23 +102,7 @@ To deploy the `PostsContract` on the Berkeley testnet:
 node build/src/posts/PostsDeploy.js
 ```
 
-Wait for the transaction to confirm. Then you can do some test transactions already available in `/src/PostInteract.ts`. To make the first transaction:
-
-```console
-node build/src/posts/PostsInteract.js 1
-```
-
-Wait for the transaction to confirm, then to make the second transaction:
-
-```console
-node build/src/posts/PostsInteract.js 2
-```
-
-And so on, up to transaction 4.
-
-Congrats!!! You have successfully deployed the `PostsContract`, and updated the on-chain state for proving the posting and deletion of some posts, through individual and merged proofs, created through the `Posts` ZkProgram.
-
-Similarly you can test and deploy the smart-contracts for Reactions, Comments, and Reposts.
+Similarly you can test and deploy the smart-contracts and zkPrograms for Reactions, Comments, and Reposts.
 
 ## License
 
