@@ -7,6 +7,8 @@ import {
   Signature,
   Bool,
   CircuitString,
+  Mina,
+  AccountUpdate,
 } from 'o1js';
 import { PostState } from '../posts/Posts';
 import {
@@ -14,6 +16,21 @@ import {
   fieldToFlagCommentsAsDeleted,
   fieldToFlagCommentsAsRestored,
 } from './Comments.js';
+import { CommentsContract } from './CommentsContract';
+
+export async function deployCommentsContract(
+  deployerAddress: PublicKey,
+  deployerKey: PrivateKey,
+  commentsContract: CommentsContract,
+  commentsContractKey: PrivateKey
+) {
+  const txn = await Mina.transaction(deployerAddress, () => {
+    AccountUpdate.fundNewAccount(deployerAddress);
+    commentsContract.deploy();
+  });
+  await txn.prove();
+  await txn.sign([deployerKey, commentsContractKey]).send();
+}
 
 export function createCommentTransitionValidInputs(
   targetState: PostState,

@@ -7,7 +7,6 @@ import {
   Mina,
   PrivateKey,
   PublicKey,
-  AccountUpdate,
   MerkleMap,
   CircuitString,
   UInt32,
@@ -19,6 +18,7 @@ import {
   createPostPublishingTransitionValidInputs,
 } from '../posts/PostsUtils';
 import {
+  deployCommentsContract,
   createCommentTransitionValidInputs,
   createCommentDeletionTransitionValidInputs,
   createCommentRestorationTransitionValidInputs,
@@ -91,15 +91,6 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     commentsMap = new MerkleMap();
   });
 
-  async function deployCommentsContract() {
-    const txn = await Mina.transaction(user1Address, () => {
-      AccountUpdate.fundNewAccount(user1Address);
-      commentsContract.deploy();
-    });
-    await txn.prove();
-    await txn.sign([user1Key, commentsContractKey]).send();
-  }
-
   test(`CommentsContract and Comments zkProgram functionality`, async () => {
     // ==============================================================================
     // 1. Deploys PostsContract and CommentsContract.
@@ -124,7 +115,12 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
 
     console.log('PostsContract deployed');
 
-    await deployCommentsContract();
+    await deployCommentsContract(
+      user1Address,
+      user1Key,
+      commentsContract,
+      commentsContractKey
+    );
 
     // Validate expected state
     const allCommentsCounterState = commentsContract.allCommentsCounter.get();

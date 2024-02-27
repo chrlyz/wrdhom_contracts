@@ -7,7 +7,6 @@ import {
   Mina,
   PrivateKey,
   PublicKey,
-  AccountUpdate,
   MerkleMap,
   CircuitString,
   UInt32,
@@ -19,6 +18,7 @@ import {
   createPostPublishingTransitionValidInputs,
 } from '../posts/PostsUtils';
 import {
+  deployReactionsContract,
   createReactionTransitionValidInputs,
   createReactionDeletionTransitionValidInputs,
   createReactionRestorationTransitionValidInputs,
@@ -91,15 +91,6 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     reactionsMap = new MerkleMap();
   });
 
-  async function deployReactionsContract() {
-    const txn = await Mina.transaction(user1Address, () => {
-      AccountUpdate.fundNewAccount(user1Address);
-      reactionsContract.deploy();
-    });
-    await txn.prove();
-    await txn.sign([user1Key, reactionsContractKey]).send();
-  }
-
   test(`ReactionsContract and Reactions zkProgram functionality`, async () => {
     // ==============================================================================
     // 1. Deploys PostsContract and ReactionsContract.
@@ -124,7 +115,12 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
 
     console.log('PostsContract deployed');
 
-    await deployReactionsContract();
+    await deployReactionsContract(
+      user1Address,
+      user1Key,
+      reactionsContract,
+      reactionsContractKey
+    );
 
     // Validate expected state
     const allReactionsCounterState =

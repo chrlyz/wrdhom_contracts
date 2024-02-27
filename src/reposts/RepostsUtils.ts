@@ -6,6 +6,8 @@ import {
   Poseidon,
   Signature,
   Bool,
+  Mina,
+  AccountUpdate,
 } from 'o1js';
 import { PostState } from '../posts/Posts';
 import { RepostState } from './Reposts.js';
@@ -14,6 +16,21 @@ import {
   fieldToFlagRepostsAsDeleted,
   fieldToFlagRepostsAsRestored,
 } from './Reposts.js';
+import { RepostsContract } from './RepostsContract';
+
+export async function deployRepostsContract(
+  deployerAddress: PublicKey,
+  deployerKey: PrivateKey,
+  repostsContract: RepostsContract,
+  repostsContractKey: PrivateKey
+) {
+  const txn = await Mina.transaction(deployerAddress, () => {
+    AccountUpdate.fundNewAccount(deployerAddress);
+    repostsContract.deploy();
+  });
+  await txn.prove();
+  await txn.sign([deployerKey, repostsContractKey]).send();
+}
 
 export function createRepostTransitionValidInputs(
   targetState: PostState,

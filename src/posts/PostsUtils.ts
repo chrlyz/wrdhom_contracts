@@ -10,7 +10,11 @@ import {
   MerkleMap,
 } from 'o1js';
 import { PostsContract } from './PostsContract';
-import { PostState } from './Posts';
+import {
+  PostState,
+  fieldToFlagPostsAsDeleted,
+  fieldToFlagPostsAsRestored,
+} from './Posts';
 
 export async function deployPostsContract(
   deployerAddress: PublicKey,
@@ -72,5 +76,108 @@ export function createPostPublishingTransitionValidInputs(
     latestPosts: latestPosts,
     postState: postState,
     postWitness: postWitness,
+  };
+}
+
+export function createPostDeletionTransitionValidInputs(
+  posterKey: PrivateKey,
+  allPostsCounter: Field,
+  initialPostState: PostState,
+  deletionBlockHeight: Field,
+  usersPostsCountersMap: MerkleMap,
+  postsMap: MerkleMap
+) {
+  const postStateHash = initialPostState.hash();
+  const signature = Signature.create(posterKey, [
+    postStateHash,
+    fieldToFlagPostsAsDeleted,
+  ]);
+
+  const usersPostsCounters = usersPostsCountersMap.getRoot();
+
+  const posterAddressAsField = Poseidon.hash(
+    initialPostState.posterAddress.toFields()
+  );
+  const initialPosts = postsMap.getRoot();
+  const postKey = Poseidon.hash([
+    posterAddressAsField,
+    initialPostState.postContentID.hash(),
+  ]);
+  const postWitness = postsMap.getWitness(postKey);
+
+  const latestPostState = new PostState({
+    posterAddress: initialPostState.posterAddress,
+    postContentID: initialPostState.postContentID,
+    allPostsCounter: initialPostState.allPostsCounter,
+    userPostsCounter: initialPostState.userPostsCounter,
+    postBlockHeight: initialPostState.postBlockHeight,
+    deletionBlockHeight: deletionBlockHeight,
+    restorationBlockHeight: initialPostState.restorationBlockHeight,
+  });
+
+  postsMap.set(postKey, latestPostState.hash());
+  const latestPosts = postsMap.getRoot();
+
+  return {
+    signature: signature,
+    allPostsCounter: allPostsCounter,
+    usersPostsCounters: usersPostsCounters,
+    initialPosts: initialPosts,
+    latestPosts: latestPosts,
+    initialPostState: initialPostState,
+    latestPostState: latestPostState,
+    postWitness: postWitness,
+  };
+}
+
+export function createPostRestorationTransitionValidInputs(
+  posterKey: PrivateKey,
+  allPostsCounter: Field,
+  initialPostState: PostState,
+  restorationBlockHeight: Field,
+  usersPostsCountersMap: MerkleMap,
+  postsMap: MerkleMap
+) {
+  const postStateHash = initialPostState.hash();
+  const signature = Signature.create(posterKey, [
+    postStateHash,
+    fieldToFlagPostsAsRestored,
+  ]);
+
+  const usersPostsCounters = usersPostsCountersMap.getRoot();
+
+  const posterAddressAsField = Poseidon.hash(
+    initialPostState.posterAddress.toFields()
+  );
+  const initialPosts = postsMap.getRoot();
+  const postKey = Poseidon.hash([
+    posterAddressAsField,
+    initialPostState.postContentID.hash(),
+  ]);
+  const postWitness = postsMap.getWitness(postKey);
+
+  const latestPostState = new PostState({
+    posterAddress: initialPostState.posterAddress,
+    postContentID: initialPostState.postContentID,
+    allPostsCounter: initialPostState.allPostsCounter,
+    userPostsCounter: initialPostState.userPostsCounter,
+    postBlockHeight: initialPostState.postBlockHeight,
+    deletionBlockHeight: Field(0),
+    restorationBlockHeight: restorationBlockHeight,
+  });
+
+  postsMap.set(postKey, latestPostState.hash());
+  const latestPosts = postsMap.getRoot();
+
+  return {
+    signature: signature,
+    allPostsCounter: allPostsCounter,
+    usersPostsCounters: usersPostsCounters,
+    initialPosts: initialPosts,
+    latestPosts: latestPosts,
+    initialPostState: initialPostState,
+    latestPostState: latestPostState,
+    postWitness: postWitness,
+    restorationBlockHeight: restorationBlockHeight,
   };
 }
