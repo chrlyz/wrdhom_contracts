@@ -1,17 +1,10 @@
 import { PostsContract } from './PostsContract';
-import {
-  PostsTransition,
-  PostState,
-  Posts,
-  fieldToFlagPostsAsDeleted,
-  fieldToFlagPostsAsRestored,
-} from './Posts';
+import { PostsTransition, PostState, Posts } from './Posts';
 import {
   Field,
   Mina,
   PrivateKey,
   PublicKey,
-  Signature,
   CircuitString,
   Poseidon,
   MerkleMap,
@@ -22,6 +15,8 @@ import fs from 'fs/promises';
 import {
   deployPostsContract,
   createPostPublishingTransitionValidInputs,
+  createPostDeletionTransitionValidInputs,
+  createPostRestorationTransitionValidInputs,
 } from './PostsUtils';
 
 let proofsEnabled = true;
@@ -67,105 +62,6 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     postsContractAddress = postsContractKey.toPublicKey();
     postsContract = new PostsContract(postsContractAddress);
   });
-
-  function createPostDeletionTransitionValidInputs(
-    posterKey: PrivateKey,
-    allPostsCounter: Field,
-    initialPostState: PostState,
-    deletionBlockHeight: Field
-  ) {
-    const postStateHash = initialPostState.hash();
-    const signature = Signature.create(posterKey, [
-      postStateHash,
-      fieldToFlagPostsAsDeleted,
-    ]);
-
-    const usersPostsCounters = usersPostsCountersMap.getRoot();
-
-    const posterAddressAsField = Poseidon.hash(
-      initialPostState.posterAddress.toFields()
-    );
-    const initialPosts = postsMap.getRoot();
-    const postKey = Poseidon.hash([
-      posterAddressAsField,
-      initialPostState.postContentID.hash(),
-    ]);
-    const postWitness = postsMap.getWitness(postKey);
-
-    const latestPostState = new PostState({
-      posterAddress: initialPostState.posterAddress,
-      postContentID: initialPostState.postContentID,
-      allPostsCounter: initialPostState.allPostsCounter,
-      userPostsCounter: initialPostState.userPostsCounter,
-      postBlockHeight: initialPostState.postBlockHeight,
-      deletionBlockHeight: deletionBlockHeight,
-      restorationBlockHeight: initialPostState.restorationBlockHeight,
-    });
-
-    postsMap.set(postKey, latestPostState.hash());
-    const latestPosts = postsMap.getRoot();
-
-    return {
-      signature: signature,
-      allPostsCounter: allPostsCounter,
-      usersPostsCounters: usersPostsCounters,
-      initialPosts: initialPosts,
-      latestPosts: latestPosts,
-      initialPostState: initialPostState,
-      latestPostState: latestPostState,
-      postWitness: postWitness,
-    };
-  }
-
-  function createPostRestorationTransitionValidInputs(
-    posterKey: PrivateKey,
-    allPostsCounter: Field,
-    initialPostState: PostState,
-    restorationBlockHeight: Field
-  ) {
-    const postStateHash = initialPostState.hash();
-    const signature = Signature.create(posterKey, [
-      postStateHash,
-      fieldToFlagPostsAsRestored,
-    ]);
-
-    const usersPostsCounters = usersPostsCountersMap.getRoot();
-
-    const posterAddressAsField = Poseidon.hash(
-      initialPostState.posterAddress.toFields()
-    );
-    const initialPosts = postsMap.getRoot();
-    const postKey = Poseidon.hash([
-      posterAddressAsField,
-      initialPostState.postContentID.hash(),
-    ]);
-    const postWitness = postsMap.getWitness(postKey);
-
-    const latestPostState = new PostState({
-      posterAddress: initialPostState.posterAddress,
-      postContentID: initialPostState.postContentID,
-      allPostsCounter: initialPostState.allPostsCounter,
-      userPostsCounter: initialPostState.userPostsCounter,
-      postBlockHeight: initialPostState.postBlockHeight,
-      deletionBlockHeight: Field(0),
-      restorationBlockHeight: restorationBlockHeight,
-    });
-
-    postsMap.set(postKey, latestPostState.hash());
-    const latestPosts = postsMap.getRoot();
-
-    return {
-      signature: signature,
-      allPostsCounter: allPostsCounter,
-      usersPostsCounters: usersPostsCounters,
-      initialPosts: initialPosts,
-      latestPosts: latestPosts,
-      initialPostState: initialPostState,
-      latestPostState: latestPostState,
-      postWitness: postWitness,
-      restorationBlockHeight: restorationBlockHeight,
-    };
-  }
 
   test(`PostsContract and Posts ZkProgram functionality`, async () => {
     // ==============================================================================
@@ -270,7 +166,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       user1Key,
       Field(1),
       valid1.postState,
-      Field(1)
+      Field(1),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -329,7 +227,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       user1Key,
       Field(1),
       valid2.latestPostState,
-      Field(2)
+      Field(2),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -516,7 +416,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       user1Key,
       Field(3),
       valid4.postState,
-      Field(4)
+      Field(4),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -549,7 +451,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       user2Key,
       Field(3),
       valid5.postState,
-      Field(4)
+      Field(4),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -622,7 +526,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       user1Key,
       Field(3),
       valid6.latestPostState,
-      Field(5)
+      Field(5),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -655,7 +561,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       user2Key,
       Field(3),
       valid7.latestPostState,
-      Field(5)
+      Field(5),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -727,7 +635,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       user1Key,
       Field(3),
       valid8.latestPostState,
-      Field(6)
+      Field(6),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -787,7 +697,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       user1Key,
       Field(3),
       valid10.latestPostState,
-      Field(7)
+      Field(7),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -820,7 +732,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       user2Key,
       Field(3),
       valid9.latestPostState,
-      Field(7)
+      Field(7),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition
@@ -893,7 +807,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       user2Key,
       Field(3),
       valid12.latestPostState,
-      Field(8)
+      Field(8),
+      usersPostsCountersMap,
+      postsMap
     );
 
     // Create a valid state transition

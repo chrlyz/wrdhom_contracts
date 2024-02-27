@@ -7,7 +7,6 @@ import {
   Mina,
   PrivateKey,
   PublicKey,
-  AccountUpdate,
   MerkleMap,
   CircuitString,
   UInt32,
@@ -19,6 +18,7 @@ import {
   createPostPublishingTransitionValidInputs,
 } from '../posts/PostsUtils';
 import {
+  deployRepostsContract,
   createRepostTransitionValidInputs,
   createRepostDeletionTransitionValidInputs,
   createRepostRestorationTransitionValidInputs,
@@ -91,15 +91,6 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     repostsMap = new MerkleMap();
   });
 
-  async function deployRepostsContract() {
-    const txn = await Mina.transaction(user1Address, () => {
-      AccountUpdate.fundNewAccount(user1Address);
-      repostsContract.deploy();
-    });
-    await txn.prove();
-    await txn.sign([user1Key, repostsContractKey]).send();
-  }
-
   test(`RepostsContract and Reposts zkProgram functionality`, async () => {
     // ==============================================================================
     // 1. Deploys PostsContract and RepostsContract.
@@ -124,7 +115,12 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
 
     console.log('PostsContract deployed');
 
-    await deployRepostsContract();
+    await deployRepostsContract(
+      user1Address,
+      user1Key,
+      repostsContract,
+      repostsContractKey
+    );
 
     // Validate expected state
     const allRepostsCounterState = repostsContract.allRepostsCounter.get();
