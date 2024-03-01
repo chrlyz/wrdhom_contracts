@@ -1,7 +1,7 @@
 import { PostsContract } from '../posts/PostsContract';
 import { PostsTransition, Posts } from '../posts/Posts';
 import { RepostsContract } from './RepostsContract';
-import { RepostsTransition, Reposts } from './Reposts';
+import { RepostsTransition, Reposts, RepostState } from './Reposts';
 import {
   Field,
   Mina,
@@ -10,6 +10,7 @@ import {
   MerkleMap,
   CircuitString,
   UInt32,
+  Poseidon,
 } from 'o1js';
 import { Config } from '../posts/PostsDeploy';
 import fs from 'fs/promises';
@@ -686,5 +687,85 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     expect(repostsState4).not.toEqual(repostsRoot3);
 
     console.log('2nd and 3rd reposts published through merged proofs');
+
+    // ==============================================================================
+    // 7. Extra validation for all the state updates so far.
+    // ==============================================================================
+
+    const newUsersRepostsCountersMap = new MerkleMap();
+    const user1AddressAsField = Poseidon.hash(user1Address.toFields());
+    const user2AddressAsField = Poseidon.hash(user2Address.toFields());
+    newUsersRepostsCountersMap.set(user1AddressAsField, Field(1));
+    newUsersRepostsCountersMap.set(user2AddressAsField, Field(2));
+    expect(newUsersRepostsCountersMap.getRoot()).toEqual(
+      usersRepostsCountersState4
+    );
+
+    const newTargetsRepostsCountersMap = new MerkleMap();
+    newTargetsRepostsCountersMap.set(valid2.repostState.targetKey, Field(1));
+    newTargetsRepostsCountersMap.set(valid6.repostState.targetKey, Field(2));
+    expect(newTargetsRepostsCountersMap.getRoot()).toEqual(
+      targetsRepostsCountersState4
+    );
+
+    const repost1 = new RepostState({
+      isTargetPost: valid4.latestRepostState.isTargetPost,
+      targetKey: valid4.latestRepostState.targetKey,
+      reposterAddress: valid4.latestRepostState.reposterAddress,
+      allRepostsCounter: valid4.latestRepostState.allRepostsCounter,
+      userRepostsCounter: valid4.latestRepostState.userRepostsCounter,
+      targetRepostsCounter: valid4.latestRepostState.targetRepostsCounter,
+      repostBlockHeight: valid4.latestRepostState.repostBlockHeight,
+      deletionBlockHeight: valid4.latestRepostState.deletionBlockHeight,
+      restorationBlockHeight: valid4.latestRepostState.restorationBlockHeight,
+    });
+
+    const repost2 = new RepostState({
+      isTargetPost: valid6.repostState.isTargetPost,
+      targetKey: valid6.repostState.targetKey,
+      reposterAddress: valid6.repostState.reposterAddress,
+      allRepostsCounter: valid6.repostState.allRepostsCounter,
+      userRepostsCounter: valid6.repostState.userRepostsCounter,
+      targetRepostsCounter: valid6.repostState.targetRepostsCounter,
+      repostBlockHeight: valid6.repostState.repostBlockHeight,
+      deletionBlockHeight: valid6.repostState.deletionBlockHeight,
+      restorationBlockHeight: valid6.repostState.restorationBlockHeight,
+    });
+
+    const repost3 = new RepostState({
+      isTargetPost: valid7.repostState.isTargetPost,
+      targetKey: valid7.repostState.targetKey,
+      reposterAddress: valid7.repostState.reposterAddress,
+      allRepostsCounter: valid7.repostState.allRepostsCounter,
+      userRepostsCounter: valid7.repostState.userRepostsCounter,
+      targetRepostsCounter: valid7.repostState.targetRepostsCounter,
+      repostBlockHeight: valid7.repostState.repostBlockHeight,
+      deletionBlockHeight: valid7.repostState.deletionBlockHeight,
+      restorationBlockHeight: valid7.repostState.restorationBlockHeight,
+    });
+
+    const newRepostsMap = new MerkleMap();
+
+    const repost1Key = Poseidon.hash([
+      valid4.latestRepostState.targetKey,
+      user2AddressAsField,
+    ]);
+    newRepostsMap.set(repost1Key, repost1.hash());
+
+    const repost2Key = Poseidon.hash([
+      valid6.repostState.targetKey,
+      user1AddressAsField,
+    ]);
+    newRepostsMap.set(repost2Key, repost2.hash());
+
+    const repost3Key = Poseidon.hash([
+      valid7.repostState.targetKey,
+      user2AddressAsField,
+    ]);
+    newRepostsMap.set(repost3Key, repost3.hash());
+
+    expect(newRepostsMap.getRoot()).toEqual(repostsState4);
+
+    console.log('Successful extra validation of all the state updates');
   });
 });

@@ -921,11 +921,13 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     // ==============================================================================
 
     const newUsersPostsCountersMap = new MerkleMap();
-    const deployerAccountAsField = Poseidon.hash(user1Address.toFields());
-    const senderAccountAsField = Poseidon.hash(user2Address.toFields());
-    newUsersPostsCountersMap.set(deployerAccountAsField, Field(2));
-    newUsersPostsCountersMap.set(senderAccountAsField, Field(2));
-    expect(newUsersPostsCountersMap.getRoot()).toEqual(usersPostsCountersRoot9);
+    const user1AddressAsField = Poseidon.hash(user1Address.toFields());
+    const user2AddressAsField = Poseidon.hash(user2Address.toFields());
+    newUsersPostsCountersMap.set(user1AddressAsField, Field(2));
+    newUsersPostsCountersMap.set(user2AddressAsField, Field(2));
+    expect(newUsersPostsCountersMap.getRoot()).toEqual(
+      usersPostsCountersState9
+    );
 
     const post1 = new PostState({
       posterAddress: valid3.latestPostState.posterAddress,
@@ -966,19 +968,19 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
 
     const newPostsMap = new MerkleMap();
     newPostsMap.set(
-      Poseidon.hash([deployerAccountAsField, post1.postContentID.hash()]),
+      Poseidon.hash([user1AddressAsField, post1.postContentID.hash()]),
       post1.hash()
     );
     newPostsMap.set(
-      Poseidon.hash([deployerAccountAsField, post2.postContentID.hash()]),
+      Poseidon.hash([user1AddressAsField, post2.postContentID.hash()]),
       post2.hash()
     );
     newPostsMap.set(
-      Poseidon.hash([senderAccountAsField, post3.postContentID.hash()]),
+      Poseidon.hash([user2AddressAsField, post3.postContentID.hash()]),
       post3.hash()
     );
     newPostsMap.set(
-      Poseidon.hash([senderAccountAsField, post4.postContentID.hash()]),
+      Poseidon.hash([user2AddressAsField, post4.postContentID.hash()]),
       post4.hash()
     );
 
