@@ -1,7 +1,7 @@
 import { PostsContract } from '../posts/PostsContract';
 import { PostsTransition, Posts } from '../posts/Posts';
 import { ReactionsContract } from './ReactionsContract';
-import { ReactionsTransition, Reactions } from './Reactions';
+import { ReactionsTransition, Reactions, ReactionState } from './Reactions';
 import {
   Field,
   Mina,
@@ -10,6 +10,7 @@ import {
   MerkleMap,
   CircuitString,
   UInt32,
+  Poseidon,
 } from 'o1js';
 import { Config } from '../posts/PostsDeploy';
 import fs from 'fs/promises';
@@ -641,5 +642,93 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     expect(reactionsState4).not.toEqual(reactionsRoot3);
 
     console.log('2nd and 3rd reactions published through merged proofs');
+
+    // ==============================================================================
+    // 7. Extra validation for all the state updates so far.
+    // ==============================================================================
+
+    const newUsersReactionsCountersMap = new MerkleMap();
+    const user1AddressAsField = Poseidon.hash(user1Address.toFields());
+    const user2AddressAsField = Poseidon.hash(user2Address.toFields());
+    newUsersReactionsCountersMap.set(user1AddressAsField, Field(1));
+    newUsersReactionsCountersMap.set(user2AddressAsField, Field(2));
+    expect(newUsersReactionsCountersMap.getRoot()).toEqual(
+      usersReactionsCountersState4
+    );
+
+    const newTargetsReactionsCountersMap = new MerkleMap();
+    newTargetsReactionsCountersMap.set(
+      valid2.reactionState.targetKey,
+      Field(3)
+    );
+    expect(newTargetsReactionsCountersMap.getRoot()).toEqual(
+      targetsReactionsCountersState4
+    );
+
+    const reaction1 = new ReactionState({
+      isTargetPost: valid4.latestReactionState.isTargetPost,
+      targetKey: valid4.latestReactionState.targetKey,
+      reactorAddress: valid4.latestReactionState.reactorAddress,
+      reactionCodePoint: valid4.latestReactionState.reactionCodePoint,
+      allReactionsCounter: valid4.latestReactionState.allReactionsCounter,
+      userReactionsCounter: valid4.latestReactionState.userReactionsCounter,
+      targetReactionsCounter: valid4.latestReactionState.targetReactionsCounter,
+      reactionBlockHeight: valid4.latestReactionState.reactionBlockHeight,
+      deletionBlockHeight: valid4.latestReactionState.deletionBlockHeight,
+      restorationBlockHeight: valid4.latestReactionState.restorationBlockHeight,
+    });
+
+    const reaction2 = new ReactionState({
+      isTargetPost: valid5.reactionState.isTargetPost,
+      targetKey: valid5.reactionState.targetKey,
+      reactorAddress: valid5.reactionState.reactorAddress,
+      reactionCodePoint: valid5.reactionState.reactionCodePoint,
+      allReactionsCounter: valid5.reactionState.allReactionsCounter,
+      userReactionsCounter: valid5.reactionState.userReactionsCounter,
+      targetReactionsCounter: valid5.reactionState.targetReactionsCounter,
+      reactionBlockHeight: valid5.reactionState.reactionBlockHeight,
+      deletionBlockHeight: valid5.reactionState.deletionBlockHeight,
+      restorationBlockHeight: valid5.reactionState.restorationBlockHeight,
+    });
+
+    const reaction3 = new ReactionState({
+      isTargetPost: valid6.reactionState.isTargetPost,
+      targetKey: valid6.reactionState.targetKey,
+      reactorAddress: valid6.reactionState.reactorAddress,
+      reactionCodePoint: valid6.reactionState.reactionCodePoint,
+      allReactionsCounter: valid6.reactionState.allReactionsCounter,
+      userReactionsCounter: valid6.reactionState.userReactionsCounter,
+      targetReactionsCounter: valid6.reactionState.targetReactionsCounter,
+      reactionBlockHeight: valid6.reactionState.reactionBlockHeight,
+      deletionBlockHeight: valid6.reactionState.deletionBlockHeight,
+      restorationBlockHeight: valid6.reactionState.restorationBlockHeight,
+    });
+
+    const newReactionsMap = new MerkleMap();
+
+    const reaction1Key = Poseidon.hash([
+      valid4.latestReactionState.targetKey,
+      user2AddressAsField,
+      valid4.latestReactionState.reactionCodePoint,
+    ]);
+    newReactionsMap.set(reaction1Key, reaction1.hash());
+
+    const reaction2Key = Poseidon.hash([
+      valid5.reactionState.targetKey,
+      user1AddressAsField,
+      valid5.reactionState.reactionCodePoint,
+    ]);
+    newReactionsMap.set(reaction2Key, reaction2.hash());
+
+    const reaction3Key = Poseidon.hash([
+      valid6.reactionState.targetKey,
+      user2AddressAsField,
+      valid6.reactionState.reactionCodePoint,
+    ]);
+    newReactionsMap.set(reaction3Key, reaction3.hash());
+
+    expect(newReactionsMap.getRoot()).toEqual(reactionsState4);
+
+    console.log('Successful extra validation of all the state updates');
   });
 });

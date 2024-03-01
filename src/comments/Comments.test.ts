@@ -1,7 +1,7 @@
 import { PostsContract } from '../posts/PostsContract';
 import { PostsTransition, Posts } from '../posts/Posts';
 import { CommentsContract } from './CommentsContract';
-import { CommentsTransition, Comments } from './Comments';
+import { CommentsTransition, Comments, CommentState } from './Comments';
 import {
   Field,
   Mina,
@@ -10,6 +10,7 @@ import {
   MerkleMap,
   CircuitString,
   UInt32,
+  Poseidon,
 } from 'o1js';
 import { Config } from '../posts/PostsDeploy';
 import fs from 'fs/promises';
@@ -626,5 +627,90 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     expect(commentsState4).not.toEqual(commentsRoot3);
 
     console.log('2nd and 3rd comments published through merged proofs');
+
+    // ==============================================================================
+    // 7. Extra validation for all the state updates so far.
+    // ==============================================================================
+
+    const newUsersCommentsCountersMap = new MerkleMap();
+    const user1AddressAsField = Poseidon.hash(user1Address.toFields());
+    const user2AddressAsField = Poseidon.hash(user2Address.toFields());
+    newUsersCommentsCountersMap.set(user1AddressAsField, Field(1));
+    newUsersCommentsCountersMap.set(user2AddressAsField, Field(2));
+    expect(newUsersCommentsCountersMap.getRoot()).toEqual(
+      usersCommentsCountersState4
+    );
+
+    const newTargetsCommentsCountersMap = new MerkleMap();
+    newTargetsCommentsCountersMap.set(valid2.commentState.targetKey, Field(3));
+    expect(newTargetsCommentsCountersMap.getRoot()).toEqual(
+      targetsCommentsCountersState4
+    );
+
+    const comment1 = new CommentState({
+      isTargetPost: valid4.latestCommentState.isTargetPost,
+      targetKey: valid4.latestCommentState.targetKey,
+      commenterAddress: valid4.latestCommentState.commenterAddress,
+      commentContentID: valid4.latestCommentState.commentContentID,
+      allCommentsCounter: valid4.latestCommentState.allCommentsCounter,
+      userCommentsCounter: valid4.latestCommentState.userCommentsCounter,
+      targetCommentsCounter: valid4.latestCommentState.targetCommentsCounter,
+      commentBlockHeight: valid4.latestCommentState.commentBlockHeight,
+      deletionBlockHeight: valid4.latestCommentState.deletionBlockHeight,
+      restorationBlockHeight: valid4.latestCommentState.restorationBlockHeight,
+    });
+
+    const comment2 = new CommentState({
+      isTargetPost: valid5.commentState.isTargetPost,
+      targetKey: valid5.commentState.targetKey,
+      commenterAddress: valid5.commentState.commenterAddress,
+      commentContentID: valid5.commentState.commentContentID,
+      allCommentsCounter: valid5.commentState.allCommentsCounter,
+      userCommentsCounter: valid5.commentState.userCommentsCounter,
+      targetCommentsCounter: valid5.commentState.targetCommentsCounter,
+      commentBlockHeight: valid5.commentState.commentBlockHeight,
+      deletionBlockHeight: valid5.commentState.deletionBlockHeight,
+      restorationBlockHeight: valid5.commentState.restorationBlockHeight,
+    });
+
+    const comment3 = new CommentState({
+      isTargetPost: valid6.commentState.isTargetPost,
+      targetKey: valid6.commentState.targetKey,
+      commenterAddress: valid6.commentState.commenterAddress,
+      commentContentID: valid6.commentState.commentContentID,
+      allCommentsCounter: valid6.commentState.allCommentsCounter,
+      userCommentsCounter: valid6.commentState.userCommentsCounter,
+      targetCommentsCounter: valid6.commentState.targetCommentsCounter,
+      commentBlockHeight: valid6.commentState.commentBlockHeight,
+      deletionBlockHeight: valid6.commentState.deletionBlockHeight,
+      restorationBlockHeight: valid6.commentState.restorationBlockHeight,
+    });
+
+    const newCommentsMap = new MerkleMap();
+
+    const comment1Key = Poseidon.hash([
+      valid4.latestCommentState.targetKey,
+      user2AddressAsField,
+      valid4.latestCommentState.commentContentID.hash(),
+    ]);
+    newCommentsMap.set(comment1Key, comment1.hash());
+
+    const comment2Key = Poseidon.hash([
+      valid5.commentState.targetKey,
+      user1AddressAsField,
+      valid5.commentState.commentContentID.hash(),
+    ]);
+    newCommentsMap.set(comment2Key, comment2.hash());
+
+    const comment3Key = Poseidon.hash([
+      valid6.commentState.targetKey,
+      user2AddressAsField,
+      valid6.commentState.commentContentID.hash(),
+    ]);
+    newCommentsMap.set(comment3Key, comment3.hash());
+
+    expect(newCommentsMap.getRoot()).toEqual(commentsState4);
+
+    console.log('Successful extra validation of all the state updates');
   });
 });
