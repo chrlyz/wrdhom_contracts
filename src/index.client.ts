@@ -1,14 +1,37 @@
-import { PostState, fieldToFlagPostsAsDeleted, fieldToFlagPostsAsRestored } from './posts/Posts.js';
-import { ReactionState } from './reactions/Reactions.js';
-import { CommentState } from './comments/Comments.js';
-import { RepostState, fieldToFlagTargetAsReposted } from './reposts/Reposts.js';
+import {
+  PostState,
+  fieldToFlagPostsAsDeleted,
+  fieldToFlagPostsAsRestored,
+} from './posts/Posts.js';
+import {
+  ReactionState,
+  fieldToFlagReactionsAsDeleted,
+  fieldToFlagReactionsAsRestored,
+} from './reactions/Reactions.js';
+import {
+  CommentState,
+  fieldToFlagCommentsAsDeleted,
+  fieldToFlagCommentsAsRestored,
+} from './comments/Comments.js';
+import {
+  RepostState,
+  fieldToFlagTargetAsReposted,
+  fieldToFlagRepostsAsDeleted,
+  fieldToFlagRepostsAsRestored,
+} from './reposts/Reposts.js';
 
 export {
-    PostState,
-    fieldToFlagPostsAsDeleted,
-    fieldToFlagPostsAsRestored,
-    ReactionState,
-    CommentState,
-    RepostState,
-    fieldToFlagTargetAsReposted
+  PostState,
+  fieldToFlagPostsAsDeleted,
+  fieldToFlagPostsAsRestored,
+  ReactionState,
+  fieldToFlagReactionsAsDeleted,
+  fieldToFlagReactionsAsRestored,
+  CommentState,
+  fieldToFlagCommentsAsDeleted,
+  fieldToFlagCommentsAsRestored,
+  RepostState,
+  fieldToFlagTargetAsReposted,
+  fieldToFlagRepostsAsDeleted,
+  fieldToFlagRepostsAsRestored,
 };

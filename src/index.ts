@@ -4,7 +4,7 @@ import {
   Posts,
   PostsProof,
   fieldToFlagPostsAsDeleted,
-  fieldToFlagPostsAsRestored
+  fieldToFlagPostsAsRestored,
 } from './posts/Posts.js';
 import { PostsContract } from './posts/PostsContract.js';
 import {
@@ -12,6 +12,8 @@ import {
   ReactionsTransition,
   Reactions,
   ReactionsProof,
+  fieldToFlagReactionsAsDeleted,
+  fieldToFlagReactionsAsRestored,
 } from './reactions/Reactions.js';
 import { ReactionsContract } from './reactions/ReactionsContract.js';
 import {
@@ -19,14 +21,18 @@ import {
   CommentsTransition,
   Comments,
   CommentsProof,
+  fieldToFlagCommentsAsDeleted,
+  fieldToFlagCommentsAsRestored,
 } from './comments/Comments.js';
 import { CommentsContract } from './comments/CommentsContract.js';
-import   {
+import {
   RepostState,
   RepostsTransition,
   Reposts,
   RepostsProof,
-  fieldToFlagTargetAsReposted
+  fieldToFlagTargetAsReposted,
+  fieldToFlagRepostsAsDeleted,
+  fieldToFlagRepostsAsRestored,
 } from './reposts/Reposts.js';
 import { RepostsContract } from './reposts/RepostsContract.js';
 import { Config } from './posts/PostsDeploy.js';
@@ -43,17 +49,23 @@ export {
   ReactionsTransition,
   Reactions,
   ReactionsProof,
+  fieldToFlagReactionsAsDeleted,
+  fieldToFlagReactionsAsRestored,
   ReactionsContract,
   CommentState,
   CommentsTransition,
   Comments,
   CommentsProof,
+  fieldToFlagCommentsAsDeleted,
+  fieldToFlagCommentsAsRestored,
   CommentsContract,
   RepostState,
   RepostsTransition,
   Reposts,
   RepostsProof,
   fieldToFlagTargetAsReposted,
+  fieldToFlagRepostsAsDeleted,
+  fieldToFlagRepostsAsRestored,
   RepostsContract,
   Config,
 };
