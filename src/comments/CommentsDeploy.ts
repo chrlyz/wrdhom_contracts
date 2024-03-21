@@ -44,12 +44,12 @@ try {
   console.log(err);
 }
 
-if (sentTx?.hash() !== undefined) {
+if (sentTx !== undefined) {
   console.log(`
   Success! Comments deploy transaction sent.
   
   Your smart contract will be live as soon
   as the transaction is included in a block:
-  https://berkeley.minaexplorer.com/transaction/${sentTx.hash()}
+  https://berkeley.minaexplorer.com/transaction/${sentTx.hash}
   `);
 }
