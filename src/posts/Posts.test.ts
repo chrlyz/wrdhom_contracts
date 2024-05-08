@@ -31,7 +31,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     postsContract: PostsContract,
     usersPostsCountersMap: MerkleMap,
     postsMap: MerkleMap,
-    Local: ReturnType<typeof Mina.LocalBlockchain>;
+    Local: any
 
   beforeAll(async () => {
     if (proofsEnabled) {
@@ -44,10 +44,12 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
   });
 
   beforeEach(async () => {
-    Local = Mina.LocalBlockchain({ proofsEnabled });
+    Local = await Mina.LocalBlockchain({ proofsEnabled });
     Mina.setActiveInstance(Local);
-    ({ privateKey: user1Key, publicKey: user1Address } = Local.testAccounts[0]);
-    ({ privateKey: user2Key, publicKey: user2Address } = Local.testAccounts[1]);
+    user1Key = Local.testAccounts[0].key;
+    user1Address = Local.testAccounts[0].key.toPublicKey();
+    user2Key = Local.testAccounts[1].key;
+    user2Address = Local.testAccounts[1].key.toPublicKey();
     usersPostsCountersMap = new MerkleMap();
     postsMap = new MerkleMap();
     const postsConfigJson: Config = JSON.parse(
@@ -135,7 +137,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn1 = await Mina.transaction(user1Address, () => {
+    const txn1 = await Mina.transaction(user1Address, async () => {
       postsContract.update(proof1);
     });
     await txn1.prove();
@@ -197,7 +199,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn2 = await Mina.transaction(user1Address, () => {
+    const txn2 = await Mina.transaction(user1Address, async () => {
       postsContract.update(proof2);
     });
     await txn2.prove();
@@ -258,7 +260,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn3 = await Mina.transaction(user1Address, () => {
+    const txn3 = await Mina.transaction(user1Address, async () => {
       postsContract.update(proof3);
     });
     await txn3.prove();
@@ -384,7 +386,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn4 = await Mina.transaction(user1Address, () => {
+    const txn4 = await Mina.transaction(user1Address, async () => {
       postsContract.update(mergedTransitionProofs1);
     });
     await txn4.prove();
@@ -495,7 +497,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn5 = await Mina.transaction(user1Address, () => {
+    const txn5 = await Mina.transaction(user1Address, async () => {
       postsContract.update(mergedTransitionProofs2);
     });
     await txn5.prove();
@@ -605,7 +607,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn6 = await Mina.transaction(user1Address, () => {
+    const txn6 = await Mina.transaction(user1Address, async () => {
       postsContract.update(mergedTransitionProofs3);
     });
     await txn6.prove();
@@ -666,7 +668,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn7 = await Mina.transaction(user1Address, () => {
+    const txn7 = await Mina.transaction(user1Address, async () => {
       postsContract.update(proof10);
     });
     await txn7.prove();
@@ -776,7 +778,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn8 = await Mina.transaction(user1Address, () => {
+    const txn8 = await Mina.transaction(user1Address, async () => {
       postsContract.update(mergedTransitionProofs4);
     });
     await txn8.prove();
@@ -894,7 +896,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn9 = await Mina.transaction(user1Address, () => {
+    const txn9 = await Mina.transaction(user1Address, async () => {
       postsContract.update(mergedTransitionProofs5);
     });
     await txn9.prove();

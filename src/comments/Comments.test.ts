@@ -28,8 +28,7 @@ import {
 let proofsEnabled = true;
 
 describe(`the CommentsContract and the Comments ZkProgram`, () => {
-  let Local: ReturnType<typeof Mina.LocalBlockchain>,
-    user1Address: PublicKey,
+  let user1Address: PublicKey,
     user1Key: PrivateKey,
     user2Address: PublicKey,
     user2Key: PrivateKey,
@@ -43,7 +42,8 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     commentsContract: CommentsContract,
     usersCommentsCountersMap: MerkleMap,
     targetsCommentsCountersMap: MerkleMap,
-    commentsMap: MerkleMap;
+    commentsMap: MerkleMap,
+    Local: any
 
   beforeAll(async () => {
     if (proofsEnabled) {
@@ -60,11 +60,12 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
   });
 
   beforeEach(async () => {
-    Local = Mina.LocalBlockchain({ proofsEnabled });
+    Local = await Mina.LocalBlockchain({ proofsEnabled });
     Mina.setActiveInstance(Local);
-    ({ privateKey: user1Key, publicKey: user1Address } = Local.testAccounts[0]);
-    ({ privateKey: user2Key, publicKey: user2Address } = Local.testAccounts[1]);
-
+    user1Key = Local.testAccounts[0].key;
+    user1Address = Local.testAccounts[0].key.toPublicKey();
+    user2Key = Local.testAccounts[1].key;
+    user2Address = Local.testAccounts[1].key.toPublicKey();
     const configJson: Config = JSON.parse(
       await fs.readFile('config.json', 'utf8')
     );
@@ -188,7 +189,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn1 = await Mina.transaction(user1Address, () => {
+    const txn1 = await Mina.transaction(user1Address, async () => {
       postsContract.update(proof1);
     });
     await txn1.prove();
@@ -276,7 +277,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn2 = await Mina.transaction(user1Address, () => {
+    const txn2 = await Mina.transaction(user1Address, async () => {
       commentsContract.update(proof2);
     });
     await txn2.prove();
@@ -355,7 +356,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn3 = await Mina.transaction(user1Address, () => {
+    const txn3 = await Mina.transaction(user1Address, async () => {
       commentsContract.update(proof3);
     });
     await txn3.prove();
@@ -432,7 +433,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Send valid proof to update our on-chain state
-    const txn4 = await Mina.transaction(user1Address, () => {
+    const txn4 = await Mina.transaction(user1Address, async () => {
       commentsContract.update(proof4);
     });
     await txn4.prove();
@@ -600,7 +601,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
       );
 
     // Send valid proof to update our on-chain state
-    const txn5 = await Mina.transaction(user1Address, () => {
+    const txn5 = await Mina.transaction(user1Address, async () => {
       commentsContract.update(mergedTransitionProofs1);
     });
     await txn5.prove();

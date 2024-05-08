@@ -389,7 +389,7 @@ export const Reactions = ZkProgram({
         ReactionState,
       ],
 
-      method(
+      async method(
         transition: ReactionsTransition,
         signature: Signature,
         targets: Field,
@@ -449,7 +449,7 @@ export const Reactions = ZkProgram({
         Field,
       ],
 
-      method(
+      async method(
         transition: ReactionsTransition,
         signature: Signature,
         targets: Field,
@@ -499,7 +499,7 @@ export const Reactions = ZkProgram({
         Field,
       ],
 
-      method(
+      async method(
         transition: ReactionsTransition,
         signature: Signature,
         targets: Field,
@@ -536,7 +536,7 @@ export const Reactions = ZkProgram({
     proveMergedReactionsTransitions: {
       privateInputs: [SelfProof, SelfProof],
 
-      method(
+      async method(
         mergedReactionsTransitions: ReactionsTransition,
         reactionsTransition1Proof: SelfProof<ReactionsTransition, undefined>,
         reactionsTransition2Proof: SelfProof<ReactionsTransition, undefined>

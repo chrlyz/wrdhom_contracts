@@ -385,7 +385,7 @@ export const Comments = ZkProgram({
         CommentState,
       ],
 
-      method(
+      async method(
         transition: CommentsTransition,
         signature: Signature,
         targets: Field,
@@ -445,7 +445,7 @@ export const Comments = ZkProgram({
         Field,
       ],
 
-      method(
+      async method(
         transition: CommentsTransition,
         signature: Signature,
         targets: Field,
@@ -495,7 +495,7 @@ export const Comments = ZkProgram({
         Field,
       ],
 
-      method(
+      async method(
         transition: CommentsTransition,
         signature: Signature,
         targets: Field,
@@ -532,7 +532,7 @@ export const Comments = ZkProgram({
     proveMergedCommentsTransitions: {
       privateInputs: [SelfProof, SelfProof],
 
-      method(
+      async method(
         mergedCommentsTransitions: CommentsTransition,
         commentsTransition1Proof: SelfProof<CommentsTransition, undefined>,
         commentsTransition2Proof: SelfProof<CommentsTransition, undefined>

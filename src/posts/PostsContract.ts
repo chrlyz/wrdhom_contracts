@@ -7,6 +7,7 @@ import {
   UInt32,
   MerkleMap,
   PublicKey,
+  Gadgets
 } from 'o1js';
 import { PostsProof } from './Posts.js';
 import { Config } from './PostsDeploy';
@@ -42,12 +43,13 @@ export class PostsContract extends SmartContract {
     this.posts.set(newMerkleMapRoot);
   }
 
-  @method update(proof: PostsProof) {
+  @method async update(proof: PostsProof) {
     proof.verify();
+    Gadgets.rangeCheck32(proof.publicInput.blockHeight);
 
     this.network.blockchainLength.requireBetween(
-      UInt32.from(proof.publicInput.blockHeight),
-      UInt32.from(proof.publicInput.blockHeight).add(1)
+      UInt32.Unsafe.fromField(proof.publicInput.blockHeight),
+      UInt32.Unsafe.fromField(proof.publicInput.blockHeight).add(1)
     );
 
     const currentAllPostsCounter = this.allPostsCounter.getAndRequireEquals();

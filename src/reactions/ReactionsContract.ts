@@ -1,4 +1,4 @@
-import { Field, SmartContract, state, State, method, UInt32 } from 'o1js';
+import { Field, SmartContract, state, State, method, UInt32, Gadgets } from 'o1js';
 import { ReactionsProof } from './Reactions.js';
 import {
   PostsContract,
@@ -22,12 +22,13 @@ export class ReactionsContract extends SmartContract {
     this.reactions.set(newMerkleMapRoot);
   }
 
-  @method update(proof: ReactionsProof) {
+  @method async update(proof: ReactionsProof) {
     proof.verify();
+    Gadgets.rangeCheck32(proof.publicInput.blockHeight);
 
     this.network.blockchainLength.requireBetween(
-      UInt32.from(proof.publicInput.blockHeight),
-      UInt32.from(proof.publicInput.blockHeight).add(1)
+      UInt32.Unsafe.fromField(proof.publicInput.blockHeight),
+      UInt32.Unsafe.fromField(proof.publicInput.blockHeight).add(1)
     );
 
     const postsContract = new PostsContract(postsContractAddress);
