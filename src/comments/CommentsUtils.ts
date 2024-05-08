@@ -24,7 +24,7 @@ export async function deployCommentsContract(
   commentsContract: CommentsContract,
   commentsContractKey: PrivateKey
 ) {
-  const txn = await Mina.transaction(deployerAddress, () => {
+  const txn = await Mina.transaction(deployerAddress, async () => {
     AccountUpdate.fundNewAccount(deployerAddress);
     commentsContract.deploy();
   });

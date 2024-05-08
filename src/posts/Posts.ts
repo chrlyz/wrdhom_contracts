@@ -265,7 +265,7 @@ export const Posts = ZkProgram({
         MerkleMapWitness,
       ],
 
-      method(
+      async method(
         transition: PostsTransition,
         signature: Signature,
         initialAllPostsCounter: Field,
@@ -307,7 +307,7 @@ export const Posts = ZkProgram({
         Field,
       ],
 
-      method(
+      async method(
         transition: PostsTransition,
         signature: Signature,
         allPostsCounter: Field,
@@ -335,17 +335,17 @@ export const Posts = ZkProgram({
     proveMergedPostsTransitions: {
       privateInputs: [SelfProof, SelfProof],
 
-      method(
+      async method(
         mergedPostTransitions: PostsTransition,
-        postsDeletion1Proof: SelfProof<PostsTransition, undefined>,
-        postsDeletion2Proof: SelfProof<PostsTransition, undefined>
+        posts1TransitionProof: SelfProof<PostsTransition, undefined>,
+        postsTransition2Proof: SelfProof<PostsTransition, undefined>
       ) {
-        postsDeletion1Proof.verify();
-        postsDeletion2Proof.verify();
+        posts1TransitionProof.verify();
+        postsTransition2Proof.verify();
 
         const computedTransition = PostsTransition.mergePostsTransitions(
-          postsDeletion1Proof.publicInput,
-          postsDeletion2Proof.publicInput
+          posts1TransitionProof.publicInput,
+          postsTransition2Proof.publicInput
         );
         PostsTransition.assertEquals(computedTransition, mergedPostTransitions);
       },
@@ -363,7 +363,7 @@ export const Posts = ZkProgram({
         Field,
       ],
 
-      method(
+      async method(
         transition: PostsTransition,
         signature: Signature,
         allPostsCounter: Field,

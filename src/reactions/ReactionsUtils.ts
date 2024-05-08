@@ -23,7 +23,7 @@ export async function deployReactionsContract(
   reactionsContract: ReactionsContract,
   reactionsContractKey: PrivateKey
 ) {
-  const txn = await Mina.transaction(deployerAddress, () => {
+  const txn = await Mina.transaction(deployerAddress, async () => {
     AccountUpdate.fundNewAccount(deployerAddress);
     reactionsContract.deploy();
   });

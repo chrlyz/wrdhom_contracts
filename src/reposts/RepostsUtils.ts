@@ -24,7 +24,7 @@ export async function deployRepostsContract(
   repostsContract: RepostsContract,
   repostsContractKey: PrivateKey
 ) {
-  const txn = await Mina.transaction(deployerAddress, () => {
+  const txn = await Mina.transaction(deployerAddress, async () => {
     AccountUpdate.fundNewAccount(deployerAddress);
     repostsContract.deploy();
   });

@@ -33,7 +33,7 @@ let sentTx;
 try {
   const txn = await Mina.transaction(
     { sender: feePayerAddress, fee: fee },
-    () => {
+    async () => {
       AccountUpdate.fundNewAccount(feePayerAddress);
       commentsContract.deploy();
     }
@@ -50,6 +50,6 @@ if (sentTx !== undefined) {
   
   Your smart contract will be live as soon
   as the transaction is included in a block:
-  https://berkeley.minaexplorer.com/transaction/${sentTx.hash}
+  https://devnet.minaexplorer.com/transaction/${sentTx.hash}
   `);
 }

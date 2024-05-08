@@ -370,7 +370,7 @@ export const Reposts = ZkProgram({
         RepostState,
       ],
 
-      method(
+      async method(
         transition: RepostsTransition,
         signature: Signature,
         targets: Field,
@@ -430,7 +430,7 @@ export const Reposts = ZkProgram({
         Field,
       ],
 
-      method(
+      async method(
         transition: RepostsTransition,
         signature: Signature,
         targets: Field,
@@ -480,7 +480,7 @@ export const Reposts = ZkProgram({
         Field,
       ],
 
-      method(
+      async method(
         transition: RepostsTransition,
         signature: Signature,
         targets: Field,
@@ -517,7 +517,7 @@ export const Reposts = ZkProgram({
     proveMergedRepostsTransitions: {
       privateInputs: [SelfProof, SelfProof],
 
-      method(
+      async method(
         mergedRepostsTransitions: RepostsTransition,
         repostsTransition1Proof: SelfProof<RepostsTransition, undefined>,
         repostsTransition2Proof: SelfProof<RepostsTransition, undefined>
