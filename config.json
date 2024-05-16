@@ -1,4 +1,37 @@
 {
   "version": 1,
-  "deployAliases": {}
+  "deployAliases": {
+    "posts": {
+      "networkId": "testnet",
+      "url": "https://proxy.devnet.minaexplorer.com/graphql",
+      "keyPath": "keys/posts.json",
+      "feepayerKeyPath": "/home/chrlyz/.cache/zkapp-cli/keys/devnet-fee-payer.json",
+      "feepayerAlias": "devnet-fee-payer",
+      "fee": "0.1"
+    },
+    "comments": {
+      "networkId": "testnet",
+      "url": "https://proxy.devnet.minaexplorer.com/graphql",
+      "keyPath": "keys/comments.json",
+      "feepayerKeyPath": "/home/chrlyz/.cache/zkapp-cli/keys/devnet-fee-payer.json",
+      "feepayerAlias": "devnet-fee-payer",
+      "fee": "0.1"
+    },
+    "reactions": {
+      "networkId": "testnet",
+      "url": "https://proxy.devnet.minaexplorer.com/graphql",
+      "keyPath": "keys/reactions.json",
+      "feepayerKeyPath": "/home/chrlyz/.cache/zkapp-cli/keys/devnet-fee-payer.json",
+      "feepayerAlias": "devnet-fee-payer",
+      "fee": "0.1"
+    },
+    "reposts": {
+      "networkId": "testnet",
+      "url": "https://proxy.devnet.minaexplorer.com/graphql",
+      "keyPath": "keys/reposts.json",
+      "feepayerKeyPath": "/home/chrlyz/.cache/zkapp-cli/keys/devnet-fee-payer.json",
+      "feepayerAlias": "devnet-fee-payer",
+      "fee": "0.1"
+    }
+  }
 }
