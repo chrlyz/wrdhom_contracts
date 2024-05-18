@@ -1,23 +1,14 @@
-import { PostsContract } from './PostsContract';
-import { PostsContractB } from './PostsContractB';
-import { PostsTransition, PostState, PostsBlockHashing } from './Posts';
+import { PostsContract } from './PostsContract.js';
+import { PostsSubcontractA } from './PostsSubcontractA.js';
+import { PostsSubcontractB } from './PostsSubcontractB.js'; 
+import { PostPublishingTransactionHashing } from './Posts';
 import {
-  Field,
   Mina,
   PrivateKey,
   PublicKey,
-  CircuitString,
-  Poseidon,
   MerkleMap,
-  UInt32,
 } from 'o1js';
 import fs from 'fs/promises';
-import {
-  deployPostsContract,
-  createPostPublishingTransitionValidInputs,
-  createPostDeletionTransitionValidInputs,
-  createPostRestorationTransitionValidInputs,
-} from './PostsUtils';
 
 let proofsEnabled = true;
 
@@ -48,16 +39,18 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
 
   beforeAll(async () => {
     if (proofsEnabled) {
-      console.log('Compiling Posts ZkProgram...');
-      const zkProgramAnalysis = await PostsBlockHashing.analyzeMethods();
+      console.log('Compiling PostPublishingTransactionHashing ZkProgram...');
+      const zkProgramAnalysis = await PostPublishingTransactionHashing.analyzeMethods();
       console.log(zkProgramAnalysis)
-      //await Posts.compile();
       console.log('Compiling PostsContract...');
       const contractAnalysis = await PostsContract.analyzeMethods()
-      console.log(contractAnalysis)
-      const contractBAnalysis = await PostsContractB.analyzeMethods()
-      console.log(contractBAnalysis)
-      //await PostsContract.compile();
+      console.log(contractAnalysis);
+      console.log('Compiling PostsSubcontractA...');
+      const PostsSubcontractAAnalysis = await PostsSubcontractA.analyzeMethods()
+      console.log(PostsSubcontractAAnalysis);
+      console.log('Compiling PostsSubcontractB...');
+      const PostsSubcontractBAnalysis = await PostsSubcontractB.analyzeMethods()
+      console.log(PostsSubcontractBAnalysis);
       console.log('Compiled');
     }
   });
@@ -74,7 +67,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     const postsConfigJson: Config = JSON.parse(
       await fs.readFile('config.json', 'utf8')
     );
-    const postsConfig = postsConfigJson.deployAliases['posts'];
+    const postsConfig = postsConfigJson.deployAliases['postsContract'];
     const postsContractKeysBase58: { privateKey: string; publicKey: string } =
       JSON.parse(await fs.readFile(postsConfig.keyPath, 'utf8'));
     postsContractKey = PrivateKey.fromBase58(
