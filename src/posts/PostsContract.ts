@@ -10,11 +10,21 @@ import {
   MerkleTree,
   MerkleWitness,
   Signature,
-  Poseidon
+  Gadgets
 } from 'o1js';
-import { PostsTransition, PostsBlockProof } from './Posts.js';
+import { PostsSubcontractA, postsSubcontractAAddress } from './PostsSubcontractA.js';
+import { PostsSubcontractB, postsSubcontractBAddress } from './PostsSubcontractB.js'; 
+import { PostPublishingTransactionProof } from './Posts.js';
 import fs from 'fs/promises';
-import { PostsContractB } from './PostsContractB.js';
+
+// ============================================================================
+
+const newMerkleMap = new MerkleMap();
+export const newMerkleMapRoot = newMerkleMap.getRoot();
+
+const newMerkleTree = new MerkleTree(255);
+const newMerkleTreeRoot = newMerkleTree.getRoot();
+class MerkleWitness255 extends MerkleWitness(255) {}
 
 export type Config = {
   deployAliases: Record<
@@ -29,19 +39,10 @@ export type Config = {
   >;
 };
 
-// ============================================================================
-
-const newMerkleMap = new MerkleMap();
-export const newMerkleMapRoot = newMerkleMap.getRoot();
-
-const newMerkleTree = new MerkleTree(255);
-const newMerkleTreeRoot = newMerkleTree.getRoot();
-class MerkleWitness255 extends MerkleWitness(255) {}
-
-const postsConfigJson: Config = JSON.parse(
+export const configJson: Config = JSON.parse(
   await fs.readFile('config.json', 'utf8')
 );
-const postsConfig = postsConfigJson.deployAliases['posts'];
+const postsConfig = configJson.deployAliases['postsContract'];
 const postsContractAddressBase58: { publicKey: string } = JSON.parse(
   await fs.readFile(postsConfig.keyPath, 'utf8')
 );
@@ -49,130 +50,80 @@ export const postsContractAddress = PublicKey.fromBase58(
   postsContractAddressBase58.publicKey
 );
 
-const BLOCKS_IN_A_DAY = 480;
-
 // ============================================================================
 
 export class PostsContract extends SmartContract {
   @state(Field) allPostsCounter = State<Field>();
   @state(Field) usersPostsCounters = State<Field>();
   @state(Field) posts = State<Field>();
-  @state(Field) postsBlockchain = State<Field>();
   @state(Field) lastValidState = State<Field>();
+  @state(Field) postsBatch = State<Field>();
 
   init() {
     super.init();
     this.allPostsCounter.set(Field(0));
     this.usersPostsCounters.set(newMerkleMapRoot);
     this.posts.set(newMerkleMapRoot);
-    this.postsBlockchain.set(newMerkleTreeRoot);
     this.lastValidState.set(Field(0));
+    this.postsBatch.set(newMerkleTreeRoot);
   }
 
-  @method async updatePostsBlockChain(
+  @method async updatePostsContractState(
     signature: Signature,
-    transitionBlockheight: UInt32,
+    postPublishingTransactionBatchPrimerProof: PostPublishingTransactionProof,
+    postPublishingTransactionBatchPrimerWitness: MerkleWitness255,
     allPostsCounterUpdate: Field,
     usersPostsCountersUpdate: Field,
     postsUpdate: Field,
-    postsBlockchainUpdate: Field
+    postsBatchUpdate: Field
   ) {
-    const isSignatureValid = signature.verify(postsContractAddress, [postsBlockchainUpdate]);
+    const isSignatureValid = signature.verify(postsContractAddress, [postsBatchUpdate]);
     isSignatureValid.assertTrue();
 
+    postPublishingTransactionBatchPrimerWitness.calculateIndex().assertEquals(Field(0));
+
+    const postPublishingTransactionBatchPrimerWitnessRoot = postPublishingTransactionBatchPrimerWitness.calculateRoot(postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransactionHash);
+    postPublishingTransactionBatchPrimerWitnessRoot.assertEquals(postsBatchUpdate);
+
+    postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.initialAllPostsCounter.assertEquals(
+      this.allPostsCounter.getAndRequireEquals()
+    );
+    postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.initialUsersPostsCounters.assertEquals(
+      this.usersPostsCounters.getAndRequireEquals()
+    );
+    postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.initialPosts.assertEquals(
+      this.posts.getAndRequireEquals()
+    );
+
+    Gadgets.rangeCheck32(postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.blockHeight);
     this.network.blockchainLength.requireBetween(
-      transitionBlockheight,
-      transitionBlockheight.add(1)
+      UInt32.Unsafe.fromField(postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.blockHeight),
+      UInt32.Unsafe.fromField(postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.blockHeight).add(1)
     );
 
     this.allPostsCounter.set(allPostsCounterUpdate);
     this.usersPostsCounters.set(usersPostsCountersUpdate);
     this.posts.set(postsUpdate);
-    this.postsBlockchain.set(postsBlockchainUpdate);
+    this.postsBatch.set(postsBatchUpdate);
   }
 
-  @method async provePostsTransitionErrorAndRollback(
-    postsBlock1Proof: PostsBlockProof,
-    postsBlock2Proof: PostsBlockProof,
-    postsBlock1Witness: MerkleWitness255,
-    postsBlock2Witness: MerkleWitness255,
-    allPostsCounter: Field,
-    usersPostsCounters: Field,
-    posts: Field,
-    postsBlockchain: Field
-  ) {
-    const postsBlock1WitnessRoot = postsBlock1Witness.calculateRoot(postsBlock1Proof.publicInput.postsBlockHash);
-    const postsBlock2WitnessRoot = postsBlock2Witness.calculateRoot(postsBlock2Proof.publicInput.postsBlockHash);
-    postsBlock1WitnessRoot.assertEquals(postsBlock2WitnessRoot);
-    postsBlock1WitnessRoot.assertEquals(this.postsBlockchain.getAndRequireEquals());
+  @method async rollbackByPostsSubcontractA() {
+    const postsSubcontractA = new PostsSubcontractA(postsSubcontractAAddress);
 
-    const postsBlock1WitnessIndex = postsBlock1Witness.calculateIndex();
-    const postsBlock2WitnessIndex = postsBlock2Witness.calculateIndex();
-    postsBlock2WitnessIndex.assertEquals(postsBlock1WitnessIndex.add(1));
+    postsSubcontractA.lastValidState.getAndRequireEquals().assertEquals(this.lastValidState.getAndRequireEquals());
 
-    const initialAllPostsCounterIsValid = postsBlock1Proof.publicInput.postsBlock.zkProgramMethodInputs.transition.latestAllPostsCounter.equals(
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.transition.initialAllPostsCounter
-    );
-    const initialUsersPostsCountersIsValid = postsBlock1Proof.publicInput.postsBlock.zkProgramMethodInputs.transition.latestUsersPostsCounters.equals(
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.transition.initialUsersPostsCounters
-    );
-    const initialPostsIsValid = postsBlock1Proof.publicInput.postsBlock.zkProgramMethodInputs.transition.latestPosts.equals(
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.transition.initialPosts
-    );
-    const isInitialStateValid = initialAllPostsCounterIsValid.and(initialUsersPostsCountersIsValid).and(initialPostsIsValid);
-    isInitialStateValid.assertTrue();
-    
-    const transition =
-    PostsTransition.createPostPublishingTransition(
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.signature,
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.initialAllPostsCounter,
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.initialUsersPostsCounters,
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.latestUsersPostsCounters,
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.initialUserPostsCounter,
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.userPostsCounterWitness,
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.initialPosts,
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.latestPosts,
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.postState,
-      postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.postWitness
-    );
-    const latestAllPostsCounterIsEqual = transition.latestAllPostsCounter.equals(postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.transition.latestAllPostsCounter);
-    const latestUsersPostsCountersIsEqual = transition.latestUsersPostsCounters.equals(postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.transition.latestUsersPostsCounters);
-    const latestPostsIsEqual = transition.latestPosts.equals(postsBlock2Proof.publicInput.postsBlock.zkProgramMethodInputs.transition.latestPosts);
-    const isStateValid = latestAllPostsCounterIsEqual.and(latestUsersPostsCountersIsEqual).and(latestPostsIsEqual);
-    isStateValid.assertFalse();
-
-    const lastValidState = Poseidon.hash([allPostsCounter, usersPostsCounters, posts, postsBlockchain]);
-    const currentLastValidState = this.lastValidState.getAndRequireEquals();
-    lastValidState.assertEquals(currentLastValidState);
-
-    this.allPostsCounter.set(allPostsCounter);
-    this.usersPostsCounters.set(usersPostsCounters);
-    this.posts.set(posts);
-    this.postsBlockchain.set(postsBlockchain);
+    this.allPostsCounter.set(postsSubcontractA.allPostsCounter.getAndRequireEquals());
+    this.usersPostsCounters.set(postsSubcontractA.usersPostsCounters.getAndRequireEquals());
+    this.posts.set(postsSubcontractA.posts.getAndRequireEquals());
   }
 
-  @method async setLastValidState() {
-    this.network.blockchainLength.getAndRequireEquals().divMod(BLOCKS_IN_A_DAY).rest.assertEquals(UInt32.Unsafe.fromField(Field(0)));
+  @method async rollbackByPostsSubcontractB() {
+    const postsSubcontractB = new PostsSubcontractB(postsSubcontractBAddress);
 
-    const currentAllPostsCounter = this.allPostsCounter.getAndRequireEquals();
-    const currentUsersPostsCounters = this.usersPostsCounters.getAndRequireEquals();
-    const currentPosts = this.posts.getAndRequireEquals();
-    const currentPostsBlockchain = this.postsBlockchain.getAndRequireEquals();
+    postsSubcontractB.lastValidState.getAndRequireEquals().assertEquals(this.lastValidState.getAndRequireEquals());
 
-    const lastValidState = Poseidon.hash([
-      currentAllPostsCounter,
-      currentUsersPostsCounters,
-      currentPosts,
-      currentPostsBlockchain
-    ]);
-
-    this.lastValidState.set(lastValidState);
-  }
-
-  @method async rollbackByPostsContractB() {
-    const postsContractB = new PostsContractB(postsContractAddress);
-    const currentPostsBlockchainB = postsContractB.postsBlockchain.getAndRequireEquals();
-
-    this.postsBlockchain.set(currentPostsBlockchainB);
+    this.allPostsCounter.set(postsSubcontractB.allPostsCounter.getAndRequireEquals());
+    this.usersPostsCounters.set(postsSubcontractB.usersPostsCounters.getAndRequireEquals());
+    this.posts.set(postsSubcontractB.posts.getAndRequireEquals());
   }
 }

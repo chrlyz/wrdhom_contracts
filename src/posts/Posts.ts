@@ -124,7 +124,7 @@ export class PostsTransition extends Struct({
 
 // ============================================================================
 
-export class ZkProgramMethodInputs extends Struct({
+export class createPostPublishingTransitionInputs extends Struct({
   transition: PostsTransition,
   signature: Signature,
   initialAllPostsCounter: Field,
@@ -140,69 +140,58 @@ export class ZkProgramMethodInputs extends Struct({
 
 // ============================================================================
 
-export class PostsBlock extends Struct({
-  zkProgramMethodInputs: ZkProgramMethodInputs
+export class PostPublishingTransaction extends Struct({
+  createPostPublishingTransitionInputs: createPostPublishingTransitionInputs
 }) {
   hash(): Field {
     return Poseidon.hash(
-      [this.zkProgramMethodInputs.transition.hash()]
-      .concat(this.zkProgramMethodInputs.signature.toFields())
+      [this.createPostPublishingTransitionInputs.transition.hash()]
+      .concat(this.createPostPublishingTransitionInputs.signature.toFields())
       .concat([
-      this.zkProgramMethodInputs.initialAllPostsCounter,
-      this.zkProgramMethodInputs.initialUsersPostsCounters,
-      this.zkProgramMethodInputs.latestUsersPostsCounters,
-      this.zkProgramMethodInputs.initialUserPostsCounter
+      this.createPostPublishingTransitionInputs.initialAllPostsCounter,
+      this.createPostPublishingTransitionInputs.initialUsersPostsCounters,
+      this.createPostPublishingTransitionInputs.latestUsersPostsCounters,
+      this.createPostPublishingTransitionInputs.initialUserPostsCounter
       ])
-      .concat(this.zkProgramMethodInputs.userPostsCounterWitness.toFields())
+      .concat(this.createPostPublishingTransitionInputs.userPostsCounterWitness.toFields())
       .concat([
-      this.zkProgramMethodInputs.initialPosts,
-      this.zkProgramMethodInputs.latestPosts,
-      this.zkProgramMethodInputs.postState.hash()
+      this.createPostPublishingTransitionInputs.initialPosts,
+      this.createPostPublishingTransitionInputs.latestPosts,
+      this.createPostPublishingTransitionInputs.postState.hash()
       ])
-      .concat(this.zkProgramMethodInputs.postWitness.toFields())
+      .concat(this.createPostPublishingTransitionInputs.postWitness.toFields())
     );
   }
 }
 
 // ============================================================================
 
-export class PostsBlockHash extends Struct({
-  postsBlock: PostsBlock,
-  postsBlockHash: Field,
+export class PostPublishingTransactionHash extends Struct({
+  postPublishingTransaction: PostPublishingTransaction,
+  postPublishingTransactionHash: Field,
 }) {}
 
 // ============================================================================
 
-export class LastValidStateHash extends Struct({
-  field1: Field,
-  field2: Field,
-  field3: Field,
-  field4: Field,
-  field5: Field,
-  lastValidStateHash: Field
-}) {}
-
-// ============================================================================
-
-export const PostsBlockHashing = ZkProgram({
-  name: 'PostsBlockHashing',
-  publicInput: PostsBlockHash,
+export const PostPublishingTransactionHashing = ZkProgram({
+  name: 'PostPublishingTransactionHashing',
+  publicInput: PostPublishingTransactionHash,
 
   methods: {
-    provePostsBlockHash: {
+    provePostPublishingTransactionHash: {
       privateInputs: [],
 
       async method(
-        provedPostsBlock: PostsBlockHash
+        provedPostPublishingTransaction: PostPublishingTransactionHash
       ) {
-        const computedHash = provedPostsBlock.postsBlock.hash();
-        computedHash.assertEquals(provedPostsBlock.postsBlockHash)
+        const computedHash = provedPostPublishingTransaction.postPublishingTransaction.hash();
+        computedHash.assertEquals(provedPostPublishingTransaction.postPublishingTransactionHash)
       },
     },
   },
 });
 
-export let PostsBlockProof_ = ZkProgram.Proof(PostsBlockHashing);
-export class PostsBlockProof extends PostsBlockProof_ {}
+export let PostPublishingTransactionProof_ = ZkProgram.Proof(PostPublishingTransactionHashing);
+export class PostPublishingTransactionProof extends PostPublishingTransactionProof_ {}
 
 // ============================================================================

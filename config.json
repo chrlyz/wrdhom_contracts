@@ -1,7 +1,7 @@
 {
   "version": 1,
   "deployAliases": {
-    "posts": {
+    "postsContract": {
       "networkId": "testnet",
       "url": "https://proxy.devnet.minaexplorer.com/graphql",
       "keyPath": "keys/posts.json",
@@ -29,6 +29,22 @@
       "networkId": "testnet",
       "url": "https://proxy.devnet.minaexplorer.com/graphql",
       "keyPath": "keys/reposts.json",
+      "feepayerKeyPath": "/home/chrlyz/.cache/zkapp-cli/keys/devnet-fee-payer.json",
+      "feepayerAlias": "devnet-fee-payer",
+      "fee": "0.1"
+    },
+    "postsSubcontractA": {
+      "networkId": "testnet",
+      "url": "https://proxy.devnet.minaexplorer.com/graphql",
+      "keyPath": "keys/postssubcontracta.json",
+      "feepayerKeyPath": "/home/chrlyz/.cache/zkapp-cli/keys/devnet-fee-payer.json",
+      "feepayerAlias": "devnet-fee-payer",
+      "fee": "0.1"
+    },
+    "postsSubcontractB": {
+      "networkId": "testnet",
+      "url": "https://proxy.devnet.minaexplorer.com/graphql",
+      "keyPath": "keys/'postssubcontractb'.json",
       "feepayerKeyPath": "/home/chrlyz/.cache/zkapp-cli/keys/devnet-fee-payer.json",
       "feepayerAlias": "devnet-fee-payer",
       "fee": "0.1"
