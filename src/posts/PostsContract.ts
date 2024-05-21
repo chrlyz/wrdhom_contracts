@@ -22,9 +22,9 @@ import fs from 'fs/promises';
 const newMerkleMap = new MerkleMap();
 export const newMerkleMapRoot = newMerkleMap.getRoot();
 
-const newMerkleTree = new MerkleTree(255);
+const newMerkleTree = new MerkleTree(256);
 const newMerkleTreeRoot = newMerkleTree.getRoot();
-class MerkleWitness255 extends MerkleWitness(255) {}
+class MerkleWitness256 extends MerkleWitness(256) {}
 
 export type Config = {
   deployAliases: Record<
@@ -57,7 +57,7 @@ export class PostsContract extends SmartContract {
   @state(Field) usersPostsCounters = State<Field>();
   @state(Field) posts = State<Field>();
   @state(Field) lastValidState = State<Field>();
-  @state(Field) postsBatch = State<Field>();
+  @state(Field) postPublishingTransactions = State<Field>();
 
   init() {
     super.init();
@@ -65,46 +65,46 @@ export class PostsContract extends SmartContract {
     this.usersPostsCounters.set(newMerkleMapRoot);
     this.posts.set(newMerkleMapRoot);
     this.lastValidState.set(Field(0));
-    this.postsBatch.set(newMerkleTreeRoot);
+    this.postPublishingTransactions.set(newMerkleTreeRoot);
   }
 
-  @method async updatePostsContractState(
+  @method async applyPostPublishingTransactions(
     signature: Signature,
-    postPublishingTransactionBatchPrimerProof: PostPublishingTransactionProof,
-    postPublishingTransactionBatchPrimerWitness: MerkleWitness255,
+    postPublishingTransactionsPrimerProof: PostPublishingTransactionProof,
+    postPublishingTransactionsPrimerWitness: MerkleWitness256,
     allPostsCounterUpdate: Field,
     usersPostsCountersUpdate: Field,
     postsUpdate: Field,
-    postsBatchUpdate: Field
+    postPublishingTransactionsUpdate: Field
   ) {
-    const isSignatureValid = signature.verify(postsContractAddress, [postsBatchUpdate]);
+    const isSignatureValid = signature.verify(postsContractAddress, [postPublishingTransactionsUpdate]);
     isSignatureValid.assertTrue();
 
-    postPublishingTransactionBatchPrimerWitness.calculateIndex().assertEquals(Field(0));
+    postPublishingTransactionsPrimerWitness.calculateIndex().assertEquals(Field(0));
 
-    const postPublishingTransactionBatchPrimerWitnessRoot = postPublishingTransactionBatchPrimerWitness.calculateRoot(postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransactionHash);
-    postPublishingTransactionBatchPrimerWitnessRoot.assertEquals(postsBatchUpdate);
+    const postPublishingTransactionsPrimerWitnessRoot = postPublishingTransactionsPrimerWitness.calculateRoot(postPublishingTransactionsPrimerProof.publicInput.postPublishingTransactionHash);
+    postPublishingTransactionsPrimerWitnessRoot.assertEquals(postPublishingTransactionsUpdate);
 
-    postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.initialAllPostsCounter.assertEquals(
+    postPublishingTransactionsPrimerProof.publicInput.postPublishingTransaction.transition.initialAllPostsCounter.assertEquals(
       this.allPostsCounter.getAndRequireEquals()
     );
-    postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.initialUsersPostsCounters.assertEquals(
+    postPublishingTransactionsPrimerProof.publicInput.postPublishingTransaction.transition.initialUsersPostsCounters.assertEquals(
       this.usersPostsCounters.getAndRequireEquals()
     );
-    postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.initialPosts.assertEquals(
+    postPublishingTransactionsPrimerProof.publicInput.postPublishingTransaction.transition.initialPosts.assertEquals(
       this.posts.getAndRequireEquals()
     );
 
-    Gadgets.rangeCheck32(postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.blockHeight);
+    Gadgets.rangeCheck32(postPublishingTransactionsPrimerProof.publicInput.postPublishingTransaction.transition.blockHeight);
     this.network.blockchainLength.requireBetween(
-      UInt32.Unsafe.fromField(postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.blockHeight),
-      UInt32.Unsafe.fromField(postPublishingTransactionBatchPrimerProof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.blockHeight).add(1)
+      UInt32.Unsafe.fromField(postPublishingTransactionsPrimerProof.publicInput.postPublishingTransaction.transition.blockHeight),
+      UInt32.Unsafe.fromField(postPublishingTransactionsPrimerProof.publicInput.postPublishingTransaction.transition.blockHeight).add(1)
     );
 
     this.allPostsCounter.set(allPostsCounterUpdate);
     this.usersPostsCounters.set(usersPostsCountersUpdate);
     this.posts.set(postsUpdate);
-    this.postsBatch.set(postsBatchUpdate);
+    this.postPublishingTransactions.set(postPublishingTransactionsUpdate);
   }
 
   @method async rollbackByPostsSubcontractA() {

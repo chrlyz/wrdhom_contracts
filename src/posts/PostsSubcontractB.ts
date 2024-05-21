@@ -16,8 +16,8 @@ import fs from 'fs/promises';
 
 // ============================================================================
 
-const newMerkleTree = new MerkleTree(255);
-class MerkleWitness255 extends MerkleWitness(255) {}
+const newMerkleTree = new MerkleTree(256);
+class MerkleWitness256 extends MerkleWitness(256) {}
 
 const configJson: Config = JSON.parse(
   await fs.readFile('config.json', 'utf8')
@@ -55,36 +55,36 @@ export class PostsSubcontractB extends SmartContract {
     this.lastValidState.set(lastValidStateCurrent);
   }
 
-  @method async proveBlockGapAndRollbackBlockchain(
-    postPublishingTransaction1Hashed: Field,
-    postPublishingTransaction2Hashed: Field,
-    postPublishingTransaction3Hashed: Field,
-    postPublishingTransaction1Witness: MerkleWitness255,
-    postPublishingTransaction2Witness: MerkleWitness255,
-    postPublishingTransaction3Witness: MerkleWitness255,
+  @method async provePostTransactionsGapAndRollbackBlockchain(
+    postTransaction1Hashed: Field,
+    postTransaction2Hashed: Field,
+    postTransaction3Hashed: Field,
+    postTransaction1Witness: MerkleWitness256,
+    postTransaction2Witness: MerkleWitness256,
+    postTransaction3Witness: MerkleWitness256,
     allPostsCounter: Field,
     usersPostsCounters: Field,
     posts: Field
   ) {
     const postsContract = new PostsContract(postsContractAddress);
-    const postsBatchCurrent = postsContract.postsBatch.getAndRequireEquals();
+    const postPublishingTransactionsCurrent = postsContract.postPublishingTransactions.getAndRequireEquals();
 
-    postPublishingTransaction1Hashed.assertNotEquals(Field(0));
-    postPublishingTransaction2Hashed.assertEquals(Field(0));
-    postPublishingTransaction3Hashed.assertNotEquals(Field(0));
+    postTransaction1Hashed.assertNotEquals(Field(0));
+    postTransaction2Hashed.assertEquals(Field(0));
+    postTransaction3Hashed.assertNotEquals(Field(0));
 
-    const postPublishingTransaction1WitnessRoot = postPublishingTransaction1Witness.calculateRoot(postPublishingTransaction1Hashed);
-    const postPublishingTransaction2WitnessRoot = postPublishingTransaction2Witness.calculateRoot(postPublishingTransaction2Hashed);
-    const postPublishingTransaction3WitnessRoot = postPublishingTransaction3Witness.calculateRoot(postPublishingTransaction3Hashed);
-    postPublishingTransaction1WitnessRoot.assertEquals(postPublishingTransaction2WitnessRoot);
-    postPublishingTransaction2WitnessRoot.assertEquals(postPublishingTransaction3WitnessRoot);
-    postPublishingTransaction3WitnessRoot.assertEquals(postsBatchCurrent);
+    const postTransaction1WitnessRoot = postTransaction1Witness.calculateRoot(postTransaction1Hashed);
+    const postTransaction2WitnessRoot = postTransaction2Witness.calculateRoot(postTransaction2Hashed);
+    const postTransaction3WitnessRoot = postTransaction3Witness.calculateRoot(postTransaction3Hashed);
+    postTransaction1WitnessRoot.assertEquals(postTransaction2WitnessRoot);
+    postTransaction2WitnessRoot.assertEquals(postTransaction3WitnessRoot);
+    postTransaction3WitnessRoot.assertEquals(postPublishingTransactionsCurrent);
 
-    const postPublishingTransaction1WitnessIndex = postPublishingTransaction1Witness.calculateIndex();
-    const postPublishingTransaction2WitnessIndex = postPublishingTransaction2Witness.calculateIndex();
-    const postPublishingTransaction3WitnessIndex = postPublishingTransaction3Witness.calculateIndex();
-    postPublishingTransaction2WitnessIndex.assertGreaterThan(postPublishingTransaction1WitnessIndex);
-    postPublishingTransaction3WitnessIndex.assertGreaterThan(postPublishingTransaction2WitnessIndex);
+    const postTransaction1WitnessIndex = postTransaction1Witness.calculateIndex();
+    const postTransaction2WitnessIndex = postTransaction2Witness.calculateIndex();
+    const postTransaction3WitnessIndex = postTransaction3Witness.calculateIndex();
+    postTransaction2WitnessIndex.assertGreaterThan(postTransaction1WitnessIndex);
+    postTransaction3WitnessIndex.assertGreaterThan(postTransaction2WitnessIndex);
 
     const lastValidStateCurrent = postsContract.lastValidState.getAndRequireEquals();
     const lastValidState = Poseidon.hash([allPostsCounter, usersPostsCounters, posts]);
@@ -96,29 +96,29 @@ export class PostsSubcontractB extends SmartContract {
     this.lastValidState.set(lastValidStateCurrent);
   }
 
-  @method async provePostsTransitionBlockheightErrorAndRollback(
+  @method async provePostPublishingBlockheightErrorAndRollback(
     postPublishingTransaction1Proof: PostPublishingTransactionProof,
     postPublishingTransaction2Proof: PostPublishingTransactionProof,
-    postPublishingTransaction1Witness: MerkleWitness255,
-    postPublishingTransaction2Witness: MerkleWitness255,
+    postPublishingTransaction1Witness: MerkleWitness256,
+    postPublishingTransaction2Witness: MerkleWitness256,
     allPostsCounter: Field,
     usersPostsCounters: Field,
     posts: Field
   ) {
     const postsContract = new PostsContract(postsContractAddress);
-    const postsBatchCurrent = postsContract.postsBatch.getAndRequireEquals();
+    const postPublishingTransactionsCurrent = postsContract.postPublishingTransactions.getAndRequireEquals();
 
     const postPublishingTransaction1WitnessRoot = postPublishingTransaction1Witness.calculateRoot(postPublishingTransaction1Proof.publicInput.postPublishingTransactionHash);
     const postPublishingTransaction2WitnessRoot = postPublishingTransaction2Witness.calculateRoot(postPublishingTransaction2Proof.publicInput.postPublishingTransactionHash);
     postPublishingTransaction1WitnessRoot.assertEquals(postPublishingTransaction2WitnessRoot);
-    postPublishingTransaction1WitnessRoot.assertEquals(postsBatchCurrent);
+    postPublishingTransaction1WitnessRoot.assertEquals(postPublishingTransactionsCurrent);
 
     const postPublishingTransaction1WitnessIndex = postPublishingTransaction1Witness.calculateIndex();
     const postPublishingTransaction2WitnessIndex = postPublishingTransaction2Witness.calculateIndex();
     postPublishingTransaction2WitnessIndex.assertEquals(postPublishingTransaction1WitnessIndex.add(1));
 
-    postPublishingTransaction2Proof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.blockHeight.assertEquals(
-      postPublishingTransaction1Proof.publicInput.postPublishingTransaction.createPostPublishingTransitionInputs.transition.blockHeight
+    postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.blockHeight.assertEquals(
+      postPublishingTransaction1Proof.publicInput.postPublishingTransaction.transition.blockHeight
     );
 
     const lastValidStateCurrent = postsContract.lastValidState.getAndRequireEquals();
