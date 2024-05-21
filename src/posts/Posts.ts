@@ -124,42 +124,38 @@ export class PostsTransition extends Struct({
 
 // ============================================================================
 
-export class createPostPublishingTransitionInputs extends Struct({
-  transition: PostsTransition,
-  signature: Signature,
-  initialAllPostsCounter: Field,
-  initialUsersPostsCounters: Field,
-  latestUsersPostsCounters: Field,
-  initialUserPostsCounter: Field,
-  userPostsCounterWitness: MerkleMapWitness,
-  initialPosts: Field,
-  latestPosts: Field,
-  postState: PostState,
-  postWitness: MerkleMapWitness
-}) {}
-
-// ============================================================================
-
 export class PostPublishingTransaction extends Struct({
-  createPostPublishingTransitionInputs: createPostPublishingTransitionInputs
+  transition: PostsTransition,
+  inputs: {
+    signature: Signature,
+    initialAllPostsCounter: Field,
+    initialUsersPostsCounters: Field,
+    latestUsersPostsCounters: Field,
+    initialUserPostsCounter: Field,
+    userPostsCounterWitness: MerkleMapWitness,
+    initialPosts: Field,
+    latestPosts: Field,
+    postState: PostState,
+    postWitness: MerkleMapWitness
+  }
 }) {
   hash(): Field {
     return Poseidon.hash(
-      [this.createPostPublishingTransitionInputs.transition.hash()]
-      .concat(this.createPostPublishingTransitionInputs.signature.toFields())
+      [this.transition.hash()]
+      .concat(this.inputs.signature.toFields())
       .concat([
-      this.createPostPublishingTransitionInputs.initialAllPostsCounter,
-      this.createPostPublishingTransitionInputs.initialUsersPostsCounters,
-      this.createPostPublishingTransitionInputs.latestUsersPostsCounters,
-      this.createPostPublishingTransitionInputs.initialUserPostsCounter
+      this.inputs.initialAllPostsCounter,
+      this.inputs.initialUsersPostsCounters,
+      this.inputs.latestUsersPostsCounters,
+      this.inputs.initialUserPostsCounter
       ])
-      .concat(this.createPostPublishingTransitionInputs.userPostsCounterWitness.toFields())
+      .concat(this.inputs.userPostsCounterWitness.toFields())
       .concat([
-      this.createPostPublishingTransitionInputs.initialPosts,
-      this.createPostPublishingTransitionInputs.latestPosts,
-      this.createPostPublishingTransitionInputs.postState.hash()
+      this.inputs.initialPosts,
+      this.inputs.latestPosts,
+      this.inputs.postState.hash()
       ])
-      .concat(this.createPostPublishingTransitionInputs.postWitness.toFields())
+      .concat(this.inputs.postWitness.toFields())
     );
   }
 }
