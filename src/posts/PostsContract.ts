@@ -10,7 +10,8 @@ import {
   MerkleTree,
   MerkleWitness,
   Signature,
-  Gadgets
+  Gadgets,
+  Poseidon
 } from 'o1js';
 import { PostsSubcontractA, postsSubcontractAAddress } from './PostsSubcontractA.js';
 import { PostsSubcontractB, postsSubcontractBAddress } from './PostsSubcontractB.js'; 
@@ -56,6 +57,7 @@ export class PostsContract extends SmartContract {
   @state(Field) allPostsCounter = State<Field>();
   @state(Field) usersPostsCounters = State<Field>();
   @state(Field) posts = State<Field>();
+  @state(Field) lastUpdateBlockHeight = State<Field>();
   @state(Field) lastValidState = State<Field>();
   @state(Field) postPublishingTransactions = State<Field>();
 
@@ -64,6 +66,7 @@ export class PostsContract extends SmartContract {
     this.allPostsCounter.set(Field(0));
     this.usersPostsCounters.set(newMerkleMapRoot);
     this.posts.set(newMerkleMapRoot);
+    this.lastUpdateBlockHeight.set(Field(0));
     this.lastValidState.set(Field(0));
     this.postPublishingTransactions.set(newMerkleTreeRoot);
   }
@@ -77,6 +80,10 @@ export class PostsContract extends SmartContract {
     postsUpdate: Field,
     postPublishingTransactionsUpdate: Field
   ) {
+    this.network.blockchainLength.getAndRequireEquals().value.assertGreaterThan(
+      this.lastUpdateBlockHeight.getAndRequireEquals().add(3)
+    );
+
     const isSignatureValid = signature.verify(postsContractAddress, [postPublishingTransactionsUpdate]);
     isSignatureValid.assertTrue();
 
@@ -98,13 +105,34 @@ export class PostsContract extends SmartContract {
     Gadgets.rangeCheck32(postPublishingTransactionsPrimerProof.publicInput.postPublishingTransaction.transition.blockHeight);
     this.network.blockchainLength.requireBetween(
       UInt32.Unsafe.fromField(postPublishingTransactionsPrimerProof.publicInput.postPublishingTransaction.transition.blockHeight),
-      UInt32.Unsafe.fromField(postPublishingTransactionsPrimerProof.publicInput.postPublishingTransaction.transition.blockHeight).add(1)
+      UInt32.Unsafe.fromField(postPublishingTransactionsPrimerProof.publicInput.postPublishingTransaction.transition.blockHeight)
     );
 
     this.allPostsCounter.set(allPostsCounterUpdate);
     this.usersPostsCounters.set(usersPostsCountersUpdate);
     this.posts.set(postsUpdate);
+    this.lastUpdateBlockHeight.set(this.network.blockchainLength.getAndRequireEquals().value);
     this.postPublishingTransactions.set(postPublishingTransactionsUpdate);
+  }
+
+  @method async setLastValidState() {
+    this.network.blockchainLength.getAndRequireEquals().value.assertGreaterThan(
+      this.lastUpdateBlockHeight.getAndRequireEquals().add(2)
+    );
+
+    const allPostsCounterCurrent = this.allPostsCounter.getAndRequireEquals();
+    const usersPostsCountersCurrent = this.usersPostsCounters.getAndRequireEquals();
+    const postsCurrent = this.posts.getAndRequireEquals();
+    const postPublishingTransactionsCurrent = this.postPublishingTransactions.getAndRequireEquals();
+
+    const lastValidState = Poseidon.hash([
+      allPostsCounterCurrent,
+      usersPostsCountersCurrent,
+      postsCurrent,
+      postPublishingTransactionsCurrent
+    ]);
+
+    this.lastValidState.set(lastValidState);
   }
 
   @method async rollbackByPostsSubcontractA() {
