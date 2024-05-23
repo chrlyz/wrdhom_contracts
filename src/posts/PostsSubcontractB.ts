@@ -96,7 +96,7 @@ export class PostsSubcontractB extends SmartContract {
     this.lastValidState.set(lastValidStateCurrent);
   }
 
-  @method async provePostPublishingBlockheightErrorAndRollback(
+  @method async provePostPublishingBlockHeightErrorAndRollback(
     postPublishingTransaction1Proof: PostPublishingTransactionProof,
     postPublishingTransaction2Proof: PostPublishingTransactionProof,
     postPublishingTransaction1Witness: MerkleWitness256,
@@ -117,7 +117,7 @@ export class PostsSubcontractB extends SmartContract {
     const postPublishingTransaction2WitnessIndex = postPublishingTransaction2Witness.calculateIndex();
     postPublishingTransaction2WitnessIndex.assertEquals(postPublishingTransaction1WitnessIndex.add(1));
 
-    postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.blockHeight.assertEquals(
+    postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.blockHeight.assertNotEquals(
       postPublishingTransaction1Proof.publicInput.postPublishingTransaction.transition.blockHeight
     );
 
