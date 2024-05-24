@@ -55,13 +55,9 @@ export class PostsSubcontractB extends SmartContract {
     this.lastValidState.set(lastValidStateCurrent);
   }
 
-  @method async provePostTransactionsGapAndRollbackBlockchain(
-    postTransaction1Hashed: Field,
-    postTransaction2Hashed: Field,
-    postTransaction3Hashed: Field,
-    postTransaction1Witness: MerkleWitness256,
-    postTransaction2Witness: MerkleWitness256,
-    postTransaction3Witness: MerkleWitness256,
+  @method async provePostPublishingTransactionsMissingAndRollback(
+    postPublishingTransactionHashed: Field,
+    postPublishingTransactionWitness: MerkleWitness256,
     allPostsCounter: Field,
     usersPostsCounters: Field,
     posts: Field
@@ -69,22 +65,10 @@ export class PostsSubcontractB extends SmartContract {
     const postsContract = new PostsContract(postsContractAddress);
     const postPublishingTransactionsCurrent = postsContract.postPublishingTransactions.getAndRequireEquals();
 
-    postTransaction1Hashed.assertNotEquals(Field(0));
-    postTransaction2Hashed.assertEquals(Field(0));
-    postTransaction3Hashed.assertNotEquals(Field(0));
+    postPublishingTransactionHashed.assertEquals(Field(0));
 
-    const postTransaction1WitnessRoot = postTransaction1Witness.calculateRoot(postTransaction1Hashed);
-    const postTransaction2WitnessRoot = postTransaction2Witness.calculateRoot(postTransaction2Hashed);
-    const postTransaction3WitnessRoot = postTransaction3Witness.calculateRoot(postTransaction3Hashed);
-    postTransaction1WitnessRoot.assertEquals(postTransaction2WitnessRoot);
-    postTransaction2WitnessRoot.assertEquals(postTransaction3WitnessRoot);
-    postTransaction3WitnessRoot.assertEquals(postPublishingTransactionsCurrent);
-
-    const postTransaction1WitnessIndex = postTransaction1Witness.calculateIndex();
-    const postTransaction2WitnessIndex = postTransaction2Witness.calculateIndex();
-    const postTransaction3WitnessIndex = postTransaction3Witness.calculateIndex();
-    postTransaction2WitnessIndex.assertGreaterThan(postTransaction1WitnessIndex);
-    postTransaction3WitnessIndex.assertGreaterThan(postTransaction2WitnessIndex);
+    const postPublishingTransactionWitnessRoot = postPublishingTransactionWitness.calculateRoot(postPublishingTransactionHashed);
+    postPublishingTransactionWitnessRoot.assertEquals(postPublishingTransactionsCurrent);
 
     const lastValidStateCurrent = postsContract.lastValidState.getAndRequireEquals();
     const lastValidState = Poseidon.hash([allPostsCounter, usersPostsCounters, posts]);

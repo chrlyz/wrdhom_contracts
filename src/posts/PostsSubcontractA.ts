@@ -55,6 +55,49 @@ import {
       this.lastValidState.set(lastValidStateCurrent);
     }
 
+    @method async proveInvalidInitialStateAndRollback(
+      postPublishingTransaction1Proof: PostPublishingTransactionProof,
+      postPublishingTransaction2Proof: PostPublishingTransactionProof,
+      postPublishingTransaction1Witness: MerkleWitness256,
+      postPublishingTransaction2Witness: MerkleWitness256,
+      allPostsCounter: Field,
+      usersPostsCounters: Field,
+      posts: Field
+    ) {
+      const postsContract = new PostsContract(postsContractAddress);
+      const postPublishingTransactionsCurrent = postsContract.postPublishingTransactions.getAndRequireEquals();
+
+      const postPublishingTransaction1WitnessRoot = postPublishingTransaction1Witness.calculateRoot(postPublishingTransaction1Proof.publicInput.postPublishingTransactionHash);
+      const postPublishingTransaction2WitnessRoot = postPublishingTransaction2Witness.calculateRoot(postPublishingTransaction2Proof.publicInput.postPublishingTransactionHash);
+      postPublishingTransaction1WitnessRoot.assertEquals(postPublishingTransaction2WitnessRoot);
+      postPublishingTransaction1WitnessRoot.assertEquals(postPublishingTransactionsCurrent);
+  
+      const postPublishingTransaction1WitnessIndex = postPublishingTransaction1Witness.calculateIndex();
+      const postPublishingTransaction2WitnessIndex = postPublishingTransaction2Witness.calculateIndex();
+      postPublishingTransaction2WitnessIndex.assertEquals(postPublishingTransaction1WitnessIndex.add(1));
+
+      const initialAllPostsCounterIsValid = postPublishingTransaction1Proof.publicInput.postPublishingTransaction.transition.latestAllPostsCounter.equals(
+        postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.initialAllPostsCounter
+      );
+      const initialUsersPostsCountersIsValid = postPublishingTransaction1Proof.publicInput.postPublishingTransaction.transition.latestUsersPostsCounters.equals(
+        postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.initialUsersPostsCounters
+      );
+      const initialPostsIsValid = postPublishingTransaction1Proof.publicInput.postPublishingTransaction.transition.latestPosts.equals(
+        postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.initialPosts
+      );
+      const isInitialStateValid = initialAllPostsCounterIsValid.and(initialUsersPostsCountersIsValid).and(initialPostsIsValid);
+      isInitialStateValid.assertFalse();
+
+      const lastValidState = Poseidon.hash([allPostsCounter, usersPostsCounters, posts]);
+      const lastValidStateCurrent = this.lastValidState.getAndRequireEquals();
+      lastValidState.assertEquals(lastValidStateCurrent);
+  
+      this.allPostsCounter.set(allPostsCounter);
+      this.usersPostsCounters.set(usersPostsCounters);
+      this.posts.set(posts);
+      this.lastValidState.set(lastValidStateCurrent);
+    }
+
     @method async provePostPublisingTransitionErrorAndRollback(
         postPublishingTransaction1Proof: PostPublishingTransactionProof,
         postPublishingTransaction2Proof: PostPublishingTransactionProof,
@@ -75,20 +118,8 @@ import {
         const postPublishingTransaction1WitnessIndex = postPublishingTransaction1Witness.calculateIndex();
         const postPublishingTransaction2WitnessIndex = postPublishingTransaction2Witness.calculateIndex();
         postPublishingTransaction2WitnessIndex.assertEquals(postPublishingTransaction1WitnessIndex.add(1));
-    
-        const initialAllPostsCounterIsValid = postPublishingTransaction1Proof.publicInput.postPublishingTransaction.transition.latestAllPostsCounter.equals(
-          postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.initialAllPostsCounter
-        );
-        const initialUsersPostsCountersIsValid = postPublishingTransaction1Proof.publicInput.postPublishingTransaction.transition.latestUsersPostsCounters.equals(
-          postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.initialUsersPostsCounters
-        );
-        const initialPostsIsValid = postPublishingTransaction1Proof.publicInput.postPublishingTransaction.transition.latestPosts.equals(
-          postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.initialPosts
-        );
-        const isInitialStateValid = initialAllPostsCounterIsValid.and(initialUsersPostsCountersIsValid).and(initialPostsIsValid);
-        isInitialStateValid.assertTrue();
         
-        const transition =
+        const computedTransition =
         PostsTransition.createPostPublishingTransition(
           postPublishingTransaction2Proof.publicInput.postPublishingTransaction.inputs.signature,
           postPublishingTransaction2Proof.publicInput.postPublishingTransaction.inputs.initialAllPostsCounter,
@@ -101,9 +132,9 @@ import {
           postPublishingTransaction2Proof.publicInput.postPublishingTransaction.inputs.postState,
           postPublishingTransaction2Proof.publicInput.postPublishingTransaction.inputs.postWitness
         );
-        const latestAllPostsCounterIsEqual = transition.latestAllPostsCounter.equals(postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.latestAllPostsCounter);
-        const latestUsersPostsCountersIsEqual = transition.latestUsersPostsCounters.equals(postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.latestUsersPostsCounters);
-        const latestPostsIsEqual = transition.latestPosts.equals(postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.latestPosts);
+        const latestAllPostsCounterIsEqual = computedTransition.latestAllPostsCounter.equals(postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.latestAllPostsCounter);
+        const latestUsersPostsCountersIsEqual = computedTransition.latestUsersPostsCounters.equals(postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.latestUsersPostsCounters);
+        const latestPostsIsEqual = computedTransition.latestPosts.equals(postPublishingTransaction2Proof.publicInput.postPublishingTransaction.transition.latestPosts);
         const isStateValid = latestAllPostsCounterIsEqual.and(latestUsersPostsCountersIsEqual).and(latestPostsIsEqual);
         isStateValid.assertFalse();
     
