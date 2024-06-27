@@ -3,15 +3,16 @@ export default {
   verbose: true,
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
-  globals: {
-    'ts-jest': {
-      useESM: true,
-    },
-  },
+  globals: {},
   testTimeout: 2_000_000,
   transform: {
-    '^.+\\.(t)s$': 'ts-jest',
-    '^.+\\.(j)s$': 'babel-jest',
+    '^.+\\.ts$': [
+      'ts-jest',
+      {
+        useESM: true,
+      },
+    ],
+    '^.+\\.js$': 'babel-jest'
   },
   resolver: '<rootDir>/jest-resolver.cjs',
   transformIgnorePatterns: [
