@@ -88,7 +88,7 @@ export class RepostsTransition extends Struct({
     repostState.deletionBlockHeight.assertEquals(Field(0));
     repostState.restorationBlockHeight.assertEquals(Field(0));
 
-    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKeyV2(
       targetState.hash()
     );
     targetsRoot.assertEquals(targets);
@@ -101,7 +101,7 @@ export class RepostsTransition extends Struct({
     isSigned.assertTrue();
 
     const [usersRepostsCountersBefore, userRepostsCounterKey] =
-      userRepostsCounterWitness.computeRootAndKey(initialUserRepostsCounter);
+      userRepostsCounterWitness.computeRootAndKeyV2(initialUserRepostsCounter);
     usersRepostsCountersBefore.assertEquals(initialUsersRepostsCounters);
     const reposterAddressAsField = Poseidon.hash(
       repostState.reposterAddress.toFields()
@@ -111,13 +111,13 @@ export class RepostsTransition extends Struct({
       repostState.userRepostsCounter.sub(1)
     );
     const usersRepostsCountersAfter =
-      userRepostsCounterWitness.computeRootAndKey(
+      userRepostsCounterWitness.computeRootAndKeyV2(
         repostState.userRepostsCounter
       )[0];
     usersRepostsCountersAfter.assertEquals(latestUsersRepostsCounters);
 
     const [targetsRepostsCountersBefore, targetRepostsCounterKey] =
-      targetRepostsCounterWitness.computeRootAndKey(
+      targetRepostsCounterWitness.computeRootAndKeyV2(
         initialTargetRepostsCounter
       );
     targetsRepostsCountersBefore.assertEquals(initialTargetsRepostsCounters);
@@ -126,17 +126,17 @@ export class RepostsTransition extends Struct({
       repostState.targetRepostsCounter.sub(1)
     );
     const targetsRepostsCountersAfter =
-      targetRepostsCounterWitness.computeRootAndKey(
+      targetRepostsCounterWitness.computeRootAndKeyV2(
         repostState.targetRepostsCounter
       )[0];
     targetsRepostsCountersAfter.assertEquals(latestTargetsRepostsCounters);
 
-    const [repostsBefore, repostKey] = repostWitness.computeRootAndKey(
+    const [repostsBefore, repostKey] = repostWitness.computeRootAndKeyV2(
       Field(0)
     );
     repostsBefore.assertEquals(initialReposts);
     repostKey.assertEquals(Poseidon.hash([targetKey, reposterAddressAsField]));
-    const repostsAfter = repostWitness.computeRootAndKey(repostState.hash())[0];
+    const repostsAfter = repostWitness.computeRootAndKeyV2(repostState.hash())[0];
     repostsAfter.assertEquals(latestReposts);
 
     return new RepostsTransition({
@@ -196,7 +196,7 @@ export class RepostsTransition extends Struct({
   ) {
     initialRepostState.deletionBlockHeight.assertEquals(Field(0));
 
-    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKeyV2(
       targetState.hash()
     );
     targetsRoot.assertEquals(targets);
@@ -209,7 +209,7 @@ export class RepostsTransition extends Struct({
     ]);
     isSigned.assertTrue();
 
-    const repostsBefore = repostWitness.computeRootAndKey(
+    const repostsBefore = repostWitness.computeRootAndKeyV2(
       initialRepostStateHash
     )[0];
     repostsBefore.assertEquals(initialReposts);
@@ -226,7 +226,7 @@ export class RepostsTransition extends Struct({
       restorationBlockHeight: initialRepostState.restorationBlockHeight,
     });
 
-    const repostsAfter = repostWitness.computeRootAndKey(
+    const repostsAfter = repostWitness.computeRootAndKeyV2(
       latestRepostState.hash()
     )[0];
     repostsAfter.assertEquals(latestReposts);
@@ -261,7 +261,7 @@ export class RepostsTransition extends Struct({
   ) {
     initialRepostState.deletionBlockHeight.assertNotEquals(0);
 
-    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKeyV2(
       targetState.hash()
     );
     targetsRoot.assertEquals(targets);
@@ -274,7 +274,7 @@ export class RepostsTransition extends Struct({
     ]);
     isSigned.assertTrue();
 
-    const repostsBefore = repostWitness.computeRootAndKey(
+    const repostsBefore = repostWitness.computeRootAndKeyV2(
       initialRepostStateHash
     )[0];
     repostsBefore.assertEquals(initialReposts);
@@ -291,7 +291,7 @@ export class RepostsTransition extends Struct({
       restorationBlockHeight: blockHeight,
     });
 
-    const repostsAfter = repostWitness.computeRootAndKey(
+    const repostsAfter = repostWitness.computeRootAndKeyV2(
       latestRepostState.hash()
     )[0];
     repostsAfter.assertEquals(latestReposts);

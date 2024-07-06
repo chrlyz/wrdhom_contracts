@@ -62,6 +62,6 @@ if (sentTx !== undefined) {
   
   Your smart contract will be live as soon
   as the transaction is included in a block:
-  https://devnet.minaexplorer.com/transaction/${sentTx.hash}
+  https://minascan.io/devnet/tx/${sentTx.hash}
   `);
 }

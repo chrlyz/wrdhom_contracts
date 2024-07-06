@@ -74,7 +74,7 @@ And go through the prompted instructions:
 
 1. Set the name to: `posts`.
 
-2. Set the Mina GraphQL API URL to: `https://proxy.devnet.minaexplorer.com/graphql`
+2. Set the Mina GraphQL API URL to: `https://api.minascan.io/node/devnet/v1/graphql`
 
 3. Set transaction fee to: `0.1`
 

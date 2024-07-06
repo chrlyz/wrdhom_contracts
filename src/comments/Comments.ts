@@ -92,7 +92,7 @@ export class CommentsTransition extends Struct({
     commentState.deletionBlockHeight.assertEquals(Field(0));
     commentState.restorationBlockHeight.assertEquals(Field(0));
 
-    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKeyV2(
       targetState.hash()
     );
     targetsRoot.assertEquals(targets);
@@ -105,7 +105,7 @@ export class CommentsTransition extends Struct({
     isSigned.assertTrue();
 
     const [usersCommentsCountersBefore, userCommentsCounterKey] =
-      userCommentsCounterWitness.computeRootAndKey(initialUserCommentsCounter);
+      userCommentsCounterWitness.computeRootAndKeyV2(initialUserCommentsCounter);
     usersCommentsCountersBefore.assertEquals(initialUsersCommentsCounters);
     const commenterAddressAsField = Poseidon.hash(
       commentState.commenterAddress.toFields()
@@ -115,13 +115,13 @@ export class CommentsTransition extends Struct({
       commentState.userCommentsCounter.sub(1)
     );
     const usersCommentsCountersAfter =
-      userCommentsCounterWitness.computeRootAndKey(
+      userCommentsCounterWitness.computeRootAndKeyV2(
         commentState.userCommentsCounter
       )[0];
     usersCommentsCountersAfter.assertEquals(latestUsersCommentsCounters);
 
     const [targetsCommentsCountersBefore, targetCommentsCounterKey] =
-      targetCommentsCounterWitness.computeRootAndKey(
+      targetCommentsCounterWitness.computeRootAndKeyV2(
         initialTargetCommentsCounter
       );
     targetsCommentsCountersBefore.assertEquals(initialTargetsCommentsCounters);
@@ -130,12 +130,12 @@ export class CommentsTransition extends Struct({
       commentState.targetCommentsCounter.sub(1)
     );
     const targetsCommentsCountersAfter =
-      targetCommentsCounterWitness.computeRootAndKey(
+      targetCommentsCounterWitness.computeRootAndKeyV2(
         commentState.targetCommentsCounter
       )[0];
     targetsCommentsCountersAfter.assertEquals(latestTargetsCommentsCounters);
 
-    const [commentsBefore, commentKey] = commentWitness.computeRootAndKey(
+    const [commentsBefore, commentKey] = commentWitness.computeRootAndKeyV2(
       Field(0)
     );
     commentsBefore.assertEquals(initialComments);
@@ -146,7 +146,7 @@ export class CommentsTransition extends Struct({
         commentState.commentContentID.hash(),
       ])
     );
-    const commentsAfter = commentWitness.computeRootAndKey(
+    const commentsAfter = commentWitness.computeRootAndKeyV2(
       commentState.hash()
     )[0];
     commentsAfter.assertEquals(latestComments);
@@ -208,7 +208,7 @@ export class CommentsTransition extends Struct({
   ) {
     initialCommentState.deletionBlockHeight.assertEquals(Field(0));
 
-    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKeyV2(
       targetState.hash()
     );
     targetsRoot.assertEquals(targets);
@@ -221,7 +221,7 @@ export class CommentsTransition extends Struct({
     ]);
     isSigned.assertTrue();
 
-    const commentsBefore = commentWitness.computeRootAndKey(
+    const commentsBefore = commentWitness.computeRootAndKeyV2(
       initialCommentStateHash
     )[0];
     commentsBefore.assertEquals(initialComments);
@@ -239,7 +239,7 @@ export class CommentsTransition extends Struct({
       restorationBlockHeight: initialCommentState.restorationBlockHeight,
     });
 
-    const commentsAfter = commentWitness.computeRootAndKey(
+    const commentsAfter = commentWitness.computeRootAndKeyV2(
       latestCommentState.hash()
     )[0];
     commentsAfter.assertEquals(latestComments);
@@ -274,7 +274,7 @@ export class CommentsTransition extends Struct({
   ) {
     initialCommentState.deletionBlockHeight.assertNotEquals(0);
 
-    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKeyV2(
       targetState.hash()
     );
     targetsRoot.assertEquals(targets);
@@ -287,7 +287,7 @@ export class CommentsTransition extends Struct({
     ]);
     isSigned.assertTrue();
 
-    const commentsBefore = commentWitness.computeRootAndKey(
+    const commentsBefore = commentWitness.computeRootAndKeyV2(
       initialCommentStateHash
     )[0];
     commentsBefore.assertEquals(initialComments);
@@ -305,7 +305,7 @@ export class CommentsTransition extends Struct({
       restorationBlockHeight: blockHeight,
     });
 
-    const commentsAfter = commentWitness.computeRootAndKey(
+    const commentsAfter = commentWitness.computeRootAndKeyV2(
       latestCommentState.hash()
     )[0];
     commentsAfter.assertEquals(latestComments);
