@@ -91,7 +91,7 @@ export class ReactionsTransition extends Struct({
     reactionState.deletionBlockHeight.assertEquals(Field(0));
     reactionState.restorationBlockHeight.assertEquals(Field(0));
 
-    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKeyV2(
       targetState.hash()
     );
     targetsRoot.assertEquals(targets);
@@ -104,7 +104,7 @@ export class ReactionsTransition extends Struct({
     isSigned.assertTrue();
 
     const [usersReactionsCountersBefore, userReactionsCounterKey] =
-      userReactionsCounterWitness.computeRootAndKey(
+      userReactionsCounterWitness.computeRootAndKeyV2(
         initialUserReactionsCounter
       );
     usersReactionsCountersBefore.assertEquals(initialUsersReactionsCounters);
@@ -116,13 +116,13 @@ export class ReactionsTransition extends Struct({
       reactionState.userReactionsCounter.sub(1)
     );
     const usersReactionsCountersAfter =
-      userReactionsCounterWitness.computeRootAndKey(
+      userReactionsCounterWitness.computeRootAndKeyV2(
         reactionState.userReactionsCounter
       )[0];
     usersReactionsCountersAfter.assertEquals(latestUsersReactionsCounters);
 
     const [targetsReactionsCountersBefore, targetReactionsCounterKey] =
-      targetReactionsCounterWitness.computeRootAndKey(
+      targetReactionsCounterWitness.computeRootAndKeyV2(
         initialTargetReactionsCounter
       );
     targetsReactionsCountersBefore.assertEquals(
@@ -133,12 +133,12 @@ export class ReactionsTransition extends Struct({
       reactionState.targetReactionsCounter.sub(1)
     );
     const targetsReactionsCountersAfter =
-      targetReactionsCounterWitness.computeRootAndKey(
+      targetReactionsCounterWitness.computeRootAndKeyV2(
         reactionState.targetReactionsCounter
       )[0];
     targetsReactionsCountersAfter.assertEquals(latestTargetsReactionsCounters);
 
-    const [reactionsBefore, reactionKey] = reactionWitness.computeRootAndKey(
+    const [reactionsBefore, reactionKey] = reactionWitness.computeRootAndKeyV2(
       Field(0)
     );
     reactionsBefore.assertEquals(initialReactions);
@@ -149,7 +149,7 @@ export class ReactionsTransition extends Struct({
         reactionState.reactionCodePoint,
       ])
     );
-    const reactionsAfter = reactionWitness.computeRootAndKey(
+    const reactionsAfter = reactionWitness.computeRootAndKeyV2(
       reactionState.hash()
     )[0];
     reactionsAfter.assertEquals(latestReactions);
@@ -211,7 +211,7 @@ export class ReactionsTransition extends Struct({
   ) {
     initialReactionState.deletionBlockHeight.assertEquals(Field(0));
 
-    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKeyV2(
       targetState.hash()
     );
     targetsRoot.assertEquals(targets);
@@ -224,7 +224,7 @@ export class ReactionsTransition extends Struct({
     ]);
     isSigned.assertTrue();
 
-    const reactionsBefore = reactionWitness.computeRootAndKey(
+    const reactionsBefore = reactionWitness.computeRootAndKeyV2(
       initialReactionStateHash
     )[0];
     reactionsBefore.assertEquals(initialReactions);
@@ -242,7 +242,7 @@ export class ReactionsTransition extends Struct({
       restorationBlockHeight: initialReactionState.restorationBlockHeight,
     });
 
-    const reactionsAfter = reactionWitness.computeRootAndKey(
+    const reactionsAfter = reactionWitness.computeRootAndKeyV2(
       latestReactionState.hash()
     )[0];
     reactionsAfter.assertEquals(latestReactions);
@@ -277,7 +277,7 @@ export class ReactionsTransition extends Struct({
   ) {
     initialReactionState.deletionBlockHeight.assertNotEquals(0);
 
-    const [targetsRoot, targetKey] = targetWitness.computeRootAndKey(
+    const [targetsRoot, targetKey] = targetWitness.computeRootAndKeyV2(
       targetState.hash()
     );
     targetsRoot.assertEquals(targets);
@@ -290,7 +290,7 @@ export class ReactionsTransition extends Struct({
     ]);
     isSigned.assertTrue();
 
-    const reactionsBefore = reactionWitness.computeRootAndKey(
+    const reactionsBefore = reactionWitness.computeRootAndKeyV2(
       initialReactionStateHash
     )[0];
     reactionsBefore.assertEquals(initialReactions);
@@ -308,7 +308,7 @@ export class ReactionsTransition extends Struct({
       restorationBlockHeight: blockHeight,
     });
 
-    const reactionsAfter = reactionWitness.computeRootAndKey(
+    const reactionsAfter = reactionWitness.computeRootAndKeyV2(
       latestReactionState.hash()
     )[0];
     reactionsAfter.assertEquals(latestReactions);

@@ -75,7 +75,7 @@ export class PostsTransition extends Struct({
     isSigned.assertTrue();
 
     const [usersPostsCountersBefore, userPostsCounterKey] =
-      userPostsCounterWitness.computeRootAndKey(initialUserPostsCounter);
+      userPostsCounterWitness.computeRootAndKeyV2(initialUserPostsCounter);
     usersPostsCountersBefore.assertEquals(initialUsersPostsCounters);
     const posterAddressAsField = Poseidon.hash(
       postState.posterAddress.toFields()
@@ -83,18 +83,18 @@ export class PostsTransition extends Struct({
     userPostsCounterKey.assertEquals(posterAddressAsField);
     initialUserPostsCounter.assertEquals(postState.userPostsCounter.sub(1));
 
-    const usersPostsCountersAfter = userPostsCounterWitness.computeRootAndKey(
+    const usersPostsCountersAfter = userPostsCounterWitness.computeRootAndKeyV2(
       postState.userPostsCounter
     )[0];
     usersPostsCountersAfter.assertEquals(latestUsersPostsCounters);
 
-    const [postsBefore, postKey] = postWitness.computeRootAndKey(Field(0));
+    const [postsBefore, postKey] = postWitness.computeRootAndKeyV2(Field(0));
     postsBefore.assertEquals(initialPosts);
     postKey.assertEquals(
       Poseidon.hash([posterAddressAsField, postState.postContentID.hash()])
     );
 
-    const postsAfter = postWitness.computeRootAndKey(postState.hash())[0];
+    const postsAfter = postWitness.computeRootAndKeyV2(postState.hash())[0];
     postsAfter.assertEquals(latestPosts);
 
     return new PostsTransition({
@@ -171,7 +171,7 @@ export class PostsTransition extends Struct({
     ]);
     isSigned.assertTrue();
 
-    const postsBefore = postWitness.computeRootAndKey(initialPostStateHash)[0];
+    const postsBefore = postWitness.computeRootAndKeyV2(initialPostStateHash)[0];
     postsBefore.assertEquals(initialPosts);
 
     const latestPostState = new PostState({
@@ -184,7 +184,7 @@ export class PostsTransition extends Struct({
       restorationBlockHeight: initialPostState.restorationBlockHeight
     });
 
-    const postsAfter = postWitness.computeRootAndKey(latestPostState.hash())[0];
+    const postsAfter = postWitness.computeRootAndKeyV2(latestPostState.hash())[0];
     postsAfter.assertEquals(latestPosts);
 
     return new PostsTransition({
@@ -216,7 +216,7 @@ export class PostsTransition extends Struct({
     ]);
     isSigned.assertTrue();
 
-    const postsBefore = postWitness.computeRootAndKey(initialPostStateHash)[0];
+    const postsBefore = postWitness.computeRootAndKeyV2(initialPostStateHash)[0];
     postsBefore.assertEquals(initialPosts);
 
     const latestPostState = new PostState({
@@ -229,7 +229,7 @@ export class PostsTransition extends Struct({
       restorationBlockHeight: blockHeight
     });
 
-    const postsAfter = postWitness.computeRootAndKey(latestPostState.hash())[0];
+    const postsAfter = postWitness.computeRootAndKeyV2(latestPostState.hash())[0];
     postsAfter.assertEquals(latestPosts);
 
     return new PostsTransition({
