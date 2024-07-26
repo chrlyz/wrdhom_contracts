@@ -14,7 +14,7 @@ We also would like to have more open and reliable APIs that behave more like pro
 
 We could and should try to improve legacy web2 platforms through better legislation, auditing, and accountability, but this is very challenging, because:
 
-- Even if they open source their code, there’s no way to guarantee that the code they release matches the code running on their servers,or to verify to what extend humans intervene arbitrarily.
+- Even if they open source their code, there’s no way to guarantee that the code they release matches the code running on their servers, or to verify to what extend humans intervene arbitrarily.
 
 - Access to their APIs and data is expensive and restrictive.
 
@@ -36,9 +36,9 @@ The WrdHom project aims to provide an alternative by building an open, auditable
 
 <img src="https://github.com/chrlyz/wrdhom_contracts/blob/main/img/wrdhom_2.png?raw=true&sanitize=true">
 
-Mina also makes it possible to implement native zkApp-specific rollups, so we don’t have to make an on-chain transaction every time a user does something in the platform, which would be slow and expensive. Instead, we merge the proofs that we create to update the on-chain state, into a single proof that can be submitted to the network (e.g. The server receives 1,000 post requests, so it generates 1,000 proofs that then are merged, and the server uses the resulting proof to update the on-chain state for 1,000 posts in a single transaction). These proofs can also be generated in parallel, so the platform is able to handle an arbitrary number of user actions in the same amount of time, allowing the platform to scale.
+Mina also makes it possible to implement native zkApp-specific rollups, so we don’t have to make an on-chain transaction every time a user does something in the platform, which would be slow and expensive. Instead, we merge the proofs that we create to update the on-chain state, into a single proof that can be submitted to the network (e.g. The server receives 1,000 post requests, so it generates 1,000 proofs that then are merged, and the server uses the resulting proof to update the on-chain state for 1,000 posts in a single transaction). These proofs can also be generated in parallel, allowing the platform to scale.
 
-So far four zkPrograms and four smart-contracts have been implemented to handle the root state of posts, Reactions, Comments, and Reposts; as well as the [server](https://github.com/chrlyz/wrdhom_server) that serves the auditable content and creates the proofs based on the actions of users; and the [client](https://github.com/chrlyz/wrdhom_client) that automatically audits these responses and provides a graphic user interface for users to interact with the platform.
+So far four zkPrograms and four smart-contracts have been implemented to handle the root state of Posts, Reactions, Comments, and Reposts; as well as the [server](https://github.com/chrlyz/wrdhom_server) that serves the auditable content and creates the proofs based on the actions of users; and the [client](https://github.com/chrlyz/wrdhom_client) that automatically audits these responses and provides a graphic user interface for users to interact with the platform.
 
 [Here](https://www.youtube.com/playlist?list=PL5iembFEMoKwUhykeWE_E-cvxilO1wOUV) is a video of a demo of the status of the project in January.
 
