@@ -2,6 +2,7 @@ import { Mina, PrivateKey, AccountUpdate } from 'o1js';
 import fs from 'fs/promises';
 import { Posts } from './Posts.js';
 import { PostsContract } from './PostsContract.js';
+import * as dotenv from 'dotenv';
 
 export type Config = {
   deployAliases: Record<
@@ -15,6 +16,9 @@ export type Config = {
     }
   >;
 };
+
+dotenv.config();
+const lightnet = process.env.LIGHTNET === 'true' || false;
 
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
 const postsConfig = configJson.deployAliases['posts'];
@@ -35,11 +39,15 @@ const feePayerAddress = feePayerKey.toPublicKey();
 const postsContractAddress = postsContractKey.toPublicKey();
 const postsContract = new PostsContract(postsContractAddress);
 
-console.log('Compiling Posts zkProgram...');
-await Posts.compile();
-console.log('Compiling PostsContract...');
-await PostsContract.compile();
-console.log('Compiled');
+if (lightnet) {
+  Network.proofsEnabled = false;
+} else {
+    console.log('Compiling Posts zkProgram...');
+    await Posts.compile();
+    console.log('Compiling PostsContract...');
+    await PostsContract.compile();
+    console.log('Compiled');
+}
 
 let sentTx;
 try {

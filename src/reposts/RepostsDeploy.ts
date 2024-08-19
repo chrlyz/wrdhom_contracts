@@ -3,6 +3,10 @@ import fs from 'fs/promises';
 import { Reposts } from './Reposts.js';
 import { RepostsContract } from './RepostsContract.js';
 import { Config } from '../posts/PostsDeploy.js';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+const lightnet = process.env.LIGHTNET === 'true' || false;
 
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
 const repostsConfig = configJson.deployAliases['reposts'];
@@ -23,11 +27,16 @@ const feePayerAddress = feePayerKey.toPublicKey();
 const repostsContractAddress = repostsContractKey.toPublicKey();
 const repostsContract = new RepostsContract(repostsContractAddress);
 
-console.log('Compiling Reposts zkProgram...');
-await Reposts.compile();
-console.log('Compiling RepostsContract...');
-await RepostsContract.compile();
-console.log('Compiled');
+
+if (lightnet) {
+  Network.proofsEnabled = false;
+} else {
+    console.log('Compiling Reposts zkProgram...');
+    await Reposts.compile();
+    console.log('Compiling RepostsContract...');
+    await RepostsContract.compile();
+    console.log('Compiled');
+}
 
 let sentTx;
 try {

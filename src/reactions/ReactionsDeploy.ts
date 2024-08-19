@@ -3,6 +3,10 @@ import fs from 'fs/promises';
 import { Reactions } from './Reactions.js';
 import { ReactionsContract } from './ReactionsContract.js';
 import { Config } from '../posts/PostsDeploy.js';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+const lightnet = process.env.LIGHTNET === 'true' || false;
 
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
 const reactionsConfig = configJson.deployAliases['reactions'];
@@ -23,11 +27,15 @@ const feePayerAddress = feePayerKey.toPublicKey();
 const reactionsContractAddress = reactionsContractKey.toPublicKey();
 const reactionsContract = new ReactionsContract(reactionsContractAddress);
 
-console.log('Compiling Reactions zkProgram...');
-await Reactions.compile();
-console.log('Compiling ReactionsContract...');
-await ReactionsContract.compile();
-console.log('Compiled');
+if (lightnet) {
+  Network.proofsEnabled = false;
+} else {
+    console.log('Compiling Reactions zkProgram...');
+    await Reactions.compile();
+    console.log('Compiling ReactionsContract...');
+    await ReactionsContract.compile();
+    console.log('Compiled');
+}
 
 let sentTx;
 try {
