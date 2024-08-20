@@ -18,7 +18,7 @@ export type Config = {
 };
 
 dotenv.config();
-const lightnet = process.env.LIGHTNET === 'true' || false;
+const PROOFS_ENABLED = process.env.PROOFS_ENABLED === 'true' || false;
 
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
 const postsConfig = configJson.deployAliases['posts'];
@@ -39,7 +39,7 @@ const feePayerAddress = feePayerKey.toPublicKey();
 const postsContractAddress = postsContractKey.toPublicKey();
 const postsContract = new PostsContract(postsContractAddress);
 
-if (lightnet) {
+if (PROOFS_ENABLED) {
   Network.proofsEnabled = false;
 } else {
     console.log('Compiling Posts zkProgram...');

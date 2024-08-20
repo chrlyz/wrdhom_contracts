@@ -18,8 +18,10 @@ import {
   createPostDeletionTransitionValidInputs,
   createPostRestorationTransitionValidInputs,
 } from './PostsUtils';
+import * as dotenv from 'dotenv';
 
-let proofsEnabled = true;
+dotenv.config();
+const PROOFS_ENABLED = process.env.PROOFS_ENABLED === 'true' || false;
 
 describe(`the PostsContract and the Posts ZkProgram`, () => {
   let user1Address: PublicKey,
@@ -34,7 +36,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     Local: any
 
   beforeAll(async () => {
-    if (proofsEnabled) {
+    if (PROOFS_ENABLED) {
       console.log('Compiling Posts ZkProgram...');
       await Posts.compile();
       console.log('Compiling PostsContract...');
@@ -44,7 +46,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
   });
 
   beforeEach(async () => {
-    Local = await Mina.LocalBlockchain({ proofsEnabled });
+    Local = await Mina.LocalBlockchain({ proofsEnabled: PROOFS_ENABLED });
     Mina.setActiveInstance(Local);
     user1Key = Local.testAccounts[0].key;
     user1Address = Local.testAccounts[0].key.toPublicKey();
@@ -122,19 +124,35 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof1 = await Posts.provePostPublishingTransition(
-      transition1,
-      valid1.signature,
-      valid1.postState.allPostsCounter.sub(1),
-      valid1.initialUsersPostsCounters,
-      valid1.latestUsersPostsCounters,
-      valid1.postState.userPostsCounter.sub(1),
-      valid1.userPostsCounterWitness,
-      valid1.initialPosts,
-      valid1.latestPosts,
-      valid1.postState,
-      valid1.postWitness
-    );
+    let proof1: any;
+    if (PROOFS_ENABLED) {
+      proof1 = await Posts.provePostPublishingTransition(
+        transition1,
+        valid1.signature,
+        valid1.postState.allPostsCounter.sub(1),
+        valid1.initialUsersPostsCounters,
+        valid1.latestUsersPostsCounters,
+        valid1.postState.userPostsCounter.sub(1),
+        valid1.userPostsCounterWitness,
+        valid1.initialPosts,
+        valid1.latestPosts,
+        valid1.postState,
+        valid1.postWitness
+      );
+    } else {
+        proof1 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition1.blockHeight,
+            initialAllPostsCounter: transition1.initialAllPostsCounter,
+            latestAllPostsCounter: transition1.latestAllPostsCounter,
+            initialUsersPostsCounters: transition1.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition1.latestUsersPostsCounters,
+            initialPosts: transition1.initialPosts,
+            latestPosts: transition1.latestPosts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn1 = await Mina.transaction(user1Address, async () => {
@@ -186,17 +204,33 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof2 = await Posts.provePostDeletionTransition(
-      transition2,
-      valid2.signature,
-      valid2.allPostsCounter,
-      valid2.usersPostsCounters,
-      valid2.initialPosts,
-      valid2.latestPosts,
-      valid2.initialPostState,
-      valid2.postWitness,
-      valid2.latestPostState.deletionBlockHeight
-    );
+    let proof2: any;
+    if (PROOFS_ENABLED) {
+      proof2 = await Posts.provePostDeletionTransition(
+        transition2,
+        valid2.signature,
+        valid2.allPostsCounter,
+        valid2.usersPostsCounters,
+        valid2.initialPosts,
+        valid2.latestPosts,
+        valid2.initialPostState,
+        valid2.postWitness,
+        valid2.latestPostState.deletionBlockHeight
+      );
+    } else {
+      proof2 = {
+        verify: () => {},
+        publicInput: {
+          blockHeight: transition2.blockHeight,
+          initialAllPostsCounter: transition2.initialAllPostsCounter,
+          latestAllPostsCounter: transition2.latestAllPostsCounter,
+          initialUsersPostsCounters: transition2.initialUsersPostsCounters,
+          latestUsersPostsCounters: transition2.latestUsersPostsCounters,
+          initialPosts: transition2.initialPosts,
+          latestPosts: transition2.latestPosts
+        }
+      };
+    }
 
     // Send valid proof to update our on-chain state
     const txn2 = await Mina.transaction(user1Address, async () => {
@@ -247,18 +281,34 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof3 = await Posts.provePostRestorationTransition(
-      transition3,
-      valid3.signature,
-      valid3.allPostsCounter,
-      valid3.usersPostsCounters,
-      valid3.initialPosts,
-      valid3.latestPosts,
-      valid3.initialPostState,
-      valid3.postWitness,
-      valid3.restorationBlockHeight
-    );
-
+    let proof3: any;
+    if (PROOFS_ENABLED) {
+      proof3 = await Posts.provePostRestorationTransition(
+        transition3,
+        valid3.signature,
+        valid3.allPostsCounter,
+        valid3.usersPostsCounters,
+        valid3.initialPosts,
+        valid3.latestPosts,
+        valid3.initialPostState,
+        valid3.postWitness,
+        valid3.restorationBlockHeight
+      );
+  
+    } else {
+      proof3 = {
+        verify: () => {},
+        publicInput: {
+          blockHeight: transition3.blockHeight,
+          initialAllPostsCounter: transition3.initialAllPostsCounter,
+          latestAllPostsCounter: transition3.latestAllPostsCounter,
+          initialUsersPostsCounters: transition3.initialUsersPostsCounters,
+          latestUsersPostsCounters: transition3.latestUsersPostsCounters,
+          initialPosts: transition3.initialPosts,
+          latestPosts: transition3.latestPosts
+        }
+      };
+    }
     // Send valid proof to update our on-chain state
     const txn3 = await Mina.transaction(user1Address, async () => {
       postsContract.update(proof3);
@@ -315,19 +365,35 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof4 = await Posts.provePostPublishingTransition(
-      transition4,
-      valid4.signature,
-      valid4.postState.allPostsCounter.sub(1),
-      valid4.initialUsersPostsCounters,
-      valid4.latestUsersPostsCounters,
-      valid4.postState.userPostsCounter.sub(1),
-      valid4.userPostsCounterWitness,
-      valid4.initialPosts,
-      valid4.latestPosts,
-      valid4.postState,
-      valid4.postWitness
-    );
+    let proof4: any;
+    if (PROOFS_ENABLED) {
+      proof4 = await Posts.provePostPublishingTransition(
+        transition4,
+        valid4.signature,
+        valid4.postState.allPostsCounter.sub(1),
+        valid4.initialUsersPostsCounters,
+        valid4.latestUsersPostsCounters,
+        valid4.postState.userPostsCounter.sub(1),
+        valid4.userPostsCounterWitness,
+        valid4.initialPosts,
+        valid4.latestPosts,
+        valid4.postState,
+        valid4.postWitness
+      );
+    } else {
+      proof4 = {
+        verify: () => {},
+        publicInput: {
+          blockHeight: transition4.blockHeight,
+          initialAllPostsCounter: transition4.initialAllPostsCounter,
+          latestAllPostsCounter: transition4.latestAllPostsCounter,
+          initialUsersPostsCounters: transition4.initialUsersPostsCounters,
+          latestUsersPostsCounters: transition4.latestUsersPostsCounters,
+          initialPosts: transition4.initialPosts,
+          latestPosts: transition4.latestPosts
+        }
+      };
+    }
 
     // Prepare inputs to create a valid state transition
     const valid5 = createPostPublishingTransitionValidInputs(
@@ -358,19 +424,35 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof5 = await Posts.provePostPublishingTransition(
-      transition5,
-      valid5.signature,
-      valid5.postState.allPostsCounter.sub(1),
-      valid5.initialUsersPostsCounters,
-      valid5.latestUsersPostsCounters,
-      valid5.postState.userPostsCounter.sub(1),
-      valid5.userPostsCounterWitness,
-      valid5.initialPosts,
-      valid5.latestPosts,
-      valid5.postState,
-      valid5.postWitness
-    );
+    let proof5: any;
+    if (PROOFS_ENABLED) {
+      proof5 = await Posts.provePostPublishingTransition(
+        transition5,
+        valid5.signature,
+        valid5.postState.allPostsCounter.sub(1),
+        valid5.initialUsersPostsCounters,
+        valid5.latestUsersPostsCounters,
+        valid5.postState.userPostsCounter.sub(1),
+        valid5.userPostsCounterWitness,
+        valid5.initialPosts,
+        valid5.latestPosts,
+        valid5.postState,
+        valid5.postWitness
+      );
+    } else {
+      proof5 = {
+        verify: () => {},
+        publicInput: {
+          blockHeight: transition5.blockHeight,
+          initialAllPostsCounter: transition5.initialAllPostsCounter,
+          latestAllPostsCounter: transition5.latestAllPostsCounter,
+          initialUsersPostsCounters: transition5.initialUsersPostsCounters,
+          latestUsersPostsCounters: transition5.latestUsersPostsCounters,
+          initialPosts: transition5.initialPosts,
+          latestPosts: transition5.latestPosts
+        }
+      };
+    }
 
     // Merge valid state transitions
     const mergedTransitions1 = PostsTransition.mergePostsTransitions(
@@ -379,11 +461,27 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create proof of valid merged state transitions
-    const mergedTransitionProofs1 = await Posts.proveMergedPostsTransitions(
-      mergedTransitions1,
-      proof4,
-      proof5
-    );
+    let mergedTransitionProofs1:any;
+    if (PROOFS_ENABLED) {
+      mergedTransitionProofs1 = await Posts.proveMergedPostsTransitions(
+        mergedTransitions1,
+        proof4,
+        proof5
+      );
+    } else {
+        mergedTransitionProofs1 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: mergedTransitions1.blockHeight,
+            initialAllPostsCounter: mergedTransitions1.initialAllPostsCounter,
+            latestAllPostsCounter: mergedTransitions1.latestAllPostsCounter,
+            initialUsersPostsCounters: mergedTransitions1.initialUsersPostsCounters,
+            latestUsersPostsCounters: mergedTransitions1.latestUsersPostsCounters,
+            initialPosts: mergedTransitions1.initialPosts,
+            latestPosts: mergedTransitions1.latestPosts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn4 = await Mina.transaction(user1Address, async () => {
@@ -436,17 +534,33 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof6 = await Posts.provePostDeletionTransition(
-      transition6,
-      valid6.signature,
-      valid6.allPostsCounter,
-      valid6.usersPostsCounters,
-      valid6.initialPosts,
-      valid6.latestPosts,
-      valid6.initialPostState,
-      valid6.postWitness,
-      valid6.latestPostState.deletionBlockHeight
-    );
+    let proof6: any;
+    if (PROOFS_ENABLED) {
+      proof6 = await Posts.provePostDeletionTransition(
+        transition6,
+        valid6.signature,
+        valid6.allPostsCounter,
+        valid6.usersPostsCounters,
+        valid6.initialPosts,
+        valid6.latestPosts,
+        valid6.initialPostState,
+        valid6.postWitness,
+        valid6.latestPostState.deletionBlockHeight
+      );
+    } else {
+        proof6 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition6.blockHeight,
+            initialAllPostsCounter: transition6.initialAllPostsCounter,
+            latestAllPostsCounter: transition6.latestAllPostsCounter,
+            initialUsersPostsCounters: transition6.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition6.latestUsersPostsCounters,
+            initialPosts: transition6.initialPosts,
+            latestPosts: transition6.latestPosts
+          }
+        };
+    }
 
     // Prepare inputs to create a valid state transition
     const valid7 = createPostDeletionTransitionValidInputs(
@@ -471,17 +585,33 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof7 = await Posts.provePostDeletionTransition(
-      transition7,
-      valid7.signature,
-      valid7.allPostsCounter,
-      valid7.usersPostsCounters,
-      valid7.initialPosts,
-      valid7.latestPosts,
-      valid7.initialPostState,
-      valid7.postWitness,
-      valid7.latestPostState.deletionBlockHeight
-    );
+    let proof7: any;
+    if (PROOFS_ENABLED) {
+      proof7 = await Posts.provePostDeletionTransition(
+        transition7,
+        valid7.signature,
+        valid7.allPostsCounter,
+        valid7.usersPostsCounters,
+        valid7.initialPosts,
+        valid7.latestPosts,
+        valid7.initialPostState,
+        valid7.postWitness,
+        valid7.latestPostState.deletionBlockHeight
+      );
+    } else {
+      proof7 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition7.blockHeight,
+            initialAllPostsCounter: transition7.initialAllPostsCounter,
+            latestAllPostsCounter: transition7.latestAllPostsCounter,
+            initialUsersPostsCounters: transition7.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition7.latestUsersPostsCounters,
+            initialPosts: transition7.initialPosts,
+            latestPosts: transition7.latestPosts
+          }
+        };
+    }
 
     // Merge valid state transitions
     const mergedTransitions2 = PostsTransition.mergePostsTransitions(
@@ -490,11 +620,27 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create proof of valid merged state transitions
-    const mergedTransitionProofs2 = await Posts.proveMergedPostsTransitions(
-      mergedTransitions2,
-      proof6,
-      proof7
-    );
+    let mergedTransitionProofs2: any;
+    if (PROOFS_ENABLED) {
+      mergedTransitionProofs2 = await Posts.proveMergedPostsTransitions(
+        mergedTransitions2,
+        proof6,
+        proof7
+      );
+    } else {
+        mergedTransitionProofs2 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: mergedTransitions2.blockHeight,
+            initialAllPostsCounter: mergedTransitions2.initialAllPostsCounter,
+            latestAllPostsCounter: mergedTransitions2.latestAllPostsCounter,
+            initialUsersPostsCounters: mergedTransitions2.initialUsersPostsCounters,
+            latestUsersPostsCounters: mergedTransitions2.latestUsersPostsCounters,
+            initialPosts: mergedTransitions2.initialPosts,
+            latestPosts: mergedTransitions2.latestPosts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn5 = await Mina.transaction(user1Address, async () => {
@@ -546,17 +692,33 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof8 = await Posts.provePostRestorationTransition(
-      transition8,
-      valid8.signature,
-      valid8.allPostsCounter,
-      valid8.usersPostsCounters,
-      valid8.initialPosts,
-      valid8.latestPosts,
-      valid8.initialPostState,
-      valid8.postWitness,
-      valid8.restorationBlockHeight
-    );
+    let proof8: any;
+    if (PROOFS_ENABLED) {
+      proof8 = await Posts.provePostRestorationTransition(
+        transition8,
+        valid8.signature,
+        valid8.allPostsCounter,
+        valid8.usersPostsCounters,
+        valid8.initialPosts,
+        valid8.latestPosts,
+        valid8.initialPostState,
+        valid8.postWitness,
+        valid8.restorationBlockHeight
+      );
+    } else {
+      proof8 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition8.blockHeight,
+            initialAllPostsCounter: transition8.initialAllPostsCounter,
+            latestAllPostsCounter: transition8.latestAllPostsCounter,
+            initialUsersPostsCounters: transition8.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition8.latestUsersPostsCounters,
+            initialPosts: transition8.initialPosts,
+            latestPosts: transition8.latestPosts
+          }
+        };
+    }
 
     // Prepare inputs to create a valid state transition
     const valid9 = createPostRestorationTransitionValidInputs(
@@ -581,17 +743,33 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof9 = await Posts.provePostRestorationTransition(
-      transition9,
-      valid9.signature,
-      valid9.allPostsCounter,
-      valid9.usersPostsCounters,
-      valid9.initialPosts,
-      valid9.latestPosts,
-      valid9.initialPostState,
-      valid9.postWitness,
-      valid9.restorationBlockHeight
-    );
+    let proof9: any;
+    if (PROOFS_ENABLED) {
+      proof9 = await Posts.provePostRestorationTransition(
+        transition9,
+        valid9.signature,
+        valid9.allPostsCounter,
+        valid9.usersPostsCounters,
+        valid9.initialPosts,
+        valid9.latestPosts,
+        valid9.initialPostState,
+        valid9.postWitness,
+        valid9.restorationBlockHeight
+      );
+    } else {
+        proof9 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition9.blockHeight,
+            initialAllPostsCounter: transition9.initialAllPostsCounter,
+            latestAllPostsCounter: transition9.latestAllPostsCounter,
+            initialUsersPostsCounters: transition9.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition9.latestUsersPostsCounters,
+            initialPosts: transition9.initialPosts,
+            latestPosts: transition9.latestPosts
+          }
+        };
+    }
 
     // Merge valid state transitions
     const mergedTransitions3 = PostsTransition.mergePostsTransitions(
@@ -600,11 +778,27 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create proof of valid merged state transitions
-    const mergedTransitionProofs3 = await Posts.proveMergedPostsTransitions(
-      mergedTransitions3,
-      proof8,
-      proof9
-    );
+    let mergedTransitionProofs3: any;
+    if (PROOFS_ENABLED) {
+      mergedTransitionProofs3 = await Posts.proveMergedPostsTransitions(
+        mergedTransitions3,
+        proof8,
+        proof9
+      );
+    } else {
+        mergedTransitionProofs3 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: mergedTransitions3.blockHeight,
+            initialAllPostsCounter: mergedTransitions3.initialAllPostsCounter,
+            latestAllPostsCounter: mergedTransitions3.latestAllPostsCounter,
+            initialUsersPostsCounters: mergedTransitions3.initialUsersPostsCounters,
+            latestUsersPostsCounters: mergedTransitions3.latestUsersPostsCounters,
+            initialPosts: mergedTransitions3.initialPosts,
+            latestPosts: mergedTransitions3.latestPosts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn6 = await Mina.transaction(user1Address, async () => {
@@ -655,17 +849,33 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof10 = await Posts.provePostDeletionTransition(
-      transition10,
-      valid10.signature,
-      valid10.allPostsCounter,
-      valid10.usersPostsCounters,
-      valid10.initialPosts,
-      valid10.latestPosts,
-      valid10.initialPostState,
-      valid10.postWitness,
-      valid10.latestPostState.deletionBlockHeight
-    );
+    let proof10: any ;
+    if (PROOFS_ENABLED) {
+      proof10 = await Posts.provePostDeletionTransition(
+        transition10,
+        valid10.signature,
+        valid10.allPostsCounter,
+        valid10.usersPostsCounters,
+        valid10.initialPosts,
+        valid10.latestPosts,
+        valid10.initialPostState,
+        valid10.postWitness,
+        valid10.latestPostState.deletionBlockHeight
+      );
+    } else {
+        proof10 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition10.blockHeight,
+            initialAllPostsCounter: transition10.initialAllPostsCounter,
+            latestAllPostsCounter: transition10.latestAllPostsCounter,
+            initialUsersPostsCounters: transition10.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition10.latestUsersPostsCounters,
+            initialPosts: transition10.initialPosts,
+            latestPosts: transition10.latestPosts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn7 = await Mina.transaction(user1Address, async () => {
@@ -717,17 +927,33 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof11 = await Posts.provePostRestorationTransition(
-      transition11,
-      valid11.signature,
-      valid11.allPostsCounter,
-      valid11.usersPostsCounters,
-      valid11.initialPosts,
-      valid11.latestPosts,
-      valid11.initialPostState,
-      valid11.postWitness,
-      valid11.restorationBlockHeight
-    );
+    let proof11: any;
+    if (PROOFS_ENABLED) {
+      proof11 = await Posts.provePostRestorationTransition(
+        transition11,
+        valid11.signature,
+        valid11.allPostsCounter,
+        valid11.usersPostsCounters,
+        valid11.initialPosts,
+        valid11.latestPosts,
+        valid11.initialPostState,
+        valid11.postWitness,
+        valid11.restorationBlockHeight
+      );
+    } else {
+      proof11 = {
+        verify: () => {},
+        publicInput: {
+          blockHeight: transition11.blockHeight,
+          initialAllPostsCounter: transition11.initialAllPostsCounter,
+          latestAllPostsCounter: transition11.latestAllPostsCounter,
+          initialUsersPostsCounters: transition11.initialUsersPostsCounters,
+          latestUsersPostsCounters: transition11.latestUsersPostsCounters,
+          initialPosts: transition11.initialPosts,
+          latestPosts: transition11.latestPosts
+        }
+      };
+    }
 
     // Prepare inputs to create a valid state transition
     const valid12 = createPostDeletionTransitionValidInputs(
@@ -752,17 +978,33 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof12 = await Posts.provePostDeletionTransition(
-      transition12,
-      valid12.signature,
-      valid12.allPostsCounter,
-      valid12.usersPostsCounters,
-      valid12.initialPosts,
-      valid12.latestPosts,
-      valid12.initialPostState,
-      valid12.postWitness,
-      valid12.latestPostState.deletionBlockHeight
-    );
+    let proof12: any;
+    if (PROOFS_ENABLED) {
+      proof12 = await Posts.provePostDeletionTransition(
+        transition12,
+        valid12.signature,
+        valid12.allPostsCounter,
+        valid12.usersPostsCounters,
+        valid12.initialPosts,
+        valid12.latestPosts,
+        valid12.initialPostState,
+        valid12.postWitness,
+        valid12.latestPostState.deletionBlockHeight
+      );
+    } else {
+        proof12 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition12.blockHeight,
+            initialAllPostsCounter: transition12.initialAllPostsCounter,
+            latestAllPostsCounter: transition12.latestAllPostsCounter,
+            initialUsersPostsCounters: transition12.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition12.latestUsersPostsCounters,
+            initialPosts: transition12.initialPosts,
+            latestPosts: transition12.latestPosts
+          }
+        };
+    }
 
     // Merge valid state transitions
     const mergedTransitions4 = PostsTransition.mergePostsTransitions(
@@ -771,11 +1013,27 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create proof of valid merged state transitions
-    const mergedTransitionProofs4 = await Posts.proveMergedPostsTransitions(
-      mergedTransitions4,
-      proof11,
-      proof12
-    );
+    let mergedTransitionProofs4: any;
+    if (PROOFS_ENABLED) {
+      mergedTransitionProofs4 = await Posts.proveMergedPostsTransitions(
+        mergedTransitions4,
+        proof11,
+        proof12
+      );
+    } else {
+        mergedTransitionProofs4 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: mergedTransitions4.blockHeight,
+            initialAllPostsCounter: mergedTransitions4.initialAllPostsCounter,
+            latestAllPostsCounter: mergedTransitions4.latestAllPostsCounter,
+            initialUsersPostsCounters: mergedTransitions4.initialUsersPostsCounters,
+            latestUsersPostsCounters: mergedTransitions4.latestUsersPostsCounters,
+            initialPosts: mergedTransitions4.initialPosts,
+            latestPosts: mergedTransitions4.latestPosts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn8 = await Mina.transaction(user1Address, async () => {
@@ -827,17 +1085,33 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof13 = await Posts.provePostRestorationTransition(
-      transition13,
-      valid13.signature,
-      valid13.allPostsCounter,
-      valid13.usersPostsCounters,
-      valid13.initialPosts,
-      valid13.latestPosts,
-      valid13.initialPostState,
-      valid13.postWitness,
-      valid13.restorationBlockHeight
-    );
+    let proof13: any;
+    if (PROOFS_ENABLED) {
+      proof13 = await Posts.provePostRestorationTransition(
+        transition13,
+        valid13.signature,
+        valid13.allPostsCounter,
+        valid13.usersPostsCounters,
+        valid13.initialPosts,
+        valid13.latestPosts,
+        valid13.initialPostState,
+        valid13.postWitness,
+        valid13.restorationBlockHeight
+      );
+    } else {
+        proof13 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition13.blockHeight,
+            initialAllPostsCounter: transition13.initialAllPostsCounter,
+            latestAllPostsCounter: transition13.latestAllPostsCounter,
+            initialUsersPostsCounters: transition13.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition13.latestUsersPostsCounters,
+            initialPosts: transition13.initialPosts,
+            latestPosts: transition13.latestPosts
+          }
+        };
+    }
 
     // Prepare inputs to create a valid state transition
     const valid14 = createPostPublishingTransitionValidInputs(
@@ -868,19 +1142,35 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof14 = await Posts.provePostPublishingTransition(
-      transition14,
-      valid14.signature,
-      valid14.postState.allPostsCounter.sub(1),
-      valid14.initialUsersPostsCounters,
-      valid14.latestUsersPostsCounters,
-      valid14.postState.userPostsCounter.sub(1),
-      valid14.userPostsCounterWitness,
-      valid14.initialPosts,
-      valid14.latestPosts,
-      valid14.postState,
-      valid14.postWitness
-    );
+    let proof14: any;
+    if (PROOFS_ENABLED) {
+      proof14 = await Posts.provePostPublishingTransition(
+        transition14,
+        valid14.signature,
+        valid14.postState.allPostsCounter.sub(1),
+        valid14.initialUsersPostsCounters,
+        valid14.latestUsersPostsCounters,
+        valid14.postState.userPostsCounter.sub(1),
+        valid14.userPostsCounterWitness,
+        valid14.initialPosts,
+        valid14.latestPosts,
+        valid14.postState,
+        valid14.postWitness
+      );
+    } else {
+        proof14 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition14.blockHeight,
+            initialAllPostsCounter: transition14.initialAllPostsCounter,
+            latestAllPostsCounter: transition14.latestAllPostsCounter,
+            initialUsersPostsCounters: transition14.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition14.latestUsersPostsCounters,
+            initialPosts: transition14.initialPosts,
+            latestPosts: transition14.latestPosts
+          }
+        };
+    }
 
     // Merge valid state transitions
     const mergedTransitions5 = PostsTransition.mergePostsTransitions(
@@ -889,11 +1179,27 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Create proof of valid merged state transitions
-    const mergedTransitionProofs5 = await Posts.proveMergedPostsTransitions(
-      mergedTransitions5,
-      proof13,
-      proof14
-    );
+    let mergedTransitionProofs5: any;
+    if (PROOFS_ENABLED) {
+      mergedTransitionProofs5 = await Posts.proveMergedPostsTransitions(
+        mergedTransitions5,
+        proof13,
+        proof14
+      );
+    } else {
+      mergedTransitionProofs5 = {
+        verify: () => {},
+        publicInput: {
+          blockHeight: mergedTransitions5.blockHeight,
+          initialAllPostsCounter: mergedTransitions5.initialAllPostsCounter,
+          latestAllPostsCounter: mergedTransitions5.latestAllPostsCounter,
+          initialUsersPostsCounters: mergedTransitions5.initialUsersPostsCounters,
+          latestUsersPostsCounters: mergedTransitions5.latestUsersPostsCounters,
+          initialPosts: mergedTransitions5.initialPosts,
+          latestPosts: mergedTransitions5.latestPosts
+        }
+      };
+    }
 
     // Send valid proof to update our on-chain state
     const txn9 = await Mina.transaction(user1Address, async () => {

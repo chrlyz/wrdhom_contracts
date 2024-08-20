@@ -6,7 +6,7 @@ import { Config } from '../posts/PostsDeploy.js';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
-const lightnet = process.env.LIGHTNET === 'true' || false;
+const PROOFS_ENABLED = process.env.PROOFS_ENABLED === 'true' || false;
 
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
 const commentsConfig = configJson.deployAliases['comments'];
@@ -27,7 +27,7 @@ const feePayerAddress = feePayerKey.toPublicKey();
 const commentsContractAddress = commentsContractKey.toPublicKey();
 const commentsContract = new CommentsContract(commentsContractAddress);
 
-if (lightnet) {
+if (PROOFS_ENABLED) {
   Network.proofsEnabled = false;
 } else {
     console.log('Compiling Comments zkProgram...');

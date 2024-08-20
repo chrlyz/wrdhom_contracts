@@ -24,8 +24,10 @@ import {
   createReactionDeletionTransitionValidInputs,
   createReactionRestorationTransitionValidInputs,
 } from './ReactionsUtils';
+import * as dotenv from 'dotenv';
 
-let proofsEnabled = true;
+dotenv.config();
+const PROOFS_ENABLED = process.env.PROOFS_ENABLED === 'true' || false;
 
 describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
   let Local: any,
@@ -46,7 +48,7 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     reactionsMap: MerkleMap;
 
   beforeAll(async () => {
-    if (proofsEnabled) {
+    if (PROOFS_ENABLED) {
       console.log('Compiling Posts ZkProgram...');
       await Posts.compile();
       console.log('Compiling PostsContract...');
@@ -60,7 +62,7 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
   });
 
   beforeEach(async () => {
-    Local = await Mina.LocalBlockchain({ proofsEnabled });
+    Local = await Mina.LocalBlockchain({ proofsEnabled: PROOFS_ENABLED });
     Mina.setActiveInstance(Local);
     user1Key = Local.testAccounts[0].key;
     user1Address = Local.testAccounts[0].key.toPublicKey();
@@ -175,19 +177,35 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof1 = await Posts.provePostPublishingTransition(
-      transition1,
-      valid1.signature,
-      valid1.postState.allPostsCounter.sub(1),
-      valid1.initialUsersPostsCounters,
-      valid1.latestUsersPostsCounters,
-      valid1.postState.userPostsCounter.sub(1),
-      valid1.userPostsCounterWitness,
-      valid1.initialPosts,
-      valid1.latestPosts,
-      valid1.postState,
-      valid1.postWitness
-    );
+    let proof1: any;
+    if (PROOFS_ENABLED) {
+      proof1 = await Posts.provePostPublishingTransition(
+        transition1,
+        valid1.signature,
+        valid1.postState.allPostsCounter.sub(1),
+        valid1.initialUsersPostsCounters,
+        valid1.latestUsersPostsCounters,
+        valid1.postState.userPostsCounter.sub(1),
+        valid1.userPostsCounterWitness,
+        valid1.initialPosts,
+        valid1.latestPosts,
+        valid1.postState,
+        valid1.postWitness
+      );
+    } else {
+        proof1 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition1.blockHeight,
+            initialAllPostsCounter: transition1.initialAllPostsCounter,
+            latestAllPostsCounter: transition1.latestAllPostsCounter,
+            initialUsersPostsCounters: transition1.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition1.latestUsersPostsCounters,
+            initialPosts: transition1.initialPosts,
+            latestPosts: transition1.latestPosts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn1 = await Mina.transaction(user1Address, async () => {
@@ -254,26 +272,45 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof2 = await Reactions.proveReactionPublishingTransition(
-      transition2,
-      valid2.signature,
-      valid2.targets,
-      valid2.targetState,
-      valid2.targetWitness,
-      valid2.reactionState.allReactionsCounter.sub(1),
-      valid2.initialUsersReactionsCounters,
-      valid2.latestUsersReactionsCounters,
-      valid2.reactionState.userReactionsCounter.sub(1),
-      valid2.userReactionsCounterWitness,
-      valid2.initialTargetsReactionsCounters,
-      valid2.latestTargetsReactionsCounters,
-      valid2.reactionState.targetReactionsCounter.sub(1),
-      valid2.targetReactionsCounterWitness,
-      valid2.initialReactions,
-      valid2.latestReactions,
-      valid2.reactionWitness,
-      valid2.reactionState
-    );
+    let proof2: any;
+    if (PROOFS_ENABLED) {
+      proof2 = await Reactions.proveReactionPublishingTransition(
+        transition2,
+        valid2.signature,
+        valid2.targets,
+        valid2.targetState,
+        valid2.targetWitness,
+        valid2.reactionState.allReactionsCounter.sub(1),
+        valid2.initialUsersReactionsCounters,
+        valid2.latestUsersReactionsCounters,
+        valid2.reactionState.userReactionsCounter.sub(1),
+        valid2.userReactionsCounterWitness,
+        valid2.initialTargetsReactionsCounters,
+        valid2.latestTargetsReactionsCounters,
+        valid2.reactionState.targetReactionsCounter.sub(1),
+        valid2.targetReactionsCounterWitness,
+        valid2.initialReactions,
+        valid2.latestReactions,
+        valid2.reactionWitness,
+        valid2.reactionState
+      );
+    } else {
+        proof2 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition2.targets,
+            blockHeight: transition2.blockHeight,
+            initialAllReactionsCounter: transition2.initialAllReactionsCounter,
+            latestAllReactionsCounter: transition2.latestAllReactionsCounter,
+            initialUsersReactionsCounters: transition2.initialUsersReactionsCounters,
+            latestUsersReactionsCounters: transition2.latestUsersReactionsCounters,
+            initialTargetsReactionsCounters: transition2.initialTargetsReactionsCounters,
+            latestTargetsReactionsCounters: transition2.latestTargetsReactionsCounters,
+            initialReactions: transition2.initialReactions,
+            latestReactions: transition2.latestReactions
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn2 = await Mina.transaction(user1Address, async () => {
@@ -343,21 +380,40 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof3 = await Reactions.proveReactionDeletionTransition(
-      transition3,
-      valid3.signature,
-      valid3.targets,
-      valid3.targetState,
-      valid3.targetWitness,
-      valid3.allReactionsCounter,
-      valid3.usersReactionsCounters,
-      valid3.targetsReactionsCounters,
-      valid3.initialReactions,
-      valid3.latestReactions,
-      valid3.initialReactionState,
-      valid3.reactionWitness,
-      valid3.latestReactionState.deletionBlockHeight
-    );
+    let proof3: any;
+    if (PROOFS_ENABLED) {
+      proof3 = await Reactions.proveReactionDeletionTransition(
+        transition3,
+        valid3.signature,
+        valid3.targets,
+        valid3.targetState,
+        valid3.targetWitness,
+        valid3.allReactionsCounter,
+        valid3.usersReactionsCounters,
+        valid3.targetsReactionsCounters,
+        valid3.initialReactions,
+        valid3.latestReactions,
+        valid3.initialReactionState,
+        valid3.reactionWitness,
+        valid3.latestReactionState.deletionBlockHeight
+      );
+    } else {
+        proof3 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition3.targets,
+            blockHeight: transition3.blockHeight,
+            initialAllReactionsCounter: transition3.initialAllReactionsCounter,
+            latestAllReactionsCounter: transition3.latestAllReactionsCounter,
+            initialUsersReactionsCounters: transition3.initialUsersReactionsCounters,
+            latestUsersReactionsCounters: transition3.latestUsersReactionsCounters,
+            initialTargetsReactionsCounters: transition3.initialTargetsReactionsCounters,
+            latestTargetsReactionsCounters: transition3.latestTargetsReactionsCounters,
+            initialReactions: transition3.initialReactions,
+            latestReactions: transition3.latestReactions
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn3 = await Mina.transaction(user1Address, async () => {
@@ -425,21 +481,40 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof4 = await Reactions.proveReactionRestorationTransition(
-      transition4,
-      valid4.signature,
-      valid4.targets,
-      valid4.targetState,
-      valid4.targetWitness,
-      valid4.allReactionsCounter,
-      valid4.usersReactionsCounters,
-      valid4.targetsReactionsCounters,
-      valid4.initialReactions,
-      valid4.latestReactions,
-      valid4.initialReactionState,
-      valid4.reactionWitness,
-      valid4.latestReactionState.restorationBlockHeight
-    );
+    let proof4: any;
+    if (PROOFS_ENABLED) {
+      proof4 = await Reactions.proveReactionRestorationTransition(
+        transition4,
+        valid4.signature,
+        valid4.targets,
+        valid4.targetState,
+        valid4.targetWitness,
+        valid4.allReactionsCounter,
+        valid4.usersReactionsCounters,
+        valid4.targetsReactionsCounters,
+        valid4.initialReactions,
+        valid4.latestReactions,
+        valid4.initialReactionState,
+        valid4.reactionWitness,
+        valid4.latestReactionState.restorationBlockHeight
+      );
+    } else {
+        proof4 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition4.targets,
+            blockHeight: transition4.blockHeight,
+            initialAllReactionsCounter: transition4.initialAllReactionsCounter,
+            latestAllReactionsCounter: transition4.latestAllReactionsCounter,
+            initialUsersReactionsCounters: transition4.initialUsersReactionsCounters,
+            latestUsersReactionsCounters: transition4.latestUsersReactionsCounters,
+            initialTargetsReactionsCounters: transition4.initialTargetsReactionsCounters,
+            latestTargetsReactionsCounters: transition4.latestTargetsReactionsCounters,
+            initialReactions: transition4.initialReactions,
+            latestReactions: transition4.latestReactions
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn4 = await Mina.transaction(user1Address, async () => {
@@ -516,26 +591,45 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof5 = await Reactions.proveReactionPublishingTransition(
-      transition5,
-      valid5.signature,
-      valid5.targets,
-      valid5.targetState,
-      valid5.targetWitness,
-      valid5.reactionState.allReactionsCounter.sub(1),
-      valid5.initialUsersReactionsCounters,
-      valid5.latestUsersReactionsCounters,
-      valid5.reactionState.userReactionsCounter.sub(1),
-      valid5.userReactionsCounterWitness,
-      valid5.initialTargetsReactionsCounters,
-      valid5.latestTargetsReactionsCounters,
-      valid5.reactionState.targetReactionsCounter.sub(1),
-      valid5.targetReactionsCounterWitness,
-      valid5.initialReactions,
-      valid5.latestReactions,
-      valid5.reactionWitness,
-      valid5.reactionState
-    );
+    let proof5: any;
+    if (PROOFS_ENABLED) {
+      proof5 = await Reactions.proveReactionPublishingTransition(
+        transition5,
+        valid5.signature,
+        valid5.targets,
+        valid5.targetState,
+        valid5.targetWitness,
+        valid5.reactionState.allReactionsCounter.sub(1),
+        valid5.initialUsersReactionsCounters,
+        valid5.latestUsersReactionsCounters,
+        valid5.reactionState.userReactionsCounter.sub(1),
+        valid5.userReactionsCounterWitness,
+        valid5.initialTargetsReactionsCounters,
+        valid5.latestTargetsReactionsCounters,
+        valid5.reactionState.targetReactionsCounter.sub(1),
+        valid5.targetReactionsCounterWitness,
+        valid5.initialReactions,
+        valid5.latestReactions,
+        valid5.reactionWitness,
+        valid5.reactionState
+      );
+    } else {
+        proof5 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition5.targets,
+            blockHeight: transition5.blockHeight,
+            initialAllReactionsCounter: transition5.initialAllReactionsCounter,
+            latestAllReactionsCounter: transition5.latestAllReactionsCounter,
+            initialUsersReactionsCounters: transition5.initialUsersReactionsCounters,
+            latestUsersReactionsCounters: transition5.latestUsersReactionsCounters,
+            initialTargetsReactionsCounters: transition5.initialTargetsReactionsCounters,
+            latestTargetsReactionsCounters: transition5.latestTargetsReactionsCounters,
+            initialReactions: transition5.initialReactions,
+            latestReactions: transition5.latestReactions
+          }
+        };
+    }
 
     // Prepare inputs to create a valid state transition
     const valid6 = createReactionTransitionValidInputs(
@@ -575,26 +669,45 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof6 = await Reactions.proveReactionPublishingTransition(
-      transition6,
-      valid6.signature,
-      valid6.targets,
-      valid6.targetState,
-      valid6.targetWitness,
-      valid6.reactionState.allReactionsCounter.sub(1),
-      valid6.initialUsersReactionsCounters,
-      valid6.latestUsersReactionsCounters,
-      valid6.reactionState.userReactionsCounter.sub(1),
-      valid6.userReactionsCounterWitness,
-      valid6.initialTargetsReactionsCounters,
-      valid6.latestTargetsReactionsCounters,
-      valid6.reactionState.targetReactionsCounter.sub(1),
-      valid6.targetReactionsCounterWitness,
-      valid6.initialReactions,
-      valid6.latestReactions,
-      valid6.reactionWitness,
-      valid6.reactionState
-    );
+    let proof6: any;
+    if (PROOFS_ENABLED) {
+      proof6 = await Reactions.proveReactionPublishingTransition(
+        transition6,
+        valid6.signature,
+        valid6.targets,
+        valid6.targetState,
+        valid6.targetWitness,
+        valid6.reactionState.allReactionsCounter.sub(1),
+        valid6.initialUsersReactionsCounters,
+        valid6.latestUsersReactionsCounters,
+        valid6.reactionState.userReactionsCounter.sub(1),
+        valid6.userReactionsCounterWitness,
+        valid6.initialTargetsReactionsCounters,
+        valid6.latestTargetsReactionsCounters,
+        valid6.reactionState.targetReactionsCounter.sub(1),
+        valid6.targetReactionsCounterWitness,
+        valid6.initialReactions,
+        valid6.latestReactions,
+        valid6.reactionWitness,
+        valid6.reactionState
+      );
+    } else {
+        proof6 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition6.targets,
+            blockHeight: transition6.blockHeight,
+            initialAllReactionsCounter: transition6.initialAllReactionsCounter,
+            latestAllReactionsCounter: transition6.latestAllReactionsCounter,
+            initialUsersReactionsCounters: transition6.initialUsersReactionsCounters,
+            latestUsersReactionsCounters: transition6.latestUsersReactionsCounters,
+            initialTargetsReactionsCounters: transition6.initialTargetsReactionsCounters,
+            latestTargetsReactionsCounters: transition6.latestTargetsReactionsCounters,
+            initialReactions: transition6.initialReactions,
+            latestReactions: transition6.latestReactions
+          }
+        };
+    }
 
     // Merge valid state transitions
     const mergedTransitions1 = ReactionsTransition.mergeReactionsTransitions(
@@ -603,12 +716,31 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     );
 
     // Create proof of valid merged state transitions
-    const mergedTransitionProofs1 =
-      await Reactions.proveMergedReactionsTransitions(
-        mergedTransitions1,
-        proof5,
-        proof6
-      );
+    let mergedTransitionProofs1: any;
+    if (PROOFS_ENABLED) {
+      mergedTransitionProofs1 =
+        await Reactions.proveMergedReactionsTransitions(
+          mergedTransitions1,
+          proof5,
+          proof6
+        );
+    } else {
+        mergedTransitionProofs1 = {
+          verify: () => {},
+          publicInput: {
+            targets: mergedTransitions1.targets,
+            blockHeight: mergedTransitions1.blockHeight,
+            initialAllReactionsCounter: mergedTransitions1.initialAllReactionsCounter,
+            latestAllReactionsCounter: mergedTransitions1.latestAllReactionsCounter,
+            initialUsersReactionsCounters: mergedTransitions1.initialUsersReactionsCounters,
+            latestUsersReactionsCounters: mergedTransitions1.latestUsersReactionsCounters,
+            initialTargetsReactionsCounters: mergedTransitions1.initialTargetsReactionsCounters,
+            latestTargetsReactionsCounters: mergedTransitions1.latestTargetsReactionsCounters,
+            initialReactions: mergedTransitions1.initialReactions,
+            latestReactions: mergedTransitions1.latestReactions
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn5 = await Mina.transaction(user1Address, async () => {

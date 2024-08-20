@@ -24,8 +24,10 @@ import {
   createRepostDeletionTransitionValidInputs,
   createRepostRestorationTransitionValidInputs,
 } from './RepostsUtils';
+import * as dotenv from 'dotenv';
 
-let proofsEnabled = true;
+dotenv.config();
+const PROOFS_ENABLED = process.env.PROOFS_ENABLED === 'true' || false;
 
 describe(`the RepostsContract and the Reposts ZkProgram`, () => {
   let Local: any,
@@ -46,7 +48,7 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     repostsMap: MerkleMap;
 
   beforeAll(async () => {
-    if (proofsEnabled) {
+    if (PROOFS_ENABLED) {
       console.log('Compiling Posts ZkProgram...');
       await Posts.compile();
       console.log('Compiling PostsContract...');
@@ -60,7 +62,7 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
   });
 
   beforeEach(async () => {
-    Local = await Mina.LocalBlockchain({ proofsEnabled });
+    Local = await Mina.LocalBlockchain({ proofsEnabled: PROOFS_ENABLED });
     Mina.setActiveInstance(Local);
     user1Key = Local.testAccounts[0].key;
     user1Address = Local.testAccounts[0].key.toPublicKey();
@@ -174,19 +176,35 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof1 = await Posts.provePostPublishingTransition(
-      transition1,
-      valid1.signature,
-      valid1.postState.allPostsCounter.sub(1),
-      valid1.initialUsersPostsCounters,
-      valid1.latestUsersPostsCounters,
-      valid1.postState.userPostsCounter.sub(1),
-      valid1.userPostsCounterWitness,
-      valid1.initialPosts,
-      valid1.latestPosts,
-      valid1.postState,
-      valid1.postWitness
-    );
+    let proof1: any;
+    if (PROOFS_ENABLED) {
+      proof1 = await Posts.provePostPublishingTransition(
+        transition1,
+        valid1.signature,
+        valid1.postState.allPostsCounter.sub(1),
+        valid1.initialUsersPostsCounters,
+        valid1.latestUsersPostsCounters,
+        valid1.postState.userPostsCounter.sub(1),
+        valid1.userPostsCounterWitness,
+        valid1.initialPosts,
+        valid1.latestPosts,
+        valid1.postState,
+        valid1.postWitness
+      );
+    } else {
+        proof1 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition1.blockHeight,
+            initialAllPostsCounter: transition1.initialAllPostsCounter,
+            latestAllPostsCounter: transition1.latestAllPostsCounter,
+            initialUsersPostsCounters: transition1.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition1.latestUsersPostsCounters,
+            initialPosts: transition1.initialPosts,
+            latestPosts: transition1.latestPosts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn1 = await Mina.transaction(user1Address, async () => {
@@ -252,26 +270,45 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof2 = await Reposts.proveRepostPublishingTransition(
-      transition2,
-      valid2.signature,
-      postsMap.getRoot(),
-      valid2.targetState,
-      valid2.targetWitness,
-      valid2.repostState.allRepostsCounter.sub(1),
-      valid2.initialUsersRepostsCounters,
-      valid2.latestUsersRepostsCounters,
-      valid2.repostState.userRepostsCounter.sub(1),
-      valid2.userRepostsCounterWitness,
-      valid2.initialTargetsRepostsCounters,
-      valid2.latestTargetsRepostsCounters,
-      valid2.repostState.targetRepostsCounter.sub(1),
-      valid2.targetRepostsCounterWitness,
-      valid2.initialReposts,
-      valid2.latestReposts,
-      valid2.repostWitness,
-      valid2.repostState
-    );
+    let proof2: any;
+    if (PROOFS_ENABLED) {
+      proof2 = await Reposts.proveRepostPublishingTransition(
+        transition2,
+        valid2.signature,
+        postsMap.getRoot(),
+        valid2.targetState,
+        valid2.targetWitness,
+        valid2.repostState.allRepostsCounter.sub(1),
+        valid2.initialUsersRepostsCounters,
+        valid2.latestUsersRepostsCounters,
+        valid2.repostState.userRepostsCounter.sub(1),
+        valid2.userRepostsCounterWitness,
+        valid2.initialTargetsRepostsCounters,
+        valid2.latestTargetsRepostsCounters,
+        valid2.repostState.targetRepostsCounter.sub(1),
+        valid2.targetRepostsCounterWitness,
+        valid2.initialReposts,
+        valid2.latestReposts,
+        valid2.repostWitness,
+        valid2.repostState
+      );
+    } else {
+        proof2 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition2.targets,
+            blockHeight: transition2.blockHeight,
+            initialAllRepostsCounter: transition2.initialAllRepostsCounter,
+            latestAllRepostsCounter: transition2.latestAllRepostsCounter,
+            initialUsersRepostsCounters: transition2.initialUsersRepostsCounters,
+            latestUsersRepostsCounters: transition2.latestUsersRepostsCounters,
+            initialTargetsRepostsCounters: transition2.initialTargetsRepostsCounters,
+            latestTargetsRepostsCounters: transition2.latestTargetsRepostsCounters,
+            initialReposts: transition2.initialReposts,
+            latestReposts: transition2.latestReposts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn2 = await Mina.transaction(user1Address, async () => {
@@ -336,21 +373,40 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof3 = await Reposts.proveRepostDeletionTransition(
-      transition3,
-      valid3.signature,
-      valid3.targets,
-      valid3.targetState,
-      valid3.targetWitness,
-      valid3.allRepostsCounter,
-      valid3.usersRepostsCounters,
-      valid3.targetsRepostsCounters,
-      valid3.initialReposts,
-      valid3.latestReposts,
-      valid3.initialRepostState,
-      valid3.repostWitness,
-      valid3.latestRepostState.deletionBlockHeight
-    );
+    let proof3: any;
+    if (PROOFS_ENABLED) {
+      proof3 = await Reposts.proveRepostDeletionTransition(
+        transition3,
+        valid3.signature,
+        valid3.targets,
+        valid3.targetState,
+        valid3.targetWitness,
+        valid3.allRepostsCounter,
+        valid3.usersRepostsCounters,
+        valid3.targetsRepostsCounters,
+        valid3.initialReposts,
+        valid3.latestReposts,
+        valid3.initialRepostState,
+        valid3.repostWitness,
+        valid3.latestRepostState.deletionBlockHeight
+      );
+    } else {
+        proof3 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition3.targets,
+            blockHeight: transition3.blockHeight,
+            initialAllRepostsCounter: transition3.initialAllRepostsCounter,
+            latestAllRepostsCounter: transition3.latestAllRepostsCounter,
+            initialUsersRepostsCounters: transition3.initialUsersRepostsCounters,
+            latestUsersRepostsCounters: transition3.latestUsersRepostsCounters,
+            initialTargetsRepostsCounters: transition3.initialTargetsRepostsCounters,
+            latestTargetsRepostsCounters: transition3.latestTargetsRepostsCounters,
+            initialReposts: transition3.initialReposts,
+            latestReposts: transition3.latestReposts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn3 = await Mina.transaction(user1Address, async () => {
@@ -413,21 +469,40 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof4 = await Reposts.proveRepostRestorationTransition(
-      transition4,
-      valid4.signature,
-      valid4.targets,
-      valid4.targetState,
-      valid4.targetWitness,
-      valid4.allRepostsCounter,
-      valid4.usersRepostsCounters,
-      valid4.targetsRepostsCounters,
-      valid4.initialReposts,
-      valid4.latestReposts,
-      valid4.initialRepostState,
-      valid4.repostWitness,
-      valid4.latestRepostState.restorationBlockHeight
-    );
+    let proof4: any;
+    if (PROOFS_ENABLED) {
+      proof4 = await Reposts.proveRepostRestorationTransition(
+        transition4,
+        valid4.signature,
+        valid4.targets,
+        valid4.targetState,
+        valid4.targetWitness,
+        valid4.allRepostsCounter,
+        valid4.usersRepostsCounters,
+        valid4.targetsRepostsCounters,
+        valid4.initialReposts,
+        valid4.latestReposts,
+        valid4.initialRepostState,
+        valid4.repostWitness,
+        valid4.latestRepostState.restorationBlockHeight
+      );
+    } else {
+        proof4 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition4.targets,
+            blockHeight: transition4.blockHeight,
+            initialAllRepostsCounter: transition4.initialAllRepostsCounter,
+            latestAllRepostsCounter: transition4.latestAllRepostsCounter,
+            initialUsersRepostsCounters: transition4.initialUsersRepostsCounters,
+            latestUsersRepostsCounters: transition4.latestUsersRepostsCounters,
+            initialTargetsRepostsCounters: transition4.initialTargetsRepostsCounters,
+            latestTargetsRepostsCounters: transition4.latestTargetsRepostsCounters,
+            initialReposts: transition4.initialReposts,
+            latestReposts: transition4.latestReposts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn4 = await Mina.transaction(user1Address, async () => {
@@ -489,19 +564,35 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof5 = await Posts.provePostPublishingTransition(
-      transition5,
-      valid5.signature,
-      valid5.postState.allPostsCounter.sub(1),
-      valid5.initialUsersPostsCounters,
-      valid5.latestUsersPostsCounters,
-      valid5.postState.userPostsCounter.sub(1),
-      valid5.userPostsCounterWitness,
-      valid5.initialPosts,
-      valid5.latestPosts,
-      valid5.postState,
-      valid5.postWitness
-    );
+    let proof5: any;
+    if (PROOFS_ENABLED) {
+      proof5 = await Posts.provePostPublishingTransition(
+        transition5,
+        valid5.signature,
+        valid5.postState.allPostsCounter.sub(1),
+        valid5.initialUsersPostsCounters,
+        valid5.latestUsersPostsCounters,
+        valid5.postState.userPostsCounter.sub(1),
+        valid5.userPostsCounterWitness,
+        valid5.initialPosts,
+        valid5.latestPosts,
+        valid5.postState,
+        valid5.postWitness
+      );
+    } else {
+        proof5 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition5.blockHeight,
+            initialAllPostsCounter: transition5.initialAllPostsCounter,
+            latestAllPostsCounter: transition5.latestAllPostsCounter,
+            initialUsersPostsCounters: transition5.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition5.latestUsersPostsCounters,
+            initialPosts: transition5.initialPosts,
+            latestPosts: transition5.latestPosts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn5 = await Mina.transaction(user1Address, async () => {
@@ -568,26 +659,45 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof6 = await Reposts.proveRepostPublishingTransition(
-      transition6,
-      valid6.signature,
-      valid6.targets,
-      valid6.targetState,
-      valid6.targetWitness,
-      valid6.repostState.allRepostsCounter.sub(1),
-      valid6.initialUsersRepostsCounters,
-      valid6.latestUsersRepostsCounters,
-      valid6.repostState.userRepostsCounter.sub(1),
-      valid6.userRepostsCounterWitness,
-      valid6.initialTargetsRepostsCounters,
-      valid6.latestTargetsRepostsCounters,
-      valid6.repostState.targetRepostsCounter.sub(1),
-      valid6.targetRepostsCounterWitness,
-      valid6.initialReposts,
-      valid6.latestReposts,
-      valid6.repostWitness,
-      valid6.repostState
-    );
+    let proof6: any;
+    if (PROOFS_ENABLED) {
+      proof6 = await Reposts.proveRepostPublishingTransition(
+        transition6,
+        valid6.signature,
+        valid6.targets,
+        valid6.targetState,
+        valid6.targetWitness,
+        valid6.repostState.allRepostsCounter.sub(1),
+        valid6.initialUsersRepostsCounters,
+        valid6.latestUsersRepostsCounters,
+        valid6.repostState.userRepostsCounter.sub(1),
+        valid6.userRepostsCounterWitness,
+        valid6.initialTargetsRepostsCounters,
+        valid6.latestTargetsRepostsCounters,
+        valid6.repostState.targetRepostsCounter.sub(1),
+        valid6.targetRepostsCounterWitness,
+        valid6.initialReposts,
+        valid6.latestReposts,
+        valid6.repostWitness,
+        valid6.repostState
+      );
+    } else {
+        proof6 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition6.targets,
+            blockHeight: transition6.blockHeight,
+            initialAllRepostsCounter: transition6.initialAllRepostsCounter,
+            latestAllRepostsCounter: transition6.latestAllRepostsCounter,
+            initialUsersRepostsCounters: transition6.initialUsersRepostsCounters,
+            latestUsersRepostsCounters: transition6.latestUsersRepostsCounters,
+            initialTargetsRepostsCounters: transition6.initialTargetsRepostsCounters,
+            latestTargetsRepostsCounters: transition6.latestTargetsRepostsCounters,
+            initialReposts: transition6.initialReposts,
+            latestReposts: transition6.latestReposts
+          }
+        };
+    }
 
     // Prepare inputs to create a valid state transition
     const valid7 = createRepostTransitionValidInputs(
@@ -626,26 +736,45 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof7 = await Reposts.proveRepostPublishingTransition(
-      transition7,
-      valid7.signature,
-      valid7.targets,
-      valid7.targetState,
-      valid7.targetWitness,
-      valid7.repostState.allRepostsCounter.sub(1),
-      valid7.initialUsersRepostsCounters,
-      valid7.latestUsersRepostsCounters,
-      valid7.repostState.userRepostsCounter.sub(1),
-      valid7.userRepostsCounterWitness,
-      valid7.initialTargetsRepostsCounters,
-      valid7.latestTargetsRepostsCounters,
-      valid7.repostState.targetRepostsCounter.sub(1),
-      valid7.targetRepostsCounterWitness,
-      valid7.initialReposts,
-      valid7.latestReposts,
-      valid7.repostWitness,
-      valid7.repostState
-    );
+    let proof7: any;
+    if (PROOFS_ENABLED) {
+      proof7 = await Reposts.proveRepostPublishingTransition(
+        transition7,
+        valid7.signature,
+        valid7.targets,
+        valid7.targetState,
+        valid7.targetWitness,
+        valid7.repostState.allRepostsCounter.sub(1),
+        valid7.initialUsersRepostsCounters,
+        valid7.latestUsersRepostsCounters,
+        valid7.repostState.userRepostsCounter.sub(1),
+        valid7.userRepostsCounterWitness,
+        valid7.initialTargetsRepostsCounters,
+        valid7.latestTargetsRepostsCounters,
+        valid7.repostState.targetRepostsCounter.sub(1),
+        valid7.targetRepostsCounterWitness,
+        valid7.initialReposts,
+        valid7.latestReposts,
+        valid7.repostWitness,
+        valid7.repostState
+      );
+    } else {
+        proof7 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition7.targets,
+            blockHeight: transition7.blockHeight,
+            initialAllRepostsCounter: transition7.initialAllRepostsCounter,
+            latestAllRepostsCounter: transition7.latestAllRepostsCounter,
+            initialUsersRepostsCounters: transition7.initialUsersRepostsCounters,
+            latestUsersRepostsCounters: transition7.latestUsersRepostsCounters,
+            initialTargetsRepostsCounters: transition7.initialTargetsRepostsCounters,
+            latestTargetsRepostsCounters: transition7.latestTargetsRepostsCounters,
+            initialReposts: transition7.initialReposts,
+            latestReposts: transition7.latestReposts
+          }
+        };
+    }
 
     // Merge valid state transitions
     const mergedTransitions1 = RepostsTransition.mergeRepostsTransitions(
@@ -654,11 +783,30 @@ describe(`the RepostsContract and the Reposts ZkProgram`, () => {
     );
 
     // Create proof of valid merged state transitions
-    const mergedTransitionProofs1 = await Reposts.proveMergedRepostsTransitions(
-      mergedTransitions1,
-      proof6,
-      proof7
-    );
+    let mergedTransitionProofs1: any;
+    if (PROOFS_ENABLED) {
+      mergedTransitionProofs1 = await Reposts.proveMergedRepostsTransitions(
+        mergedTransitions1,
+        proof6,
+        proof7
+      );
+    } else {
+        mergedTransitionProofs1 = {
+          verify: () => {},
+          publicInput: {
+            targets: mergedTransitions1.targets,
+            blockHeight: mergedTransitions1.blockHeight,
+            initialAllRepostsCounter: mergedTransitions1.initialAllRepostsCounter,
+            latestAllRepostsCounter: mergedTransitions1.latestAllRepostsCounter,
+            initialUsersRepostsCounters: mergedTransitions1.initialUsersRepostsCounters,
+            latestUsersRepostsCounters: mergedTransitions1.latestUsersRepostsCounters,
+            initialTargetsRepostsCounters: mergedTransitions1.initialTargetsRepostsCounters,
+            latestTargetsRepostsCounters: mergedTransitions1.latestTargetsRepostsCounters,
+            initialReposts: mergedTransitions1.initialReposts,
+            latestReposts: mergedTransitions1.latestReposts
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn6 = await Mina.transaction(user1Address, async () => {
