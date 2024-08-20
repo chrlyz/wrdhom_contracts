@@ -24,8 +24,10 @@ import {
   createCommentDeletionTransitionValidInputs,
   createCommentRestorationTransitionValidInputs,
 } from './CommentsUtils';
+import * as dotenv from 'dotenv';
 
-let proofsEnabled = true;
+dotenv.config();
+const PROOFS_ENABLED = process.env.PROOFS_ENABLED === 'true' || false;
 
 describe(`the CommentsContract and the Comments ZkProgram`, () => {
   let user1Address: PublicKey,
@@ -46,7 +48,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     Local: any
 
   beforeAll(async () => {
-    if (proofsEnabled) {
+    if (PROOFS_ENABLED) {
       console.log('Compiling Posts ZkProgram...');
       await Posts.compile();
       console.log('Compiling PostsContract...');
@@ -60,7 +62,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
   });
 
   beforeEach(async () => {
-    Local = await Mina.LocalBlockchain({ proofsEnabled });
+    Local = await Mina.LocalBlockchain({ proofsEnabled: PROOFS_ENABLED });
     Mina.setActiveInstance(Local);
     user1Key = Local.testAccounts[0].key;
     user1Address = Local.testAccounts[0].key.toPublicKey();
@@ -174,19 +176,35 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof1 = await Posts.provePostPublishingTransition(
-      transition1,
-      valid1.signature,
-      valid1.postState.allPostsCounter.sub(1),
-      valid1.initialUsersPostsCounters,
-      valid1.latestUsersPostsCounters,
-      valid1.postState.userPostsCounter.sub(1),
-      valid1.userPostsCounterWitness,
-      valid1.initialPosts,
-      valid1.latestPosts,
-      valid1.postState,
-      valid1.postWitness
-    );
+    let proof1: any;
+    if (PROOFS_ENABLED) {
+      proof1 = await Posts.provePostPublishingTransition(
+        transition1,
+        valid1.signature,
+        valid1.postState.allPostsCounter.sub(1),
+        valid1.initialUsersPostsCounters,
+        valid1.latestUsersPostsCounters,
+        valid1.postState.userPostsCounter.sub(1),
+        valid1.userPostsCounterWitness,
+        valid1.initialPosts,
+        valid1.latestPosts,
+        valid1.postState,
+        valid1.postWitness
+      );
+    } else {
+      proof1 = {
+        verify: () => {},
+        publicInput: {
+          blockHeight: transition1.blockHeight,
+          initialAllPostsCounter: transition1.initialAllPostsCounter,
+          latestAllPostsCounter: transition1.latestAllPostsCounter,
+          initialUsersPostsCounters: transition1.initialUsersPostsCounters,
+          latestUsersPostsCounters: transition1.latestUsersPostsCounters,
+          initialPosts: transition1.initialPosts,
+          latestPosts: transition1.latestPosts
+        }
+      };
+    }
 
     // Send valid proof to update our on-chain state
     const txn1 = await Mina.transaction(user1Address, async () => {
@@ -255,26 +273,45 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof2 = await Comments.proveCommentPublishingTransition(
-      transition2,
-      valid2.signature,
-      postsMap.getRoot(),
-      valid2.targetState,
-      valid2.targetWitness,
-      valid2.commentState.allCommentsCounter.sub(1),
-      valid2.initialUsersCommentsCounters,
-      valid2.latestUsersCommentsCounters,
-      valid2.commentState.userCommentsCounter.sub(1),
-      valid2.userCommentsCounterWitness,
-      valid2.initialTargetsCommentsCounters,
-      valid2.latestTargetsCommentsCounters,
-      valid2.commentState.targetCommentsCounter.sub(1),
-      valid2.targetCommentsCounterWitness,
-      valid2.initialComments,
-      valid2.latestComments,
-      valid2.commentWitness,
-      valid2.commentState
-    );
+    let proof2: any;
+    if (PROOFS_ENABLED) {
+      proof2 = await Comments.proveCommentPublishingTransition(
+        transition2,
+        valid2.signature,
+        postsMap.getRoot(),
+        valid2.targetState,
+        valid2.targetWitness,
+        valid2.commentState.allCommentsCounter.sub(1),
+        valid2.initialUsersCommentsCounters,
+        valid2.latestUsersCommentsCounters,
+        valid2.commentState.userCommentsCounter.sub(1),
+        valid2.userCommentsCounterWitness,
+        valid2.initialTargetsCommentsCounters,
+        valid2.latestTargetsCommentsCounters,
+        valid2.commentState.targetCommentsCounter.sub(1),
+        valid2.targetCommentsCounterWitness,
+        valid2.initialComments,
+        valid2.latestComments,
+        valid2.commentWitness,
+        valid2.commentState
+      );
+    } else {
+        proof2 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition2.targets,
+            blockHeight: transition2.blockHeight,
+            initialAllCommentsCounter: transition2.initialAllCommentsCounter,
+            latestAllCommentsCounter: transition2.latestAllCommentsCounter,
+            initialUsersCommentsCounters: transition2.initialUsersCommentsCounters,
+            latestUsersCommentsCounters: transition2.latestUsersCommentsCounters,
+            initialTargetsCommentsCounters: transition2.initialTargetsCommentsCounters,
+            latestTargetsCommentsCounters: transition2.latestTargetsCommentsCounters,
+            initialComments: transition2.initialComments,
+            latestComments: transition2.latestComments
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn2 = await Mina.transaction(user1Address, async () => {
@@ -339,21 +376,40 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof3 = await Comments.proveCommentDeletionTransition(
-      transition3,
-      valid3.signature,
-      valid3.targets,
-      valid3.targetState,
-      valid3.targetWitness,
-      valid3.allCommentsCounter,
-      valid3.usersCommentsCounters,
-      valid3.targetsCommentsCounters,
-      valid3.initialComments,
-      valid3.latestComments,
-      valid3.initialCommentState,
-      valid3.commentWitness,
-      valid3.latestCommentState.deletionBlockHeight
-    );
+    let proof3: any;
+    if (PROOFS_ENABLED) {
+      proof3 = await Comments.proveCommentDeletionTransition(
+        transition3,
+        valid3.signature,
+        valid3.targets,
+        valid3.targetState,
+        valid3.targetWitness,
+        valid3.allCommentsCounter,
+        valid3.usersCommentsCounters,
+        valid3.targetsCommentsCounters,
+        valid3.initialComments,
+        valid3.latestComments,
+        valid3.initialCommentState,
+        valid3.commentWitness,
+        valid3.latestCommentState.deletionBlockHeight
+      );
+    } else {
+        proof3 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition3.targets,
+            blockHeight: transition3.blockHeight,
+            initialAllCommentsCounter: transition3.initialAllCommentsCounter,
+            latestAllCommentsCounter: transition3.latestAllCommentsCounter,
+            initialUsersCommentsCounters: transition3.initialUsersCommentsCounters,
+            latestUsersCommentsCounters: transition3.latestUsersCommentsCounters,
+            initialTargetsCommentsCounters: transition3.initialTargetsCommentsCounters,
+            latestTargetsCommentsCounters: transition3.latestTargetsCommentsCounters,
+            initialComments: transition3.initialComments,
+            latestComments: transition3.latestComments
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn3 = await Mina.transaction(user1Address, async () => {
@@ -416,21 +472,40 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof4 = await Comments.proveCommentRestorationTransition(
-      transition4,
-      valid4.signature,
-      valid4.targets,
-      valid4.targetState,
-      valid4.targetWitness,
-      valid4.allCommentsCounter,
-      valid4.usersCommentsCounters,
-      valid4.targetsCommentsCounters,
-      valid4.initialComments,
-      valid4.latestComments,
-      valid4.initialCommentState,
-      valid4.commentWitness,
-      valid4.latestCommentState.restorationBlockHeight
-    );
+    let proof4: any;
+    if (PROOFS_ENABLED) {
+      proof4 = await Comments.proveCommentRestorationTransition(
+        transition4,
+        valid4.signature,
+        valid4.targets,
+        valid4.targetState,
+        valid4.targetWitness,
+        valid4.allCommentsCounter,
+        valid4.usersCommentsCounters,
+        valid4.targetsCommentsCounters,
+        valid4.initialComments,
+        valid4.latestComments,
+        valid4.initialCommentState,
+        valid4.commentWitness,
+        valid4.latestCommentState.restorationBlockHeight
+      );
+    } else {
+        proof4 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition4.targets,
+            blockHeight: transition4.blockHeight,
+            initialAllCommentsCounter: transition4.initialAllCommentsCounter,
+            latestAllCommentsCounter: transition4.latestAllCommentsCounter,
+            initialUsersCommentsCounters: transition4.initialUsersCommentsCounters,
+            latestUsersCommentsCounters: transition4.latestUsersCommentsCounters,
+            initialTargetsCommentsCounters: transition4.initialTargetsCommentsCounters,
+            latestTargetsCommentsCounters: transition4.latestTargetsCommentsCounters,
+            initialComments: transition4.initialComments,
+            latestComments: transition4.latestComments
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn4 = await Mina.transaction(user1Address, async () => {
@@ -504,26 +579,45 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof5 = await Comments.proveCommentPublishingTransition(
-      transition5,
-      valid5.signature,
-      valid5.targets,
-      valid5.targetState,
-      valid5.targetWitness,
-      valid5.commentState.allCommentsCounter.sub(1),
-      valid5.initialUsersCommentsCounters,
-      valid5.latestUsersCommentsCounters,
-      valid5.commentState.userCommentsCounter.sub(1),
-      valid5.userCommentsCounterWitness,
-      valid5.initialTargetsCommentsCounters,
-      valid5.latestTargetsCommentsCounters,
-      valid5.commentState.targetCommentsCounter.sub(1),
-      valid5.targetCommentsCounterWitness,
-      valid5.initialComments,
-      valid5.latestComments,
-      valid5.commentWitness,
-      valid5.commentState
-    );
+    let proof5: any;
+    if (PROOFS_ENABLED) {
+      proof5 = await Comments.proveCommentPublishingTransition(
+        transition5,
+        valid5.signature,
+        valid5.targets,
+        valid5.targetState,
+        valid5.targetWitness,
+        valid5.commentState.allCommentsCounter.sub(1),
+        valid5.initialUsersCommentsCounters,
+        valid5.latestUsersCommentsCounters,
+        valid5.commentState.userCommentsCounter.sub(1),
+        valid5.userCommentsCounterWitness,
+        valid5.initialTargetsCommentsCounters,
+        valid5.latestTargetsCommentsCounters,
+        valid5.commentState.targetCommentsCounter.sub(1),
+        valid5.targetCommentsCounterWitness,
+        valid5.initialComments,
+        valid5.latestComments,
+        valid5.commentWitness,
+        valid5.commentState
+      );
+    } else {
+        proof5 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition5.targets,
+            blockHeight: transition5.blockHeight,
+            initialAllCommentsCounter: transition5.initialAllCommentsCounter,
+            latestAllCommentsCounter: transition5.latestAllCommentsCounter,
+            initialUsersCommentsCounters: transition5.initialUsersCommentsCounters,
+            latestUsersCommentsCounters: transition5.latestUsersCommentsCounters,
+            initialTargetsCommentsCounters: transition5.initialTargetsCommentsCounters,
+            latestTargetsCommentsCounters: transition5.latestTargetsCommentsCounters,
+            initialComments: transition5.initialComments,
+            latestComments: transition5.latestComments
+          }
+        };
+    }
 
     // Prepare inputs to create a valid state transition
     const valid6 = createCommentTransitionValidInputs(
@@ -565,26 +659,45 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Create valid proof for our state transition
-    const proof6 = await Comments.proveCommentPublishingTransition(
-      transition6,
-      valid6.signature,
-      valid6.targets,
-      valid6.targetState,
-      valid6.targetWitness,
-      valid6.commentState.allCommentsCounter.sub(1),
-      valid6.initialUsersCommentsCounters,
-      valid6.latestUsersCommentsCounters,
-      valid6.commentState.userCommentsCounter.sub(1),
-      valid6.userCommentsCounterWitness,
-      valid6.initialTargetsCommentsCounters,
-      valid6.latestTargetsCommentsCounters,
-      valid6.commentState.targetCommentsCounter.sub(1),
-      valid6.targetCommentsCounterWitness,
-      valid6.initialComments,
-      valid6.latestComments,
-      valid6.commentWitness,
-      valid6.commentState
-    );
+    let proof6: any;
+    if (PROOFS_ENABLED) {
+      proof6 = await Comments.proveCommentPublishingTransition(
+        transition6,
+        valid6.signature,
+        valid6.targets,
+        valid6.targetState,
+        valid6.targetWitness,
+        valid6.commentState.allCommentsCounter.sub(1),
+        valid6.initialUsersCommentsCounters,
+        valid6.latestUsersCommentsCounters,
+        valid6.commentState.userCommentsCounter.sub(1),
+        valid6.userCommentsCounterWitness,
+        valid6.initialTargetsCommentsCounters,
+        valid6.latestTargetsCommentsCounters,
+        valid6.commentState.targetCommentsCounter.sub(1),
+        valid6.targetCommentsCounterWitness,
+        valid6.initialComments,
+        valid6.latestComments,
+        valid6.commentWitness,
+        valid6.commentState
+      );
+    } else {
+        proof6 = {
+          verify: () => {},
+          publicInput: {
+            targets: transition6.targets,
+            blockHeight: transition6.blockHeight,
+            initialAllCommentsCounter: transition6.initialAllCommentsCounter,
+            latestAllCommentsCounter: transition6.latestAllCommentsCounter,
+            initialUsersCommentsCounters: transition6.initialUsersCommentsCounters,
+            latestUsersCommentsCounters: transition6.latestUsersCommentsCounters,
+            initialTargetsCommentsCounters: transition6.initialTargetsCommentsCounters,
+            latestTargetsCommentsCounters: transition6.latestTargetsCommentsCounters,
+            initialComments: transition6.initialComments,
+            latestComments: transition6.latestComments
+          }
+        };
+    }
 
     // Merge valid state transitions
     const mergedTransitions1 = CommentsTransition.mergeCommentsTransitions(
@@ -593,12 +706,31 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     );
 
     // Create proof of valid merged state transitions
-    const mergedTransitionProofs1 =
+    let mergedTransitionProofs1: any;
+    if (PROOFS_ENABLED) {
+      mergedTransitionProofs1 =
       await Comments.proveMergedCommentsTransitions(
         mergedTransitions1,
         proof5,
         proof6
       );
+    } else {
+        mergedTransitionProofs1 = {
+          verify: () => {},
+          publicInput: {
+            targets: mergedTransitions1.targets,
+            blockHeight: mergedTransitions1.blockHeight,
+            initialAllCommentsCounter: mergedTransitions1.initialAllCommentsCounter,
+            latestAllCommentsCounter: mergedTransitions1.latestAllCommentsCounter,
+            initialUsersCommentsCounters: mergedTransitions1.initialUsersCommentsCounters,
+            latestUsersCommentsCounters: mergedTransitions1.latestUsersCommentsCounters,
+            initialTargetsCommentsCounters: mergedTransitions1.initialTargetsCommentsCounters,
+            latestTargetsCommentsCounters: mergedTransitions1.latestTargetsCommentsCounters,
+            initialComments: mergedTransitions1.initialComments,
+            latestComments: mergedTransitions1.latestComments
+          }
+        };
+    }
 
     // Send valid proof to update our on-chain state
     const txn5 = await Mina.transaction(user1Address, async () => {
