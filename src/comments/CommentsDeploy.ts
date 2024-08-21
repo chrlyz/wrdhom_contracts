@@ -6,7 +6,7 @@ import { Config } from '../posts/PostsDeploy.js';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
-const PROOFS_ENABLED = process.env.PROOFS_ENABLED === 'true' || false;
+const PROOFS_ENABLED = process.env.PROOFS_ENABLED === undefined ? true : process.env.PROOFS_ENABLED === 'true';
 
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
 const commentsConfig = configJson.deployAliases['comments'];
@@ -28,13 +28,13 @@ const commentsContractAddress = commentsContractKey.toPublicKey();
 const commentsContract = new CommentsContract(commentsContractAddress);
 
 if (PROOFS_ENABLED) {
-  Network.proofsEnabled = false;
+  console.log('Compiling Comments zkProgram...');
+  await Comments.compile();
+  console.log('Compiling commentsContract...');
+  await CommentsContract.compile();
+  console.log('Compiled');
 } else {
-    console.log('Compiling Comments zkProgram...');
-    await Comments.compile();
-    console.log('Compiling commentsContract...');
-    await CommentsContract.compile();
-    console.log('Compiled');
+  Network.proofsEnabled = false;
 }
 
 let sentTx;

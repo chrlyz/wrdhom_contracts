@@ -18,7 +18,7 @@ export type Config = {
 };
 
 dotenv.config();
-const PROOFS_ENABLED = process.env.PROOFS_ENABLED === 'true' || false;
+const PROOFS_ENABLED = process.env.PROOFS_ENABLED === undefined ? true : process.env.PROOFS_ENABLED === 'true';
 
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
 const postsConfig = configJson.deployAliases['posts'];
@@ -40,13 +40,13 @@ const postsContractAddress = postsContractKey.toPublicKey();
 const postsContract = new PostsContract(postsContractAddress);
 
 if (PROOFS_ENABLED) {
-  Network.proofsEnabled = false;
+  console.log('Compiling Posts zkProgram...');
+  await Posts.compile();
+  console.log('Compiling PostsContract...');
+  await PostsContract.compile();
+  console.log('Compiled');
 } else {
-    console.log('Compiling Posts zkProgram...');
-    await Posts.compile();
-    console.log('Compiling PostsContract...');
-    await PostsContract.compile();
-    console.log('Compiled');
+  Network.proofsEnabled = false;
 }
 
 let sentTx;

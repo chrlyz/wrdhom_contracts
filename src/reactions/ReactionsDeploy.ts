@@ -6,7 +6,7 @@ import { Config } from '../posts/PostsDeploy.js';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
-const PROOFS_ENABLED = process.env.PROOFS_ENABLED === 'true' || false;
+const PROOFS_ENABLED = process.env.PROOFS_ENABLED === undefined ? true : process.env.PROOFS_ENABLED === 'true';
 
 const configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
 const reactionsConfig = configJson.deployAliases['reactions'];
@@ -28,13 +28,13 @@ const reactionsContractAddress = reactionsContractKey.toPublicKey();
 const reactionsContract = new ReactionsContract(reactionsContractAddress);
 
 if (PROOFS_ENABLED) {
-  Network.proofsEnabled = false;
+  console.log('Compiling Reactions zkProgram...');
+  await Reactions.compile();
+  console.log('Compiling ReactionsContract...');
+  await ReactionsContract.compile();
+  console.log('Compiled');
 } else {
-    console.log('Compiling Reactions zkProgram...');
-    await Reactions.compile();
-    console.log('Compiling ReactionsContract...');
-    await ReactionsContract.compile();
-    console.log('Compiled');
+  Network.proofsEnabled = false;
 }
 
 let sentTx;
