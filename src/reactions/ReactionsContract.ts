@@ -28,7 +28,7 @@ export class ReactionsContract extends SmartContract {
 
     this.network.blockchainLength.requireBetween(
       UInt32.Unsafe.fromField(proof.publicInput.blockHeight),
-      UInt32.Unsafe.fromField(proof.publicInput.blockHeight).add(1)
+      UInt32.Unsafe.fromField(proof.publicInput.blockHeight).add(10)
     );
 
     const postsContract = new PostsContract(postsContractAddress);
