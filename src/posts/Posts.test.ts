@@ -33,6 +33,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     postsContract: PostsContract,
     usersPostsCountersMap: MerkleMap,
     postsMap: MerkleMap,
+    stateHistoryMap: MerkleMap,
     Local: any
 
   beforeAll(async () => {
@@ -54,6 +55,7 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     user2Address = Local.testAccounts[1].key.toPublicKey();
     usersPostsCountersMap = new MerkleMap();
     postsMap = new MerkleMap();
+    stateHistoryMap = new MerkleMap();
     const postsConfigJson: Config = JSON.parse(
       await fs.readFile('config.json', 'utf8')
     );
@@ -80,20 +82,32 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     );
 
     // Validate expected state
+
     const allPostsCounterState = postsContract.allPostsCounter.get();
     const usersPostsCountersState = postsContract.usersPostsCounters.get();
     const postsState = postsContract.posts.get();
+    const lastUpdate = postsContract.lastUpdate.get();
+    const stateHistory = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot = usersPostsCountersMap.getRoot();
     const postsRoot = postsMap.getRoot();
+    const stateHistoryRoot = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState).toEqual(Field(0));
     expect(usersPostsCountersState).toEqual(usersPostsCountersRoot);
     expect(postsState).toEqual(postsRoot);
+    expect(lastUpdate).toEqual(Field(0));
+    expect(stateHistory).toEqual(stateHistoryRoot);
 
     console.log('PostsContract deployed');
 
     // ==============================================================================
     // 2. Publishes on-chain proof for publication of 1st post.
     // ==============================================================================
+
+    const allPostsCounter1 = Field(1);
+    const userPostsCounter1 = Field(1);
+    const blockHeight1 = Field(0);
 
     // Prepare inputs to create a valid state transition
     const valid1 = createPostPublishingTransitionValidInputs(
@@ -102,9 +116,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       CircuitString.fromString(
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
-      Field(1),
-      Field(1),
-      Field(0),
+      allPostsCounter1,
+      userPostsCounter1,
+      blockHeight1,
       usersPostsCountersMap,
       postsMap
     );
@@ -155,8 +169,15 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const stateHistoryWitness1 = stateHistoryMap.getWitness(blockHeight1);
+    const latestState1 = Poseidon.hash([
+      transition1.latestAllPostsCounter,
+      transition1.latestUsersPostsCounters,
+      transition1.latestPosts
+    ]);
+    stateHistoryMap.set(blockHeight1, latestState1);
     const txn1 = await Mina.transaction(user1Address, async () => {
-      postsContract.update(proof1);
+      postsContract.update(proof1, stateHistoryWitness1);
     });
     await txn1.prove();
     await txn1.sign([user1Key]).send();
@@ -166,27 +187,37 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     const allPostsCounterState1 = postsContract.allPostsCounter.get();
     const usersPostsCountersState1 = postsContract.usersPostsCounters.get();
     const postsState1 = postsContract.posts.get();
+    const lastUpdate1 = postsContract.lastUpdate.get();
+    const stateHistory1 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot1 = usersPostsCountersMap.getRoot();
     const postsRoot1 = postsMap.getRoot();
+    const stateHistoryRoot1 = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState1).toEqual(Field(1));
     expect(allPostsCounterState1).not.toEqual(allPostsCounterState);
     expect(usersPostsCountersState1).toEqual(usersPostsCountersRoot1);
     expect(usersPostsCountersState1).not.toEqual(usersPostsCountersState);
     expect(postsState1).toEqual(postsRoot1);
     expect(postsState1).not.toEqual(postsRoot);
+    expect(lastUpdate1).toEqual(blockHeight1);
+    expect(stateHistory1).toEqual(stateHistoryRoot1);
+    expect(stateHistory1).not.toEqual(stateHistoryRoot);
 
     console.log('1st post published');
 
-    // ==============================================================================
+     // ==============================================================================
     // 3. Publishes on-chain proof for deletion of 1st post.
     // ==============================================================================
+
+    const blockHeight2 = Field(1);
 
     // Prepare inputs to create a valid state transition
     const valid2 = createPostDeletionTransitionValidInputs(
       user1Key,
-      Field(1),
+      allPostsCounter1,
       valid1.postState,
-      Field(1),
+      blockHeight2,
       usersPostsCountersMap,
       postsMap
     );
@@ -233,8 +264,15 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const stateHistoryWitness2 = stateHistoryMap.getWitness(blockHeight2);
+    const latestState2 = Poseidon.hash([
+      transition2.latestAllPostsCounter,
+      transition2.latestUsersPostsCounters,
+      transition2.latestPosts
+    ]);
+    stateHistoryMap.set(blockHeight2, latestState2);
     const txn2 = await Mina.transaction(user1Address, async () => {
-      postsContract.update(proof2);
+      postsContract.update(proof2, stateHistoryWitness2);
     });
     await txn2.prove();
     await txn2.sign([user1Key]).send();
@@ -244,13 +282,21 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     const allPostsCounterState2 = postsContract.allPostsCounter.get();
     const usersPostsCountersState2 = postsContract.usersPostsCounters.get();
     const postsState2 = postsContract.posts.get();
+    const lastUpdate2 = postsContract.lastUpdate.get();
+    const stateHistory2 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot2 = usersPostsCountersMap.getRoot();
     const postsRoot2 = postsMap.getRoot();
+    const stateHistoryRoot2 = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState2).toEqual(allPostsCounterState1);
     expect(usersPostsCountersState2).toEqual(usersPostsCountersRoot2);
     expect(usersPostsCountersState2).toEqual(usersPostsCountersState1);
     expect(postsState2).toEqual(postsRoot2);
     expect(postsState2).not.toEqual(postsRoot1);
+    expect(lastUpdate2).toEqual(blockHeight2);
+    expect(stateHistory2).toEqual(stateHistoryRoot2);
+    expect(stateHistory2).not.toEqual(stateHistoryRoot1);
 
     console.log('1st post deleted');
 
@@ -258,12 +304,14 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     // 4. Publishes on-chain proof for restoration of 1st post.
     // ==============================================================================
 
+    const blockHeight3 = Field(2);
+
     // Prepare inputs to create a valid state transition
     const valid3 = createPostRestorationTransitionValidInputs(
       user1Key,
-      Field(1),
+      allPostsCounter1,
       valid2.latestPostState,
-      Field(2),
+      blockHeight3,
       usersPostsCountersMap,
       postsMap
     );
@@ -310,8 +358,15 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       };
     }
     // Send valid proof to update our on-chain state
+    const stateHistoryWitness3 = stateHistoryMap.getWitness(blockHeight3);
+    const latestState3 = Poseidon.hash([
+      transition3.latestAllPostsCounter,
+      transition3.latestUsersPostsCounters,
+      transition3.latestPosts
+    ]);
+    stateHistoryMap.set(blockHeight3, latestState3);
     const txn3 = await Mina.transaction(user1Address, async () => {
-      postsContract.update(proof3);
+      postsContract.update(proof3, stateHistoryWitness3);
     });
     await txn3.prove();
     await txn3.sign([user1Key]).send();
@@ -321,13 +376,21 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     const allPostsCounterState3 = postsContract.allPostsCounter.get();
     const usersPostsCountersState3 = postsContract.usersPostsCounters.get();
     const postsState3 = postsContract.posts.get();
+    const lastUpdate3 = postsContract.lastUpdate.get();
+    const stateHistory3 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot3 = usersPostsCountersMap.getRoot();
     const postsRoot3 = postsMap.getRoot();
+    const stateHistoryRoot3 = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState3).toEqual(allPostsCounterState2);
     expect(usersPostsCountersState3).toEqual(usersPostsCountersRoot3);
     expect(usersPostsCountersState3).toEqual(usersPostsCountersState2);
     expect(postsState3).toEqual(postsRoot3);
     expect(postsState3).not.toEqual(postsState2);
+    expect(lastUpdate3).toEqual(blockHeight3);
+    expect(stateHistory3).toEqual(stateHistoryRoot3);
+    expect(stateHistory3).not.toEqual(stateHistoryRoot2);
 
     console.log('1st post restored');
 
@@ -336,6 +399,10 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     //    and 3rd posts.
     // ==============================================================================
 
+    const allPostsCounter4 = Field(2);
+    const userPostsCounter2 = Field(2);
+    const blockHeight4 = Field(3);
+
     // Prepare inputs to create a valid state transition
     const valid4 = createPostPublishingTransitionValidInputs(
       user1Address,
@@ -343,9 +410,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       CircuitString.fromString(
         'b3333333333333333333333333333333333333333333333333333333333'
       ),
-      Field(2),
-      Field(2),
-      Field(3),
+      allPostsCounter4,
+      userPostsCounter2,
+      blockHeight4,
       usersPostsCountersMap,
       postsMap
     );
@@ -395,6 +462,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       };
     }
 
+    const allPostsCounter5 = Field(3);
+    const userPostsCounter3 = Field(1);
+
     // Prepare inputs to create a valid state transition
     const valid5 = createPostPublishingTransitionValidInputs(
       user2Address,
@@ -402,9 +472,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       CircuitString.fromString(
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
-      Field(3),
-      Field(1),
-      Field(3),
+      allPostsCounter5,
+      userPostsCounter3,
+      blockHeight4,
       usersPostsCountersMap,
       postsMap
     );
@@ -484,8 +554,15 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const stateHistoryWitness4 = stateHistoryMap.getWitness(blockHeight4);
+    const latestState4 = Poseidon.hash([
+      mergedTransitions1.latestAllPostsCounter,
+      mergedTransitions1.latestUsersPostsCounters,
+      mergedTransitions1.latestPosts
+    ]);
+    stateHistoryMap.set(blockHeight4, latestState4);
     const txn4 = await Mina.transaction(user1Address, async () => {
-      postsContract.update(mergedTransitionProofs1);
+      postsContract.update(mergedTransitionProofs1, stateHistoryWitness4);
     });
     await txn4.prove();
     await txn4.sign([user1Key]).send();
@@ -495,14 +572,22 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     const allPostsCounterState4 = postsContract.allPostsCounter.get();
     const usersPostsCountersState4 = postsContract.usersPostsCounters.get();
     const postsState4 = postsContract.posts.get();
+    const lastUpdate4 = postsContract.lastUpdate.get();
+    const stateHistory4 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot4 = usersPostsCountersMap.getRoot();
     const postsRoot4 = postsMap.getRoot();
+    const stateHistoryRoot4 = stateHistoryMap.getRoot();
+    
     expect(allPostsCounterState4).toEqual(Field(3));
     expect(allPostsCounterState4).not.toEqual(allPostsCounterState3);
     expect(usersPostsCountersState4).toEqual(usersPostsCountersRoot4);
     expect(usersPostsCountersState4).not.toEqual(usersPostsCountersState3);
     expect(postsState4).toEqual(postsRoot4);
     expect(postsState4).not.toEqual(postsState3);
+    expect(lastUpdate4).toEqual(blockHeight4);
+    expect(stateHistory4).toEqual(stateHistoryRoot4);
+    expect(stateHistory4).not.toEqual(stateHistoryRoot3);
 
     console.log('2nd and 3rd posts published through merged proofs');
 
@@ -511,12 +596,14 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     //    and 3rd posts.
     // ==============================================================================
 
+    const blockHeight5 = Field(4);
+
     // Prepare inputs to create a valid state transition
     const valid6 = createPostDeletionTransitionValidInputs(
       user1Key,
-      Field(3),
+      allPostsCounter5,
       valid4.postState,
-      Field(4),
+      blockHeight5,
       usersPostsCountersMap,
       postsMap
     );
@@ -565,9 +652,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     // Prepare inputs to create a valid state transition
     const valid7 = createPostDeletionTransitionValidInputs(
       user2Key,
-      Field(3),
+      allPostsCounter5,
       valid5.postState,
-      Field(4),
+      blockHeight5,
       usersPostsCountersMap,
       postsMap
     );
@@ -643,8 +730,15 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const stateHistoryWitness5 = stateHistoryMap.getWitness(blockHeight5);
+    const latestState5 = Poseidon.hash([
+      mergedTransitions2.latestAllPostsCounter,
+      mergedTransitions2.latestUsersPostsCounters,
+      mergedTransitions2.latestPosts
+    ]);
+    stateHistoryMap.set(blockHeight5, latestState5);
     const txn5 = await Mina.transaction(user1Address, async () => {
-      postsContract.update(mergedTransitionProofs2);
+      postsContract.update(mergedTransitionProofs2, stateHistoryWitness5);
     });
     await txn5.prove();
     await txn5.sign([user1Key]).send();
@@ -654,13 +748,21 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     const allPostsCounterState5 = postsContract.allPostsCounter.get();
     const usersPostsCountersState5 = postsContract.usersPostsCounters.get();
     const postsState5 = postsContract.posts.get();
+    const lastUpdate5 = postsContract.lastUpdate.get();
+    const stateHistory5 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot5 = usersPostsCountersMap.getRoot();
     const postsRoot5 = postsMap.getRoot();
+    const stateHistoryRoot5 = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState5).toEqual(allPostsCounterState4);
     expect(usersPostsCountersState5).toEqual(usersPostsCountersRoot5);
     expect(usersPostsCountersState5).toEqual(usersPostsCountersState4);
     expect(postsState5).toEqual(postsRoot5);
     expect(postsState5).not.toEqual(postsState4);
+    expect(lastUpdate5).toEqual(blockHeight5);
+    expect(stateHistory5).toEqual(stateHistoryRoot5);
+    expect(stateHistory5).not.toEqual(stateHistoryRoot4);
 
     console.log('2nd and 3rd posts deleted through merged proofs');
 
@@ -669,12 +771,14 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     //    and 3rd posts.
     // ==============================================================================
 
+    const blockHeight6 = Field(5);
+
     // Prepare inputs to create a valid state transition
     const valid8 = createPostRestorationTransitionValidInputs(
       user1Key,
-      Field(3),
+      allPostsCounter5,
       valid6.latestPostState,
-      Field(5),
+      blockHeight6,
       usersPostsCountersMap,
       postsMap
     );
@@ -723,9 +827,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     // Prepare inputs to create a valid state transition
     const valid9 = createPostRestorationTransitionValidInputs(
       user2Key,
-      Field(3),
+      allPostsCounter5,
       valid7.latestPostState,
-      Field(5),
+      blockHeight6,
       usersPostsCountersMap,
       postsMap
     );
@@ -801,8 +905,15 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const stateHistoryWitness6 = stateHistoryMap.getWitness(blockHeight6);
+    const latestState6 = Poseidon.hash([
+      mergedTransitions3.latestAllPostsCounter,
+      mergedTransitions3.latestUsersPostsCounters,
+      mergedTransitions3.latestPosts
+    ]);
+    stateHistoryMap.set(blockHeight6, latestState6);
     const txn6 = await Mina.transaction(user1Address, async () => {
-      postsContract.update(mergedTransitionProofs3);
+      postsContract.update(mergedTransitionProofs3, stateHistoryWitness6);
     });
     await txn6.prove();
     await txn6.sign([user1Key]).send();
@@ -812,13 +923,21 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     const allPostsCounterState6 = postsContract.allPostsCounter.get();
     const usersPostsCountersState6 = postsContract.usersPostsCounters.get();
     const postsState6 = postsContract.posts.get();
+    const lastUpdate6 = postsContract.lastUpdate.get();
+    const stateHistory6 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot6 = usersPostsCountersMap.getRoot();
     const postsRoot6 = postsMap.getRoot();
+    const stateHistoryRoot6 = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState6).toEqual(allPostsCounterState5);
     expect(usersPostsCountersState6).toEqual(usersPostsCountersRoot6);
     expect(usersPostsCountersState6).toEqual(usersPostsCountersState5);
     expect(postsState6).toEqual(postsRoot6);
     expect(postsState6).not.toEqual(postsState5);
+    expect(lastUpdate6).toEqual(blockHeight6);
+    expect(stateHistory6).toEqual(stateHistoryRoot6);
+    expect(stateHistory6).not.toEqual(stateHistoryRoot5);
 
     console.log('2nd and 3rd posts restored through merged proofs');
 
@@ -826,12 +945,14 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     // 7. Publishes on-chain proof for deletion of 2nd post.
     // ==============================================================================
 
+    const blockHeight7 = Field(6);
+
     // Prepare inputs to create a valid state transition
     const valid10 = createPostDeletionTransitionValidInputs(
       user1Key,
-      Field(3),
+      allPostsCounter5,
       valid8.latestPostState,
-      Field(6),
+      blockHeight7,
       usersPostsCountersMap,
       postsMap
     );
@@ -878,8 +999,15 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const stateHistoryWitness7 = stateHistoryMap.getWitness(blockHeight7);
+    const latestState7 = Poseidon.hash([
+      transition10.latestAllPostsCounter,
+      transition10.latestUsersPostsCounters,
+      transition10.latestPosts
+    ]);
+    stateHistoryMap.set(blockHeight7, latestState7);
     const txn7 = await Mina.transaction(user1Address, async () => {
-      postsContract.update(proof10);
+      postsContract.update(proof10, stateHistoryWitness7);
     });
     await txn7.prove();
     await txn7.sign([user1Key]).send();
@@ -889,13 +1017,21 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     const allPostsCounterState7 = postsContract.allPostsCounter.get();
     const usersPostsCountersState7 = postsContract.usersPostsCounters.get();
     const postsState7 = postsContract.posts.get();
+    const lastUpdate7 = postsContract.lastUpdate.get();
+    const stateHistory7 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot7 = usersPostsCountersMap.getRoot();
     const postsRoot7 = postsMap.getRoot();
+    const stateHistoryRoot7 = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState7).toEqual(allPostsCounterState6);
     expect(usersPostsCountersState7).toEqual(usersPostsCountersRoot7);
     expect(usersPostsCountersState7).toEqual(usersPostsCountersState6);
     expect(postsState7).toEqual(postsRoot7);
     expect(postsState7).not.toEqual(postsState6);
+    expect(lastUpdate7).toEqual(blockHeight7);
+    expect(stateHistory7).toEqual(stateHistoryRoot7);
+    expect(stateHistory7).not.toEqual(stateHistoryRoot6);
 
     console.log('2nd post deleted');
 
@@ -904,12 +1040,14 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     //    and deletion of 3rd post.
     // ==============================================================================
 
+    const blockHeight8 = Field(7);
+
     // Prepare inputs to create a valid state transition
     const valid11 = createPostRestorationTransitionValidInputs(
       user1Key,
-      Field(3),
+      allPostsCounter5,
       valid10.latestPostState,
-      Field(7),
+      blockHeight8,
       usersPostsCountersMap,
       postsMap
     );
@@ -958,9 +1096,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     // Prepare inputs to create a valid state transition
     const valid12 = createPostDeletionTransitionValidInputs(
       user2Key,
-      Field(3),
+      allPostsCounter5,
       valid9.latestPostState,
-      Field(7),
+      blockHeight8,
       usersPostsCountersMap,
       postsMap
     );
@@ -1036,8 +1174,15 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const stateHistoryWitness8 = stateHistoryMap.getWitness(blockHeight8);
+    const latestState8 = Poseidon.hash([
+      mergedTransitions4.latestAllPostsCounter,
+      mergedTransitions4.latestUsersPostsCounters,
+      mergedTransitions4.latestPosts
+    ]);
+    stateHistoryMap.set(blockHeight8, latestState8);
     const txn8 = await Mina.transaction(user1Address, async () => {
-      postsContract.update(mergedTransitionProofs4);
+      postsContract.update(mergedTransitionProofs4, stateHistoryWitness8);
     });
     await txn8.prove();
     await txn8.sign([user1Key]).send();
@@ -1047,13 +1192,21 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     const allPostsCounterState8 = postsContract.allPostsCounter.get();
     const usersPostsCountersState8 = postsContract.usersPostsCounters.get();
     const postsState8 = postsContract.posts.get();
+    const lastUpdate8 = postsContract.lastUpdate.get();
+    const stateHistory8 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot8 = usersPostsCountersMap.getRoot();
     const postsRoot8 = postsMap.getRoot();
+    const stateHistoryRoot8 = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState8).toEqual(allPostsCounterState7);
     expect(usersPostsCountersState8).toEqual(usersPostsCountersRoot8);
     expect(usersPostsCountersState8).toEqual(usersPostsCountersState7);
     expect(postsState8).toEqual(postsRoot8);
     expect(postsState8).not.toEqual(postsState7);
+    expect(lastUpdate8).toEqual(blockHeight8);
+    expect(stateHistory8).toEqual(stateHistoryRoot8);
+    expect(stateHistory8).not.toEqual(stateHistoryRoot7);
 
     console.log('2nd and 3rd posts restored and deleted, respectively');
 
@@ -1062,12 +1215,14 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     //    and publication of 4th post.
     // ==============================================================================
 
+    const blockHeight9 = Field(8);
+
     // Prepare inputs to create a valid state transition
     const valid13 = createPostRestorationTransitionValidInputs(
       user2Key,
-      Field(3),
+      allPostsCounter5,
       valid12.latestPostState,
-      Field(8),
+      blockHeight9,
       usersPostsCountersMap,
       postsMap
     );
@@ -1113,6 +1268,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
         };
     }
 
+    const allPostsCounter6 = Field(4);
+    const userPostsCounter4 = Field(2);
+
     // Prepare inputs to create a valid state transition
     const valid14 = createPostPublishingTransitionValidInputs(
       user2Address,
@@ -1120,9 +1278,9 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
       CircuitString.fromString(
         'b4444444444444444444444444444444444444444444444444444444444'
       ),
-      Field(4),
-      Field(2),
-      Field(8),
+      allPostsCounter6,
+      userPostsCounter4,
+      blockHeight9,
       usersPostsCountersMap,
       postsMap
     );
@@ -1202,8 +1360,15 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const stateHistoryWitness9 = stateHistoryMap.getWitness(blockHeight9);
+    const latestState9 = Poseidon.hash([
+      mergedTransitions5.latestAllPostsCounter,
+      mergedTransitions5.latestUsersPostsCounters,
+      mergedTransitions5.latestPosts
+    ]);
+    stateHistoryMap.set(blockHeight9, latestState9);
     const txn9 = await Mina.transaction(user1Address, async () => {
-      postsContract.update(mergedTransitionProofs5);
+      postsContract.update(mergedTransitionProofs5, stateHistoryWitness9);
     });
     await txn9.prove();
     await txn9.sign([user1Key]).send();
@@ -1213,14 +1378,22 @@ describe(`the PostsContract and the Posts ZkProgram`, () => {
     const allPostsCounterState9 = postsContract.allPostsCounter.get();
     const usersPostsCountersState9 = postsContract.usersPostsCounters.get();
     const postsState9 = postsContract.posts.get();
+    const lastUpdate9 = postsContract.lastUpdate.get();
+    const stateHistory9 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot9 = usersPostsCountersMap.getRoot();
     const postsRoot9 = postsMap.getRoot();
+    const stateHistoryRoot9 = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState9).toEqual(Field(4));
     expect(allPostsCounterState9).not.toEqual(allPostsCounterState8);
     expect(usersPostsCountersState9).toEqual(usersPostsCountersRoot9);
     expect(usersPostsCountersState9).not.toEqual(usersPostsCountersState8);
     expect(postsState9).toEqual(postsRoot9);
     expect(postsState9).not.toEqual(postsState8);
+    expect(lastUpdate9).toEqual(blockHeight9);
+    expect(stateHistory9).toEqual(stateHistoryRoot9);
+    expect(stateHistory9).not.toEqual(stateHistoryRoot8);
 
     console.log('3rd and 4th posts restored and publicated, respectively');
 
