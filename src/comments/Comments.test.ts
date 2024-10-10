@@ -39,6 +39,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     postsContract: PostsContract,
     usersPostsCountersMap: MerkleMap,
     postsMap: MerkleMap,
+    stateHistoryMap: MerkleMap,
     commentsContractAddress: PublicKey,
     commentsContractKey: PrivateKey,
     commentsContract: CommentsContract,
@@ -80,6 +81,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     postsContract = new PostsContract(postsContractAddress);
     usersPostsCountersMap = new MerkleMap();
     postsMap = new MerkleMap();
+    stateHistoryMap = new MerkleMap();
 
     const commentsConfig = configJson.deployAliases['comments'];
     const commentsContractKeyBase58: { privateKey: string } = JSON.parse(
@@ -111,11 +113,18 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     const allPostsCounterState = postsContract.allPostsCounter.get();
     const usersPostsCountersState = postsContract.usersPostsCounters.get();
     const postsState = postsContract.posts.get();
+    const lastUpdate = postsContract.lastUpdate.get();
+    const stateHistory = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot = usersPostsCountersMap.getRoot();
     const postsRoot = postsMap.getRoot();
+    const stateHistoryRoot = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState).toEqual(Field(0));
     expect(usersPostsCountersState).toEqual(usersPostsCountersRoot);
     expect(postsState).toEqual(postsRoot);
+    expect(lastUpdate).toEqual(Field(0));
+    expect(stateHistory).toEqual(stateHistoryRoot);
 
     console.log('PostsContract deployed');
 
@@ -207,8 +216,15 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const stateHistoryWitness1 = stateHistoryMap.getWitness(Field(0));
+    const latestState1 = Poseidon.hash([
+      transition1.latestAllPostsCounter,
+      transition1.latestUsersPostsCounters,
+      transition1.latestPosts
+    ]);
+    stateHistoryMap.set(Field(0), latestState1);
     const txn1 = await Mina.transaction(user1Address, async () => {
-      postsContract.update(proof1);
+      postsContract.update(proof1, stateHistoryWitness1);
     });
     await txn1.prove();
     await txn1.sign([user1Key]).send();

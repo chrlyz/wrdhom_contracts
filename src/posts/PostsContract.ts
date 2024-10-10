@@ -7,7 +7,9 @@ import {
   UInt32,
   MerkleMap,
   PublicKey,
-  Gadgets
+  Gadgets,
+  Poseidon,
+  MerkleMapWitness
 } from 'o1js';
 import { PostsProof } from './Posts.js';
 import { Config } from './PostsDeploy';
@@ -35,39 +37,57 @@ export class PostsContract extends SmartContract {
   @state(Field) allPostsCounter = State<Field>();
   @state(Field) usersPostsCounters = State<Field>();
   @state(Field) posts = State<Field>();
+  @state(Field) lastUpdate = State<Field>();
+  @state(Field) stateHistory = State<Field>();
 
   init() {
     super.init();
     this.allPostsCounter.set(Field(0));
     this.usersPostsCounters.set(newMerkleMapRoot);
     this.posts.set(newMerkleMapRoot);
+    this.lastUpdate.set(Field(0));
+    this.stateHistory.set(newMerkleMapRoot);
   }
 
-  @method async update(proof: PostsProof) {
+  @method async update(proof: PostsProof, stateHistoryWitness: MerkleMapWitness) {
     proof.verify();
-    Gadgets.rangeCheck32(proof.publicInput.blockHeight);
 
-    this.network.blockchainLength.requireBetween(
-      UInt32.Unsafe.fromField(proof.publicInput.blockHeight),
-      UInt32.Unsafe.fromField(proof.publicInput.blockHeight).add(10)
-    );
+    Gadgets.rangeCheck32(proof.publicInput.blockHeight);
+    const blockHeightAsField = proof.publicInput.blockHeight;
+    const blockHeight = UInt32.Unsafe.fromField(proof.publicInput.blockHeight);
+    this.network.blockchainLength.requireBetween(blockHeight,blockHeight.add(10));
 
     const currentAllPostsCounter = this.allPostsCounter.getAndRequireEquals();
-    proof.publicInput.initialAllPostsCounter.assertEquals(
-      currentAllPostsCounter
-    );
+    const initialAllPostsCounter = proof.publicInput.initialAllPostsCounter;
+    currentAllPostsCounter.assertEquals(initialAllPostsCounter);
 
-    const currentUsersPostsCounters =
-      this.usersPostsCounters.getAndRequireEquals();
-    proof.publicInput.initialUsersPostsCounters.assertEquals(
-      currentUsersPostsCounters
-    );
+    const currentUsersPostsCounters = this.usersPostsCounters.getAndRequireEquals();
+    const initialUserPostsCounter = proof.publicInput.initialUsersPostsCounters;
+    currentUsersPostsCounters.assertEquals(initialUserPostsCounter);
 
-    const currentState = this.posts.getAndRequireEquals();
-    proof.publicInput.initialPosts.assertEquals(currentState);
+    const currentPosts = this.posts.getAndRequireEquals();
+    const initialPosts = proof.publicInput.initialPosts;
+    currentPosts.assertEquals(initialPosts);
 
-    this.allPostsCounter.set(proof.publicInput.latestAllPostsCounter);
-    this.usersPostsCounters.set(proof.publicInput.latestUsersPostsCounters);
-    this.posts.set(proof.publicInput.latestPosts);
+    const currentStateHistory = this.stateHistory.getAndRequireEquals();
+    const [initialStateHistory, stateHistoryKey] = stateHistoryWitness.computeRootAndKeyV2(Field(0));
+    currentStateHistory.assertEquals(initialStateHistory);
+    blockHeightAsField.assertEquals(stateHistoryKey);
+
+    const latestAllPostsCounter = proof.publicInput.latestAllPostsCounter;
+    const latestUsersPostsCounters = proof.publicInput.latestUsersPostsCounters;
+    const latestPosts = proof.publicInput.latestPosts;
+    const latestState = Poseidon.hash([
+      latestAllPostsCounter,
+      latestUsersPostsCounters,
+      latestPosts
+    ]);
+    const latestStateHistory = stateHistoryWitness.computeRootAndKeyV2(latestState)[0];
+
+    this.allPostsCounter.set(latestAllPostsCounter);
+    this.usersPostsCounters.set(latestUsersPostsCounters);
+    this.posts.set(latestPosts);
+    this.lastUpdate.set(blockHeightAsField);
+    this.stateHistory.set(latestStateHistory);
   }
 }
