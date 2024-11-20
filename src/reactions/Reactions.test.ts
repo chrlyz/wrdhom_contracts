@@ -46,6 +46,7 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     reactionsContract: ReactionsContract,
     usersReactionsCountersMap: MerkleMap,
     targetsReactionsCountersMap: MerkleMap,
+    reactionsStateHistoryMap: MerkleMap,
     reactionsMap: MerkleMap;
 
   beforeAll(async () => {
@@ -95,6 +96,7 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     usersReactionsCountersMap = new MerkleMap();
     targetsReactionsCountersMap = new MerkleMap();
     reactionsMap = new MerkleMap();
+    reactionsStateHistoryMap = new MerkleMap();
   });
 
   test(`ReactionsContract and Reactions zkProgram functionality`, async () => {
@@ -136,26 +138,34 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     );
 
     // Validate expected state
-    const allReactionsCounterState =
-      reactionsContract.allReactionsCounter.get();
-    const usersReactionsCountersState =
-      reactionsContract.usersReactionsCounters.get();
-    const targetsReactionsCountersState =
-      reactionsContract.targetsReactionsCounters.get();
+    const allReactionsCounterState = reactionsContract.allReactionsCounter.get();
+    const usersReactionsCountersState = reactionsContract.usersReactionsCounters.get();
+    const targetsReactionsCountersState = reactionsContract.targetsReactionsCounters.get();
     const reactionsState = reactionsContract.reactions.get();
+    const reactionsLastUpdateState = reactionsContract.lastUpdate.get();
+    const reactionsStateHistoryState = reactionsContract.stateHistory.get();
+
     const usersReactionsCountersRoot = usersReactionsCountersMap.getRoot();
     const targetsReactionsCountersRoot = targetsReactionsCountersMap.getRoot();
     const reactionsRoot = reactionsMap.getRoot();
+    const reactionsStateHistoryRoot = reactionsStateHistoryMap.getRoot();
+
     expect(allReactionsCounterState).toEqual(Field(0));
     expect(usersReactionsCountersState).toEqual(usersReactionsCountersRoot);
     expect(targetsReactionsCountersState).toEqual(targetsReactionsCountersRoot);
     expect(reactionsState).toEqual(reactionsRoot);
+    expect(reactionsLastUpdateState).toEqual(Field(0));
+    expect(reactionsStateHistoryState).toEqual(reactionsStateHistoryRoot);
 
     console.log('ReactionsContract deployed');
 
     // ==============================================================================
     // 2. Publishes on-chain proof for publication of 1st post.
     // ==============================================================================
+
+    const allPostsCounter1 = Field(1);
+    const userPostsCounter1 = Field(1);
+    const blockHeight1 = Field(0);
 
     // Prepare inputs to create a valid state transition
     const valid1 = createPostPublishingTransitionValidInputs(
@@ -164,9 +174,9 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
       CircuitString.fromString(
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
-      Field(1),
-      Field(1),
-      Field(0),
+      allPostsCounter1,
+      userPostsCounter1,
+      blockHeight1,
       usersPostsCountersMap,
       postsMap
     );
@@ -217,13 +227,13 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
-    const stateHistoryWitness1 = stateHistoryMap.getWitness(Field(0));
+    const stateHistoryWitness1 = stateHistoryMap.getWitness(blockHeight1);
     const latestState1 = Poseidon.hash([
       transition1.latestAllPostsCounter,
       transition1.latestUsersPostsCounters,
       transition1.latestPosts
     ]);
-    stateHistoryMap.set(Field(0), latestState1);
+    stateHistoryMap.set(blockHeight1, latestState1);
     const txn1 = await Mina.transaction(user1Address, async () => {
       postsContract.update(proof1, stateHistoryWitness1);
     });
@@ -235,14 +245,22 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     const allPostsCounterState1 = postsContract.allPostsCounter.get();
     const usersPostsCountersState1 = postsContract.usersPostsCounters.get();
     const postsState1 = postsContract.posts.get();
+    const lastUpdate1 = postsContract.lastUpdate.get();
+    const stateHistory1 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot1 = usersPostsCountersMap.getRoot();
     const postsRoot1 = postsMap.getRoot();
+    const stateHistoryRoot1 = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState1).toEqual(Field(1));
     expect(allPostsCounterState1).not.toEqual(allPostsCounterState);
     expect(usersPostsCountersState1).toEqual(usersPostsCountersRoot1);
     expect(usersPostsCountersState1).not.toEqual(usersPostsCountersState);
     expect(postsState1).toEqual(postsRoot1);
     expect(postsState1).not.toEqual(postsRoot);
+    expect(lastUpdate1).toEqual(blockHeight1);
+    expect(stateHistory1).toEqual(stateHistoryRoot1);
+    expect(stateHistory1).not.toEqual(stateHistoryRoot);
 
     console.log('1st post published');
 
@@ -250,16 +268,22 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     // 3. Publishes on-chain proof for reacting to the 1st post.
     // ==============================================================================
 
+    const reactionsCodePoint1 = Field(10084);
+    const allReactionsCounter1 = Field(1);
+    const userReactionsCounter1 = Field(1);
+    const targetReactionsCounter1 = Field(1);
+    const blockHeight2 = Field(1);
+
     // Prepare inputs to create a valid state transition
     const valid2 = createReactionTransitionValidInputs(
       valid1.postState,
       user2Address,
       user2Key,
-      Field(10084),
-      Field(1),
-      Field(1),
-      Field(1),
-      Field(1),
+      reactionsCodePoint1,
+      allReactionsCounter1,
+      userReactionsCounter1,
+      targetReactionsCounter1,
+      blockHeight2,
       postsMap,
       usersReactionsCountersMap,
       targetsReactionsCountersMap,
@@ -329,36 +353,43 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const reactionsStateHistoryWitness1 = reactionsStateHistoryMap.getWitness(blockHeight2);
+    const reactionsLatestState1 = Poseidon.hash([
+      transition2.latestAllReactionsCounter,
+      transition2.latestUsersReactionsCounters,
+      transition2.latestTargetsReactionsCounters,
+      transition2.latestReactions
+    ]);
+    reactionsStateHistoryMap.set(blockHeight2, reactionsLatestState1);
     const txn2 = await Mina.transaction(user1Address, async () => {
-      reactionsContract.update(proof2);
+      reactionsContract.update(proof2, reactionsStateHistoryWitness1);
     });
     await txn2.prove();
     await txn2.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(2));
 
-    const allReactionsCounterState1 =
-      reactionsContract.allReactionsCounter.get();
-    const usersReactionsCountersState1 =
-      reactionsContract.usersReactionsCounters.get();
-    const targetsReactionsCountersState1 =
-      reactionsContract.targetsReactionsCounters.get();
+    const allReactionsCounterState1 = reactionsContract.allReactionsCounter.get();
+    const usersReactionsCountersState1 = reactionsContract.usersReactionsCounters.get();
+    const targetsReactionsCountersState1 = reactionsContract.targetsReactionsCounters.get();
     const reactionsState1 = reactionsContract.reactions.get();
+    const reactionsLastUpdateState1 = reactionsContract.lastUpdate.get();
+    const reactionsStateHistoryState1 = reactionsContract.stateHistory.get();
+
     const usersReactionsCountersRoot1 = usersReactionsCountersMap.getRoot();
     const targetsReactionsCountersRoot1 = targetsReactionsCountersMap.getRoot();
     const reactionsRoot1 = reactionsMap.getRoot();
+    const reactionsStateHistoryRoot1 = reactionsStateHistoryMap.getRoot();
+
     expect(allReactionsCounterState1).toEqual(Field(1));
     expect(usersReactionsCountersState1).toEqual(usersReactionsCountersRoot1);
-    expect(usersReactionsCountersState1).not.toEqual(
-      usersReactionsCountersRoot
-    );
-    expect(targetsReactionsCountersState1).toEqual(
-      targetsReactionsCountersRoot1
-    );
-    expect(targetsReactionsCountersState1).not.toEqual(
-      targetsReactionsCountersRoot
-    );
+    expect(usersReactionsCountersState1).not.toEqual(usersReactionsCountersRoot);
+    expect(targetsReactionsCountersState1).toEqual(targetsReactionsCountersRoot1);
+    expect(targetsReactionsCountersState1).not.toEqual(targetsReactionsCountersRoot);
     expect(reactionsState1).toEqual(reactionsRoot1);
     expect(reactionsState1).not.toEqual(reactionsRoot);
+    expect(reactionsLastUpdateState1).toEqual(blockHeight2);
+    expect(reactionsStateHistoryState1).toEqual(reactionsStateHistoryRoot1);
+    expect(reactionsStateHistoryState1).not.toEqual(reactionsStateHistoryRoot);
 
     console.log('Reacted to 1st post');
 
@@ -366,13 +397,15 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     // 4. Publishes on-chain proof for deleting the reaction to the 1st post.
     // ==============================================================================
 
+    const blockHeight3 = Field(2);
+
     // Prepare inputs to create a valid state transition
     const valid3 = createReactionDeletionTransitionValidInputs(
       valid2.targetState,
       user2Key,
-      Field(1),
+      allReactionsCounter1,
       valid2.reactionState,
-      Field(2),
+      blockHeight3,
       postsMap,
       usersReactionsCountersMap,
       targetsReactionsCountersMap,
@@ -432,34 +465,43 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const reactionsStateHistoryWitness2 = reactionsStateHistoryMap.getWitness(blockHeight3);
+    const reactionsLatestState2 = Poseidon.hash([
+      transition3.latestAllReactionsCounter,
+      transition3.latestUsersReactionsCounters,
+      transition3.latestTargetsReactionsCounters,
+      transition3.latestReactions
+    ]);
+    reactionsStateHistoryMap.set(blockHeight3, reactionsLatestState2);
     const txn3 = await Mina.transaction(user1Address, async () => {
-      reactionsContract.update(proof3);
+      reactionsContract.update(proof3, reactionsStateHistoryWitness2);
     });
     await txn3.prove();
     await txn3.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(3));
 
-    const allReactionsCounterState2 =
-      reactionsContract.allReactionsCounter.get();
-    const usersReactionsCountersState2 =
-      reactionsContract.usersReactionsCounters.get();
-    const targetsReactionsCountersState2 =
-      reactionsContract.targetsReactionsCounters.get();
+    const allReactionsCounterState2 = reactionsContract.allReactionsCounter.get();
+    const usersReactionsCountersState2 = reactionsContract.usersReactionsCounters.get();
+    const targetsReactionsCountersState2 = reactionsContract.targetsReactionsCounters.get();
     const reactionsState2 = reactionsContract.reactions.get();
+    const reactionsLastUpdateState2 = reactionsContract.lastUpdate.get();
+    const reactionsStateHistoryState2 = reactionsContract.stateHistory.get();
+
     const usersReactionsCountersRoot2 = usersReactionsCountersMap.getRoot();
     const targetsReactionsCountersRoot2 = targetsReactionsCountersMap.getRoot();
     const reactionsRoot2 = reactionsMap.getRoot();
+    const reactionsStateHistoryRoot2 = reactionsStateHistoryMap.getRoot();
+
     expect(allReactionsCounterState2).toEqual(Field(1));
     expect(usersReactionsCountersState2).toEqual(usersReactionsCountersRoot2);
     expect(usersReactionsCountersState2).toEqual(usersReactionsCountersRoot1);
-    expect(targetsReactionsCountersState2).toEqual(
-      targetsReactionsCountersRoot2
-    );
-    expect(targetsReactionsCountersState2).toEqual(
-      targetsReactionsCountersRoot1
-    );
+    expect(targetsReactionsCountersState2).toEqual(targetsReactionsCountersRoot2);
+    expect(targetsReactionsCountersState2).toEqual(targetsReactionsCountersRoot1);
     expect(reactionsState2).toEqual(reactionsRoot2);
     expect(reactionsState2).not.toEqual(reactionsRoot1);
+    expect(reactionsLastUpdateState2).toEqual(blockHeight3);
+    expect(reactionsStateHistoryState2).toEqual(reactionsStateHistoryRoot2);
+    expect(reactionsStateHistoryState2).not.toEqual(reactionsStateHistoryRoot1);
 
     console.log('Reaction to 1st post deleted');
 
@@ -467,13 +509,15 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     // 5. Publishes on-chain proof for restoring the reaction to the 1st post.
     // ==============================================================================
 
+    const blockHeight4 = Field(3);
+
     // Prepare inputs to create a valid state transition
     const valid4 = createReactionRestorationTransitionValidInputs(
       valid3.targetState,
       user2Key,
-      Field(1),
+      allReactionsCounter1,
       valid3.latestReactionState,
-      Field(3),
+      blockHeight4,
       postsMap,
       usersReactionsCountersMap,
       targetsReactionsCountersMap,
@@ -533,34 +577,43 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const reactionsStateHistoryWitness3 = reactionsStateHistoryMap.getWitness(blockHeight4);
+    const reactionsLatestState3 = Poseidon.hash([
+      transition4.latestAllReactionsCounter,
+      transition4.latestUsersReactionsCounters,
+      transition4.latestTargetsReactionsCounters,
+      transition4.latestReactions
+    ]);
+    reactionsStateHistoryMap.set(blockHeight4, reactionsLatestState3);
     const txn4 = await Mina.transaction(user1Address, async () => {
-      reactionsContract.update(proof4);
+      reactionsContract.update(proof4, reactionsStateHistoryWitness3);
     });
     await txn4.prove();
     await txn4.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(4));
 
-    const allReactionsCounterState3 =
-      reactionsContract.allReactionsCounter.get();
-    const usersReactionsCountersState3 =
-      reactionsContract.usersReactionsCounters.get();
-    const targetsReactionsCountersState3 =
-      reactionsContract.targetsReactionsCounters.get();
+    const allReactionsCounterState3 = reactionsContract.allReactionsCounter.get();
+    const usersReactionsCountersState3 = reactionsContract.usersReactionsCounters.get();
+    const targetsReactionsCountersState3 = reactionsContract.targetsReactionsCounters.get();
     const reactionsState3 = reactionsContract.reactions.get();
+    const reactionsLastUpdateState3 = reactionsContract.lastUpdate.get();
+    const reactionsStateHistoryState3 = reactionsContract.stateHistory.get();
+
     const usersReactionsCountersRoot3 = usersReactionsCountersMap.getRoot();
     const targetsReactionsCountersRoot3 = targetsReactionsCountersMap.getRoot();
     const reactionsRoot3 = reactionsMap.getRoot();
+    const reactionsStateHistoryRoot3 = reactionsStateHistoryMap.getRoot();
+
     expect(allReactionsCounterState3).toEqual(Field(1));
     expect(usersReactionsCountersState3).toEqual(usersReactionsCountersRoot3);
     expect(usersReactionsCountersState3).toEqual(usersReactionsCountersRoot2);
-    expect(targetsReactionsCountersState3).toEqual(
-      targetsReactionsCountersRoot3
-    );
-    expect(targetsReactionsCountersState3).toEqual(
-      targetsReactionsCountersRoot2
-    );
+    expect(targetsReactionsCountersState3).toEqual(targetsReactionsCountersRoot3);
+    expect(targetsReactionsCountersState3).toEqual(targetsReactionsCountersRoot2);
     expect(reactionsState3).toEqual(reactionsRoot3);
     expect(reactionsState3).not.toEqual(reactionsRoot2);
+    expect(reactionsLastUpdateState3).toEqual(blockHeight4);
+    expect(reactionsStateHistoryState3).toEqual(reactionsStateHistoryRoot3);
+    expect(reactionsStateHistoryState3).not.toEqual(reactionsStateHistoryRoot2);
 
     console.log('Reaction to 1st post restored');
 
@@ -569,16 +622,22 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     //    the 1st post.
     // ==============================================================================
 
+    const reactionsCodePoint2 = Field(128064);
+    const allReactionsCounter2 = Field(2);
+    const userReactionsCounter2 = Field(1);
+    const targetReactionsCounter2 = Field(2);
+    const blockHeight5 = Field(4);
+
     // Prepare inputs to create a valid state transition
     const valid5 = createReactionTransitionValidInputs(
       valid1.postState,
       user1Address,
       user1Key,
-      Field(128064),
-      Field(2),
-      Field(1),
-      Field(2),
-      Field(4),
+      reactionsCodePoint2,
+      allReactionsCounter2,
+      userReactionsCounter2,
+      targetReactionsCounter2,
+      blockHeight5,
       postsMap,
       usersReactionsCountersMap,
       targetsReactionsCountersMap,
@@ -647,16 +706,21 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
         };
     }
 
+    const reactionsCodePoint3 = Field(129654);
+    const allReactionsCounter3 = Field(3);
+    const userReactionsCounter3 = Field(2);
+    const targetReactionsCounter3 = Field(3);
+
     // Prepare inputs to create a valid state transition
     const valid6 = createReactionTransitionValidInputs(
       valid1.postState,
       user2Address,
       user2Key,
-      Field(129654),
-      Field(3),
-      Field(2),
-      Field(3),
-      Field(4),
+      reactionsCodePoint3,
+      allReactionsCounter3,
+      userReactionsCounter3,
+      targetReactionsCounter3,
+      blockHeight5,
       postsMap,
       usersReactionsCountersMap,
       targetsReactionsCountersMap,
@@ -759,36 +823,43 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const reactionsStateHistoryWitness4 = reactionsStateHistoryMap.getWitness(blockHeight5);
+    const reactionsLatestState4 = Poseidon.hash([
+      mergedTransitions1.latestAllReactionsCounter,
+      mergedTransitions1.latestUsersReactionsCounters,
+      mergedTransitions1.latestTargetsReactionsCounters,
+      mergedTransitions1.latestReactions
+    ]);
+    reactionsStateHistoryMap.set(blockHeight5, reactionsLatestState4);
     const txn5 = await Mina.transaction(user1Address, async () => {
-      reactionsContract.update(mergedTransitionProofs1);
+      reactionsContract.update(mergedTransitionProofs1, reactionsStateHistoryWitness4);
     });
     await txn5.prove();
     await txn5.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(5));
 
-    const allReactionsCounterState4 =
-      reactionsContract.allReactionsCounter.get();
-    const usersReactionsCountersState4 =
-      reactionsContract.usersReactionsCounters.get();
-    const targetsReactionsCountersState4 =
-      reactionsContract.targetsReactionsCounters.get();
+    const allReactionsCounterState4 = reactionsContract.allReactionsCounter.get();
+    const usersReactionsCountersState4 = reactionsContract.usersReactionsCounters.get();
+    const targetsReactionsCountersState4 = reactionsContract.targetsReactionsCounters.get();
     const reactionsState4 = reactionsContract.reactions.get();
+    const reactionsLastUpdateState4 = reactionsContract.lastUpdate.get();
+    const reactionsStateHistoryState4 = reactionsContract.stateHistory.get();
+
     const usersReactionsCountersRoot4 = usersReactionsCountersMap.getRoot();
     const targetsReactionsCountersRoot4 = targetsReactionsCountersMap.getRoot();
     const reactionsRoot4 = reactionsMap.getRoot();
+    const reactionsStateHistoryRoot4 = reactionsStateHistoryMap.getRoot();
+
     expect(allReactionsCounterState4).toEqual(Field(3));
     expect(usersReactionsCountersState4).toEqual(usersReactionsCountersRoot4);
-    expect(usersReactionsCountersState4).not.toEqual(
-      usersReactionsCountersRoot3
-    );
-    expect(targetsReactionsCountersState4).toEqual(
-      targetsReactionsCountersRoot4
-    );
-    expect(targetsReactionsCountersState4).not.toEqual(
-      targetsReactionsCountersRoot3
-    );
+    expect(usersReactionsCountersState4).not.toEqual(usersReactionsCountersRoot3);
+    expect(targetsReactionsCountersState4).toEqual(targetsReactionsCountersRoot4);
+    expect(targetsReactionsCountersState4).not.toEqual(targetsReactionsCountersRoot3);
     expect(reactionsState4).toEqual(reactionsRoot4);
     expect(reactionsState4).not.toEqual(reactionsRoot3);
+    expect(reactionsLastUpdateState4).toEqual(blockHeight5);
+    expect(reactionsStateHistoryState4).toEqual(reactionsStateHistoryRoot4);
+    expect(reactionsStateHistoryState4).not.toEqual(reactionsStateHistoryRoot3);
 
     console.log('2nd and 3rd reactions published through merged proofs');
 
@@ -801,18 +872,11 @@ describe(`the ReactionsContract and the Reactions ZkProgram`, () => {
     const user2AddressAsField = Poseidon.hash(user2Address.toFields());
     newUsersReactionsCountersMap.set(user1AddressAsField, Field(1));
     newUsersReactionsCountersMap.set(user2AddressAsField, Field(2));
-    expect(newUsersReactionsCountersMap.getRoot()).toEqual(
-      usersReactionsCountersState4
-    );
+    expect(newUsersReactionsCountersMap.getRoot()).toEqual(usersReactionsCountersState4);
 
     const newTargetsReactionsCountersMap = new MerkleMap();
-    newTargetsReactionsCountersMap.set(
-      valid2.reactionState.targetKey,
-      Field(3)
-    );
-    expect(newTargetsReactionsCountersMap.getRoot()).toEqual(
-      targetsReactionsCountersState4
-    );
+    newTargetsReactionsCountersMap.set(valid2.reactionState.targetKey, Field(3));
+    expect(newTargetsReactionsCountersMap.getRoot()).toEqual(targetsReactionsCountersState4);
 
     const reaction1 = new ReactionState({
       isTargetPost: valid4.latestReactionState.isTargetPost,

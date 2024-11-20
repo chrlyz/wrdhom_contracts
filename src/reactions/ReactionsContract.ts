@@ -1,4 +1,14 @@
-import { Field, SmartContract, state, State, method, UInt32, Gadgets } from 'o1js';
+import {
+  Field,
+  SmartContract,
+  state,
+  State,
+  method,
+  UInt32,
+  Gadgets,
+  Poseidon,
+  MerkleMapWitness
+} from 'o1js';
 import { ReactionsProof } from './Reactions.js';
 import {
   PostsContract,
@@ -13,6 +23,8 @@ export class ReactionsContract extends SmartContract {
   @state(Field) usersReactionsCounters = State<Field>();
   @state(Field) targetsReactionsCounters = State<Field>();
   @state(Field) reactions = State<Field>();
+  @state(Field) lastUpdate = State<Field>();
+  @state(Field) stateHistory = State<Field>();
 
   init() {
     super.init();
@@ -20,49 +32,61 @@ export class ReactionsContract extends SmartContract {
     this.usersReactionsCounters.set(newMerkleMapRoot);
     this.targetsReactionsCounters.set(newMerkleMapRoot);
     this.reactions.set(newMerkleMapRoot);
+    this.lastUpdate.set(Field(0));
+    this.stateHistory.set(newMerkleMapRoot);
   }
 
-  @method async update(proof: ReactionsProof) {
+  @method async update(proof: ReactionsProof, stateHistoryWitness: MerkleMapWitness) {
     proof.verify();
-    Gadgets.rangeCheck32(proof.publicInput.blockHeight);
 
-    this.network.blockchainLength.requireBetween(
-      UInt32.Unsafe.fromField(proof.publicInput.blockHeight),
-      UInt32.Unsafe.fromField(proof.publicInput.blockHeight).add(10)
-    );
+    Gadgets.rangeCheck32(proof.publicInput.blockHeight);
+    const blockHeightAsField = proof.publicInput.blockHeight;
+    const blockHeight = UInt32.Unsafe.fromField(proof.publicInput.blockHeight);
+    this.network.blockchainLength.requireBetween(blockHeight,blockHeight.add(10));
 
     const postsContract = new PostsContract(postsContractAddress);
     const currentPosts = postsContract.posts.getAndRequireEquals();
     proof.publicInput.targets.assertEquals(currentPosts);
 
-    const currentAllReactionsCounter =
-      this.allReactionsCounter.getAndRequireEquals();
-    proof.publicInput.initialAllReactionsCounter.assertEquals(
-      currentAllReactionsCounter
-    );
+    const currentAllReactionsCounter = this.allReactionsCounter.getAndRequireEquals();
+    const initialAllReactionsCounter = proof.publicInput.initialAllReactionsCounter;
+    currentAllReactionsCounter.assertEquals(initialAllReactionsCounter);
 
-    const currentUsersReactionsCounters =
-      this.usersReactionsCounters.getAndRequireEquals();
-    proof.publicInput.initialUsersReactionsCounters.assertEquals(
-      currentUsersReactionsCounters
-    );
+    const currentUsersReactionsCounters = this.usersReactionsCounters.getAndRequireEquals();
+    const initialUsersReactionsCounters = proof.publicInput.initialUsersReactionsCounters;
+    currentUsersReactionsCounters.assertEquals(initialUsersReactionsCounters);
 
-    const currentTargetsReactionsCounters =
-      this.targetsReactionsCounters.getAndRequireEquals();
-    proof.publicInput.initialTargetsReactionsCounters.assertEquals(
-      currentTargetsReactionsCounters
-    );
+    const currentTargetsReactionsCounters = this.targetsReactionsCounters.getAndRequireEquals();
+    const initialTargetsReactionsCounters = proof.publicInput.initialTargetsReactionsCounters;
+    currentTargetsReactionsCounters.assertEquals(initialTargetsReactionsCounters);
 
     const currentReactions = this.reactions.getAndRequireEquals();
-    proof.publicInput.initialReactions.assertEquals(currentReactions);
+    const initialReactions = proof.publicInput.initialReactions;
+    currentReactions.assertEquals(initialReactions);
 
-    this.allReactionsCounter.set(proof.publicInput.latestAllReactionsCounter);
-    this.usersReactionsCounters.set(
-      proof.publicInput.latestUsersReactionsCounters
-    );
-    this.targetsReactionsCounters.set(
-      proof.publicInput.latestTargetsReactionsCounters
-    );
-    this.reactions.set(proof.publicInput.latestReactions);
+    const currentStateHistory = this.stateHistory.getAndRequireEquals();
+    const [initialStateHistory, stateHistoryKey] = stateHistoryWitness.computeRootAndKeyV2(Field(0));
+    currentStateHistory.assertEquals(initialStateHistory);
+    blockHeightAsField.assertEquals(stateHistoryKey);
+
+    const latestAllReactionsCounter = proof.publicInput.latestAllReactionsCounter;
+    const latestUsersReactionsCounters = proof.publicInput.latestUsersReactionsCounters;
+    const latestTargetsReactionsCounters = proof.publicInput.latestTargetsReactionsCounters;
+    const latestReactions = proof.publicInput.latestReactions;
+
+    const latestState = Poseidon.hash([
+      latestAllReactionsCounter,
+      latestUsersReactionsCounters,
+      latestTargetsReactionsCounters,
+      latestReactions
+    ]);
+    const latestStateHistory = stateHistoryWitness.computeRootAndKeyV2(latestState)[0];
+
+    this.allReactionsCounter.set(latestAllReactionsCounter);
+    this.usersReactionsCounters.set(latestUsersReactionsCounters);
+    this.targetsReactionsCounters.set(latestTargetsReactionsCounters);
+    this.reactions.set(latestReactions);
+    this.lastUpdate.set(blockHeightAsField);
+    this.stateHistory.set(latestStateHistory);
   }
 }
