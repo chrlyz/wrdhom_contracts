@@ -1,4 +1,14 @@
-import { Field, SmartContract, state, State, method, UInt32, Gadgets } from 'o1js';
+import {
+  Field,
+  SmartContract,
+  state,
+  State,
+  method,
+  UInt32,
+  Gadgets,
+  Poseidon,
+  MerkleMapWitness
+} from 'o1js';
 import { CommentsProof } from './Comments.js';
 import {
   PostsContract,
@@ -13,6 +23,8 @@ export class CommentsContract extends SmartContract {
   @state(Field) usersCommentsCounters = State<Field>();
   @state(Field) targetsCommentsCounters = State<Field>();
   @state(Field) comments = State<Field>();
+  @state(Field) lastUpdate = State<Field>();
+  @state(Field) stateHistory = State<Field>();
 
   init() {
     super.init();
@@ -20,49 +32,61 @@ export class CommentsContract extends SmartContract {
     this.usersCommentsCounters.set(newMerkleMapRoot);
     this.targetsCommentsCounters.set(newMerkleMapRoot);
     this.comments.set(newMerkleMapRoot);
+    this.lastUpdate.set(Field(0));
+    this.stateHistory.set(newMerkleMapRoot);
   }
 
-  @method async update(proof: CommentsProof) {
+  @method async update(proof: CommentsProof, stateHistoryWitness: MerkleMapWitness) {
     proof.verify();
-    Gadgets.rangeCheck32(proof.publicInput.blockHeight);
 
-    this.network.blockchainLength.requireBetween(
-      UInt32.Unsafe.fromField(proof.publicInput.blockHeight),
-      UInt32.Unsafe.fromField(proof.publicInput.blockHeight).add(10)
-    );
+    Gadgets.rangeCheck32(proof.publicInput.blockHeight);
+    const blockHeightAsField = proof.publicInput.blockHeight;
+    const blockHeight = UInt32.Unsafe.fromField(proof.publicInput.blockHeight);
+    this.network.blockchainLength.requireBetween(blockHeight,blockHeight.add(10));
 
     const postsContract = new PostsContract(postsContractAddress);
     const currentPosts = postsContract.posts.getAndRequireEquals();
     proof.publicInput.targets.assertEquals(currentPosts);
 
-    const currentAllCommentsCounter =
-      this.allCommentsCounter.getAndRequireEquals();
-    proof.publicInput.initialAllCommentsCounter.assertEquals(
-      currentAllCommentsCounter
-    );
+    const currentAllCommentsCounter = this.allCommentsCounter.getAndRequireEquals();
+    const initialAllCommentsCounter = proof.publicInput.initialAllCommentsCounter;
+    currentAllCommentsCounter.assertEquals(initialAllCommentsCounter);
 
-    const currentUsersCommentsCounters =
-      this.usersCommentsCounters.getAndRequireEquals();
-    proof.publicInput.initialUsersCommentsCounters.assertEquals(
-      currentUsersCommentsCounters
-    );
+    const currentUsersCommentsCounters = this.usersCommentsCounters.getAndRequireEquals();
+    const initialUsersCommentsCounters = proof.publicInput.initialUsersCommentsCounters;
+    currentUsersCommentsCounters.assertEquals(initialUsersCommentsCounters);
 
-    const currentTargetsCommentsCounters =
-      this.targetsCommentsCounters.getAndRequireEquals();
-    proof.publicInput.initialTargetsCommentsCounters.assertEquals(
-      currentTargetsCommentsCounters
-    );
+    const currentTargetsCommentsCounters = this.targetsCommentsCounters.getAndRequireEquals();
+    const initialTargetsCommentsCounters = proof.publicInput.initialTargetsCommentsCounters;
+    currentTargetsCommentsCounters.assertEquals(initialTargetsCommentsCounters);
 
     const currentComments = this.comments.getAndRequireEquals();
-    proof.publicInput.initialComments.assertEquals(currentComments);
+    const initialComments = proof.publicInput.initialComments;
+    currentComments.assertEquals(initialComments);
 
-    this.allCommentsCounter.set(proof.publicInput.latestAllCommentsCounter);
-    this.usersCommentsCounters.set(
-      proof.publicInput.latestUsersCommentsCounters
-    );
-    this.targetsCommentsCounters.set(
-      proof.publicInput.latestTargetsCommentsCounters
-    );
-    this.comments.set(proof.publicInput.latestComments);
+    const currentStateHistory = this.stateHistory.getAndRequireEquals();
+    const [initialStateHistory, stateHistoryKey] = stateHistoryWitness.computeRootAndKeyV2(Field(0));
+    currentStateHistory.assertEquals(initialStateHistory);
+    blockHeightAsField.assertEquals(stateHistoryKey);
+
+    const latestAllCommentsCounter = proof.publicInput.latestAllCommentsCounter;
+    const latestUsersCommentsCounters = proof.publicInput.latestUsersCommentsCounters;
+    const latestTargetsCommentsCounters = proof.publicInput.latestTargetsCommentsCounters;
+    const latestComments = proof.publicInput.latestComments;
+
+    const latestState = Poseidon.hash([
+      latestAllCommentsCounter,
+      latestUsersCommentsCounters,
+      latestTargetsCommentsCounters,
+      latestComments
+    ]);
+    const latestStateHistory = stateHistoryWitness.computeRootAndKeyV2(latestState)[0];
+
+    this.allCommentsCounter.set(latestAllCommentsCounter);
+    this.usersCommentsCounters.set(latestUsersCommentsCounters);
+    this.targetsCommentsCounters.set(latestTargetsCommentsCounters);
+    this.comments.set(latestComments);
+    this.lastUpdate.set(blockHeightAsField);
+    this.stateHistory.set(latestStateHistory);
   }
 }

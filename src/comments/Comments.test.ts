@@ -30,7 +30,8 @@ dotenv.config();
 const PROOFS_ENABLED = process.env.PROOFS_ENABLED === 'true' || false;
 
 describe(`the CommentsContract and the Comments ZkProgram`, () => {
-  let user1Address: PublicKey,
+  let Local: any,
+    user1Address: PublicKey,
     user1Key: PrivateKey,
     user2Address: PublicKey,
     user2Key: PrivateKey,
@@ -45,8 +46,8 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     commentsContract: CommentsContract,
     usersCommentsCountersMap: MerkleMap,
     targetsCommentsCountersMap: MerkleMap,
-    commentsMap: MerkleMap,
-    Local: any
+    commentsStateHistoryMap: MerkleMap,
+    commentsMap: MerkleMap;
 
   beforeAll(async () => {
     if (PROOFS_ENABLED) {
@@ -95,6 +96,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     usersCommentsCountersMap = new MerkleMap();
     targetsCommentsCountersMap = new MerkleMap();
     commentsMap = new MerkleMap();
+    commentsStateHistoryMap = new MerkleMap();
   });
 
   test(`CommentsContract and Comments zkProgram functionality`, async () => {
@@ -137,24 +139,33 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
 
     // Validate expected state
     const allCommentsCounterState = commentsContract.allCommentsCounter.get();
-    const usersCommentsCountersState =
-      commentsContract.usersCommentsCounters.get();
-    const targetsCommentsCountersState =
-      commentsContract.targetsCommentsCounters.get();
+    const usersCommentsCountersState = commentsContract.usersCommentsCounters.get();
+    const targetsCommentsCountersState = commentsContract.targetsCommentsCounters.get();
     const commentsState = commentsContract.comments.get();
+    const commentsLastUpdateState = commentsContract.lastUpdate.get();
+    const commentsStateHistoryState = commentsContract.stateHistory.get();
+
     const usersCommentsCountersRoot = usersCommentsCountersMap.getRoot();
     const targetsCommentsCountersRoot = targetsCommentsCountersMap.getRoot();
     const commentsRoot = commentsMap.getRoot();
+    const commentsStateHistoryRoot = commentsStateHistoryMap.getRoot();
+
     expect(allCommentsCounterState).toEqual(Field(0));
     expect(usersCommentsCountersState).toEqual(usersCommentsCountersRoot);
     expect(targetsCommentsCountersState).toEqual(targetsCommentsCountersRoot);
     expect(commentsState).toEqual(commentsRoot);
+    expect(commentsLastUpdateState).toEqual(Field(0));
+    expect(commentsStateHistoryState).toEqual(commentsStateHistoryRoot);
 
     console.log('CommentsContract deployed');
 
     // ==============================================================================
     // 2. Publishes on-chain proof for publication of 1st post.
     // ==============================================================================
+
+    const allPostsCounter1 = Field(1);
+    const userPostsCounter1 = Field(1);
+    const blockHeight1 = Field(0);
 
     // Prepare inputs to create a valid state transition
     const valid1 = createPostPublishingTransitionValidInputs(
@@ -163,9 +174,9 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
       CircuitString.fromString(
         'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
       ),
-      Field(1),
-      Field(1),
-      Field(0),
+      allPostsCounter1,
+      userPostsCounter1,
+      blockHeight1,
       usersPostsCountersMap,
       postsMap
     );
@@ -201,28 +212,28 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
         valid1.postWitness
       );
     } else {
-      proof1 = {
-        verify: () => {},
-        publicInput: {
-          blockHeight: transition1.blockHeight,
-          initialAllPostsCounter: transition1.initialAllPostsCounter,
-          latestAllPostsCounter: transition1.latestAllPostsCounter,
-          initialUsersPostsCounters: transition1.initialUsersPostsCounters,
-          latestUsersPostsCounters: transition1.latestUsersPostsCounters,
-          initialPosts: transition1.initialPosts,
-          latestPosts: transition1.latestPosts
-        }
-      };
+        proof1 = {
+          verify: () => {},
+          publicInput: {
+            blockHeight: transition1.blockHeight,
+            initialAllPostsCounter: transition1.initialAllPostsCounter,
+            latestAllPostsCounter: transition1.latestAllPostsCounter,
+            initialUsersPostsCounters: transition1.initialUsersPostsCounters,
+            latestUsersPostsCounters: transition1.latestUsersPostsCounters,
+            initialPosts: transition1.initialPosts,
+            latestPosts: transition1.latestPosts
+          }
+        };
     }
 
     // Send valid proof to update our on-chain state
-    const stateHistoryWitness1 = stateHistoryMap.getWitness(Field(0));
+    const stateHistoryWitness1 = stateHistoryMap.getWitness(blockHeight1);
     const latestState1 = Poseidon.hash([
       transition1.latestAllPostsCounter,
       transition1.latestUsersPostsCounters,
       transition1.latestPosts
     ]);
-    stateHistoryMap.set(Field(0), latestState1);
+    stateHistoryMap.set(blockHeight1, latestState1);
     const txn1 = await Mina.transaction(user1Address, async () => {
       postsContract.update(proof1, stateHistoryWitness1);
     });
@@ -234,33 +245,47 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     const allPostsCounterState1 = postsContract.allPostsCounter.get();
     const usersPostsCountersState1 = postsContract.usersPostsCounters.get();
     const postsState1 = postsContract.posts.get();
+    const lastUpdate1 = postsContract.lastUpdate.get();
+    const stateHistory1 = postsContract.stateHistory.get();
+
     const usersPostsCountersRoot1 = usersPostsCountersMap.getRoot();
     const postsRoot1 = postsMap.getRoot();
+    const stateHistoryRoot1 = stateHistoryMap.getRoot();
+
     expect(allPostsCounterState1).toEqual(Field(1));
     expect(allPostsCounterState1).not.toEqual(allPostsCounterState);
     expect(usersPostsCountersState1).toEqual(usersPostsCountersRoot1);
     expect(usersPostsCountersState1).not.toEqual(usersPostsCountersState);
     expect(postsState1).toEqual(postsRoot1);
     expect(postsState1).not.toEqual(postsRoot);
+    expect(lastUpdate1).toEqual(blockHeight1);
+    expect(stateHistory1).toEqual(stateHistoryRoot1);
+    expect(stateHistory1).not.toEqual(stateHistoryRoot);
 
     console.log('1st post published');
 
     // ==============================================================================
-    // 3. Publishes on-chain proof for commenting to the 1st post.
+    // 3. Publishes on-chain proof for reacting to the 1st post.
     // ==============================================================================
+
+    const commentContentID1 = CircuitString.fromString(
+      'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi'
+    );
+    const allCommentsCounter1 = Field(1);
+    const userCommentsCounter1 = Field(1);
+    const targetCommentsCounter1 = Field(1);
+    const blockHeight2 = Field(1);
 
     // Prepare inputs to create a valid state transition
     const valid2 = createCommentTransitionValidInputs(
       valid1.postState,
       user2Address,
       user2Key,
-      CircuitString.fromString(
-        'bafkreifedy7l6a7izydrz7zr5nnezkfttj3be5hcbydbznn2d32ai7j26u'
-      ),
-      Field(1),
-      Field(1),
-      Field(1),
-      Field(1),
+      commentContentID1,
+      allCommentsCounter1,
+      userCommentsCounter1,
+      targetCommentsCounter1,
+      blockHeight2,
       postsMap,
       usersCommentsCountersMap,
       targetsCommentsCountersMap,
@@ -270,7 +295,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     // Create a valid state transition
     const transition2 = CommentsTransition.createCommentPublishingTransition(
       valid2.signature,
-      postsMap.getRoot(),
+      valid2.targets,
       valid2.targetState,
       valid2.targetWitness,
       valid2.commentState.allCommentsCounter.sub(1),
@@ -294,7 +319,7 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
       proof2 = await Comments.proveCommentPublishingTransition(
         transition2,
         valid2.signature,
-        postsMap.getRoot(),
+        valid2.targets,
         valid2.targetState,
         valid2.targetWitness,
         valid2.commentState.allCommentsCounter.sub(1),
@@ -330,45 +355,59 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const commentsStateHistoryWitness1 = commentsStateHistoryMap.getWitness(blockHeight2);
+    const commentsLatestState1 = Poseidon.hash([
+      transition2.latestAllCommentsCounter,
+      transition2.latestUsersCommentsCounters,
+      transition2.latestTargetsCommentsCounters,
+      transition2.latestComments
+    ]);
+    commentsStateHistoryMap.set(blockHeight2, commentsLatestState1);
     const txn2 = await Mina.transaction(user1Address, async () => {
-      commentsContract.update(proof2);
+      commentsContract.update(proof2, commentsStateHistoryWitness1);
     });
     await txn2.prove();
     await txn2.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(2));
 
     const allCommentsCounterState1 = commentsContract.allCommentsCounter.get();
-    const usersCommentsCountersState1 =
-      commentsContract.usersCommentsCounters.get();
-    const targetsCommentsCountersState1 =
-      commentsContract.targetsCommentsCounters.get();
+    const usersCommentsCountersState1 = commentsContract.usersCommentsCounters.get();
+    const targetsCommentsCountersState1 = commentsContract.targetsCommentsCounters.get();
     const commentsState1 = commentsContract.comments.get();
+    const commentsLastUpdateState1 = commentsContract.lastUpdate.get();
+    const commentsStateHistoryState1 = commentsContract.stateHistory.get();
+
     const usersCommentsCountersRoot1 = usersCommentsCountersMap.getRoot();
     const targetsCommentsCountersRoot1 = targetsCommentsCountersMap.getRoot();
     const commentsRoot1 = commentsMap.getRoot();
+    const commentsStateHistoryRoot1 = commentsStateHistoryMap.getRoot();
+
     expect(allCommentsCounterState1).toEqual(Field(1));
     expect(usersCommentsCountersState1).toEqual(usersCommentsCountersRoot1);
     expect(usersCommentsCountersState1).not.toEqual(usersCommentsCountersRoot);
     expect(targetsCommentsCountersState1).toEqual(targetsCommentsCountersRoot1);
-    expect(targetsCommentsCountersState1).not.toEqual(
-      targetsCommentsCountersRoot
-    );
+    expect(targetsCommentsCountersState1).not.toEqual(targetsCommentsCountersRoot);
     expect(commentsState1).toEqual(commentsRoot1);
     expect(commentsState1).not.toEqual(commentsRoot);
+    expect(commentsLastUpdateState1).toEqual(blockHeight2);
+    expect(commentsStateHistoryState1).toEqual(commentsStateHistoryRoot1);
+    expect(commentsStateHistoryState1).not.toEqual(commentsStateHistoryRoot);
 
-    console.log('Commented to 1st post');
+    console.log('Reacted to 1st post');
 
     // ==============================================================================
     // 4. Publishes on-chain proof for deleting the comment to the 1st post.
     // ==============================================================================
 
+    const blockHeight3 = Field(2);
+
     // Prepare inputs to create a valid state transition
     const valid3 = createCommentDeletionTransitionValidInputs(
       valid2.targetState,
       user2Key,
-      Field(1),
+      allCommentsCounter1,
       valid2.commentState,
-      Field(2),
+      blockHeight3,
       postsMap,
       usersCommentsCountersMap,
       targetsCommentsCountersMap,
@@ -428,22 +467,33 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const commentsStateHistoryWitness2 = commentsStateHistoryMap.getWitness(blockHeight3);
+    const commentsLatestState2 = Poseidon.hash([
+      transition3.latestAllCommentsCounter,
+      transition3.latestUsersCommentsCounters,
+      transition3.latestTargetsCommentsCounters,
+      transition3.latestComments
+    ]);
+    commentsStateHistoryMap.set(blockHeight3, commentsLatestState2);
     const txn3 = await Mina.transaction(user1Address, async () => {
-      commentsContract.update(proof3);
+      commentsContract.update(proof3, commentsStateHistoryWitness2);
     });
     await txn3.prove();
     await txn3.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(3));
 
     const allCommentsCounterState2 = commentsContract.allCommentsCounter.get();
-    const usersCommentsCountersState2 =
-      commentsContract.usersCommentsCounters.get();
-    const targetsCommentsCountersState2 =
-      commentsContract.targetsCommentsCounters.get();
+    const usersCommentsCountersState2 = commentsContract.usersCommentsCounters.get();
+    const targetsCommentsCountersState2 = commentsContract.targetsCommentsCounters.get();
     const commentsState2 = commentsContract.comments.get();
+    const commentsLastUpdateState2 = commentsContract.lastUpdate.get();
+    const commentsStateHistoryState2 = commentsContract.stateHistory.get();
+
     const usersCommentsCountersRoot2 = usersCommentsCountersMap.getRoot();
     const targetsCommentsCountersRoot2 = targetsCommentsCountersMap.getRoot();
     const commentsRoot2 = commentsMap.getRoot();
+    const commentsStateHistoryRoot2 = commentsStateHistoryMap.getRoot();
+
     expect(allCommentsCounterState2).toEqual(Field(1));
     expect(usersCommentsCountersState2).toEqual(usersCommentsCountersRoot2);
     expect(usersCommentsCountersState2).toEqual(usersCommentsCountersRoot1);
@@ -451,6 +501,9 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     expect(targetsCommentsCountersState2).toEqual(targetsCommentsCountersRoot1);
     expect(commentsState2).toEqual(commentsRoot2);
     expect(commentsState2).not.toEqual(commentsRoot1);
+    expect(commentsLastUpdateState2).toEqual(blockHeight3);
+    expect(commentsStateHistoryState2).toEqual(commentsStateHistoryRoot2);
+    expect(commentsStateHistoryState2).not.toEqual(commentsStateHistoryRoot1);
 
     console.log('Comment to 1st post deleted');
 
@@ -458,13 +511,15 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     // 5. Publishes on-chain proof for restoring the comment to the 1st post.
     // ==============================================================================
 
+    const blockHeight4 = Field(3);
+
     // Prepare inputs to create a valid state transition
     const valid4 = createCommentRestorationTransitionValidInputs(
       valid3.targetState,
       user2Key,
-      Field(1),
+      allCommentsCounter1,
       valid3.latestCommentState,
-      Field(3),
+      blockHeight4,
       postsMap,
       usersCommentsCountersMap,
       targetsCommentsCountersMap,
@@ -524,22 +579,33 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const commentsStateHistoryWitness3 = commentsStateHistoryMap.getWitness(blockHeight4);
+    const commentsLatestState3 = Poseidon.hash([
+      transition4.latestAllCommentsCounter,
+      transition4.latestUsersCommentsCounters,
+      transition4.latestTargetsCommentsCounters,
+      transition4.latestComments
+    ]);
+    commentsStateHistoryMap.set(blockHeight4, commentsLatestState3);
     const txn4 = await Mina.transaction(user1Address, async () => {
-      commentsContract.update(proof4);
+      commentsContract.update(proof4, commentsStateHistoryWitness3);
     });
     await txn4.prove();
     await txn4.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(4));
 
     const allCommentsCounterState3 = commentsContract.allCommentsCounter.get();
-    const usersCommentsCountersState3 =
-      commentsContract.usersCommentsCounters.get();
-    const targetsCommentsCountersState3 =
-      commentsContract.targetsCommentsCounters.get();
+    const usersCommentsCountersState3 = commentsContract.usersCommentsCounters.get();
+    const targetsCommentsCountersState3 = commentsContract.targetsCommentsCounters.get();
     const commentsState3 = commentsContract.comments.get();
+    const commentsLastUpdateState3 = commentsContract.lastUpdate.get();
+    const commentsStateHistoryState3 = commentsContract.stateHistory.get();
+
     const usersCommentsCountersRoot3 = usersCommentsCountersMap.getRoot();
     const targetsCommentsCountersRoot3 = targetsCommentsCountersMap.getRoot();
     const commentsRoot3 = commentsMap.getRoot();
+    const commentsStateHistoryRoot3 = commentsStateHistoryMap.getRoot();
+
     expect(allCommentsCounterState3).toEqual(Field(1));
     expect(usersCommentsCountersState3).toEqual(usersCommentsCountersRoot3);
     expect(usersCommentsCountersState3).toEqual(usersCommentsCountersRoot2);
@@ -547,6 +613,9 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     expect(targetsCommentsCountersState3).toEqual(targetsCommentsCountersRoot2);
     expect(commentsState3).toEqual(commentsRoot3);
     expect(commentsState3).not.toEqual(commentsRoot2);
+    expect(commentsLastUpdateState3).toEqual(blockHeight4);
+    expect(commentsStateHistoryState3).toEqual(commentsStateHistoryRoot3);
+    expect(commentsStateHistoryState3).not.toEqual(commentsStateHistoryRoot2);
 
     console.log('Comment to 1st post restored');
 
@@ -555,18 +624,24 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     //    the 1st post.
     // ==============================================================================
 
+    const commentContentID2 = CircuitString.fromString(
+      'bafkreifedy7l6a7izydrz7zr5nnezkfttj3be5hcbydbznn2d32ai7j26u'
+    );
+    const allCommentsCounter2 = Field(2);
+    const userCommentsCounter2 = Field(1);
+    const targetCommentsCounter2 = Field(2);
+    const blockHeight5 = Field(4);
+
     // Prepare inputs to create a valid state transition
     const valid5 = createCommentTransitionValidInputs(
       valid1.postState,
       user1Address,
       user1Key,
-      CircuitString.fromString(
-        'bafkreiendqwlv3ghhkaficpkkdcykrrtv52b3txgi47pmnyu4pq7wvnxxy'
-      ),
-      Field(2),
-      Field(1),
-      Field(2),
-      Field(4),
+      commentContentID2,
+      allCommentsCounter2,
+      userCommentsCounter2,
+      targetCommentsCounter2,
+      blockHeight5,
       postsMap,
       usersCommentsCountersMap,
       targetsCommentsCountersMap,
@@ -635,18 +710,23 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
         };
     }
 
+    const commentContentID3 = CircuitString.fromString(
+      'bafkreiendqwlv3ghhkaficpkkdcykrrtv52b3txgi47pmnyu4pq7wvnxxy'
+    );
+    const allCommentsCounter3 = Field(3);
+    const userCommentsCounter3 = Field(2);
+    const targetCommentsCounter3 = Field(3);
+
     // Prepare inputs to create a valid state transition
     const valid6 = createCommentTransitionValidInputs(
       valid1.postState,
       user2Address,
       user2Key,
-      CircuitString.fromString(
-        'bafkreid66gqf3q4qfggfqqovb33mh5ophojtiwld3kezvndjyxzqamub3m'
-      ),
-      Field(3),
-      Field(2),
-      Field(3),
-      Field(4),
+      commentContentID3,
+      allCommentsCounter3,
+      userCommentsCounter3,
+      targetCommentsCounter3,
+      blockHeight5,
       postsMap,
       usersCommentsCountersMap,
       targetsCommentsCountersMap,
@@ -725,11 +805,11 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     let mergedTransitionProofs1: any;
     if (PROOFS_ENABLED) {
       mergedTransitionProofs1 =
-      await Comments.proveMergedCommentsTransitions(
-        mergedTransitions1,
-        proof5,
-        proof6
-      );
+        await Comments.proveMergedCommentsTransitions(
+          mergedTransitions1,
+          proof5,
+          proof6
+        );
     } else {
         mergedTransitionProofs1 = {
           verify: () => {},
@@ -749,31 +829,43 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     }
 
     // Send valid proof to update our on-chain state
+    const commentsStateHistoryWitness4 = commentsStateHistoryMap.getWitness(blockHeight5);
+    const commentsLatestState4 = Poseidon.hash([
+      mergedTransitions1.latestAllCommentsCounter,
+      mergedTransitions1.latestUsersCommentsCounters,
+      mergedTransitions1.latestTargetsCommentsCounters,
+      mergedTransitions1.latestComments
+    ]);
+    commentsStateHistoryMap.set(blockHeight5, commentsLatestState4);
     const txn5 = await Mina.transaction(user1Address, async () => {
-      commentsContract.update(mergedTransitionProofs1);
+      commentsContract.update(mergedTransitionProofs1, commentsStateHistoryWitness4);
     });
     await txn5.prove();
     await txn5.sign([user1Key]).send();
     Local.setBlockchainLength(UInt32.from(5));
 
     const allCommentsCounterState4 = commentsContract.allCommentsCounter.get();
-    const usersCommentsCountersState4 =
-      commentsContract.usersCommentsCounters.get();
-    const targetsCommentsCountersState4 =
-      commentsContract.targetsCommentsCounters.get();
+    const usersCommentsCountersState4 = commentsContract.usersCommentsCounters.get();
+    const targetsCommentsCountersState4 = commentsContract.targetsCommentsCounters.get();
     const commentsState4 = commentsContract.comments.get();
+    const commentsLastUpdateState4 = commentsContract.lastUpdate.get();
+    const commentsStateHistoryState4 = commentsContract.stateHistory.get();
+
     const usersCommentsCountersRoot4 = usersCommentsCountersMap.getRoot();
     const targetsCommentsCountersRoot4 = targetsCommentsCountersMap.getRoot();
     const commentsRoot4 = commentsMap.getRoot();
+    const commentsStateHistoryRoot4 = commentsStateHistoryMap.getRoot();
+
     expect(allCommentsCounterState4).toEqual(Field(3));
     expect(usersCommentsCountersState4).toEqual(usersCommentsCountersRoot4);
     expect(usersCommentsCountersState4).not.toEqual(usersCommentsCountersRoot3);
     expect(targetsCommentsCountersState4).toEqual(targetsCommentsCountersRoot4);
-    expect(targetsCommentsCountersState4).not.toEqual(
-      targetsCommentsCountersRoot3
-    );
+    expect(targetsCommentsCountersState4).not.toEqual(targetsCommentsCountersRoot3);
     expect(commentsState4).toEqual(commentsRoot4);
     expect(commentsState4).not.toEqual(commentsRoot3);
+    expect(commentsLastUpdateState4).toEqual(blockHeight5);
+    expect(commentsStateHistoryState4).toEqual(commentsStateHistoryRoot4);
+    expect(commentsStateHistoryState4).not.toEqual(commentsStateHistoryRoot3);
 
     console.log('2nd and 3rd comments published through merged proofs');
 
@@ -786,15 +878,11 @@ describe(`the CommentsContract and the Comments ZkProgram`, () => {
     const user2AddressAsField = Poseidon.hash(user2Address.toFields());
     newUsersCommentsCountersMap.set(user1AddressAsField, Field(1));
     newUsersCommentsCountersMap.set(user2AddressAsField, Field(2));
-    expect(newUsersCommentsCountersMap.getRoot()).toEqual(
-      usersCommentsCountersState4
-    );
+    expect(newUsersCommentsCountersMap.getRoot()).toEqual(usersCommentsCountersState4);
 
     const newTargetsCommentsCountersMap = new MerkleMap();
     newTargetsCommentsCountersMap.set(valid2.commentState.targetKey, Field(3));
-    expect(newTargetsCommentsCountersMap.getRoot()).toEqual(
-      targetsCommentsCountersState4
-    );
+    expect(newTargetsCommentsCountersMap.getRoot()).toEqual(targetsCommentsCountersState4);
 
     const comment1 = new CommentState({
       isTargetPost: valid4.latestCommentState.isTargetPost,
